@@ -28,6 +28,7 @@ if (process.env.SUPABASE_URL) {
 }
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['127.0.0.1', 'localhost', 'ubuntu-devbox.taild86c42.ts.net'],
   trailingSlash: false,
   staticPageGenerationTimeout: 120,
   experimental: {
