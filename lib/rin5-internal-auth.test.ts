@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { authorizeRin5InternalRequest, parseRin5ExportRequest } from './rin5-internal-auth'
+import { authorizeRin5InternalRequest, parseRin5ExportRequest, parseRin5HandoffRequest } from './rin5-internal-auth'
 
 describe('rin5 internal API boundary', () => {
   it('accepts only the configured bearer secret', () => {
@@ -19,5 +19,14 @@ describe('rin5 internal API boundary', () => {
       /rin5_site_mismatch/,
     )
     assert.throws(() => parseRin5ExportRequest({}, siteId), /rin5_export_request_invalid/)
+  })
+
+  it('accepts a normalized handoff email only for the instance site', () => {
+    const siteId = '123e4567-e89b-42d3-a456-426614174000'
+    assert.deepEqual(parseRin5HandoffRequest({ siteId, email: ' Client@Example.com ' }, siteId), {
+      email: 'client@example.com',
+      siteId,
+    })
+    assert.throws(() => parseRin5HandoffRequest({ siteId, email: 'invalid' }, siteId), /rin5_handoff_request_invalid/)
   })
 })

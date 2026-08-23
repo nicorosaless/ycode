@@ -19,3 +19,14 @@ export function parseRin5ExportRequest(value: unknown, configuredSiteId: string 
   if (siteId !== configuredSiteId) throw new Error('rin5_site_mismatch')
   return { siteId }
 }
+
+export function parseRin5HandoffRequest(value: unknown, configuredSiteId: string | undefined): { email: string; siteId: string } {
+  const { siteId } = parseRin5ExportRequest(value, configuredSiteId)
+  const emailValue = (value as Record<string, unknown>).email
+  if (typeof emailValue !== 'string') throw new Error('rin5_handoff_request_invalid')
+  const email = emailValue.trim().toLowerCase()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    throw new Error('rin5_handoff_request_invalid')
+  }
+  return { email, siteId }
+}
