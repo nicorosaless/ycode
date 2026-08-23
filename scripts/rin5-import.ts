@@ -26,7 +26,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-const SITE_DIR = path.resolve(process.env.RIN5_SITE_DIR || '/home/nicolas-rosales/src/rin5/clients/3-freeform-bench/site');
+if (!process.env.RIN5_SITE_DIR) throw new Error('RIN5_SITE_DIR is required');
+const SITE_DIR = path.resolve(process.env.RIN5_SITE_DIR);
 const ASSET_DIR = path.join(SITE_DIR, 'assets');
 
 const MIME: Record<string, string> = {
