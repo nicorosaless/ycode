@@ -4,6 +4,8 @@ import { exportSite } from '@/lib/apps/static-export'
 import type { OutputFile } from '@/lib/apps/static-export/writers/types'
 import { authorizeRin5InternalRequest, parseRin5ExportRequest } from '@/lib/rin5-internal-auth'
 
+import { POST as publishDraft } from '../../publish/route'
+
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -16,6 +18,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const { siteId } = parseRin5ExportRequest(await request.json(), process.env.RIN5_SITE_ID)
+    const publishResponse = await publishDraft(new NextRequest(`${new URL(request.url).origin}/ycode/api/publish`, {
+      body: JSON.stringify({ publishAll: true }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    }))
+    if (!publishResponse.ok) throw new Error('rin5_draft_publish_failed')
     let files: readonly OutputFile[] = []
     const job = await exportSite(undefined, [{
       name: 'rin5',

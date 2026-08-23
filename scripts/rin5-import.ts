@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-const SITE_DIR = '/home/nicolas-rosales/src/rin5-billable/clients/3-freeform-bench/site';
+const SITE_DIR = path.resolve(process.env.RIN5_SITE_DIR || '/home/nicolas-rosales/src/rin5/clients/3-freeform-bench/site');
 const ASSET_DIR = path.join(SITE_DIR, 'assets');
 
 const MIME: Record<string, string> = {

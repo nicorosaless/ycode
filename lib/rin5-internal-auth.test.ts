@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { authorizeRin5InternalRequest, parseRin5ExportRequest, parseRin5HandoffRequest } from './rin5-internal-auth'
+import { authorizeRin5InternalRequest, parseRin5EditorBaseUrl, parseRin5ExportRequest, parseRin5HandoffRequest } from './rin5-internal-auth'
 
 describe('rin5 internal API boundary', () => {
   it('accepts only the configured bearer secret', () => {
@@ -28,5 +28,12 @@ describe('rin5 internal API boundary', () => {
       siteId,
     })
     assert.throws(() => parseRin5HandoffRequest({ siteId, email: 'invalid' }, siteId), /rin5_handoff_request_invalid/)
+  })
+
+  it('requires a safe editor origin for magic-link redirects', () => {
+    assert.equal(parseRin5EditorBaseUrl('https://edit.example.test'), 'https://edit.example.test')
+    assert.equal(parseRin5EditorBaseUrl('http://127.0.0.1:3002'), 'http://127.0.0.1:3002')
+    assert.throws(() => parseRin5EditorBaseUrl('https://edit.example.test/path'), /rin5_editor_base_url_invalid/)
+    assert.throws(() => parseRin5EditorBaseUrl('http://edit.example.test'), /rin5_editor_base_url_invalid/)
   })
 })

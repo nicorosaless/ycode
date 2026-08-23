@@ -24,6 +24,7 @@ const PUBLIC_API_EXACT = [
   '/ycode/api/setup/status', // Read-only bootstrap state
   '/ycode/api/supabase/config', // Public anon config used to initialize auth
   '/ycode/api/auth/callback', // Supabase OAuth/magic-link callback
+  '/ycode/api/auth/confirm', // One-time email token exchange; validates token server-side
   '/ycode/api/auth/session', // Session bootstrap; does not expose other users
   '/ycode/api/revalidate', // Cache revalidation — has own secret token auth
   '/ycode/api/oauth/register', // RFC 7591 Dynamic Client Registration — anonymous

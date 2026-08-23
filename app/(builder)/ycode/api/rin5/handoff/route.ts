@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { getSupabaseAdmin } from '@/lib/supabase-server'
-import { authorizeRin5InternalRequest, parseRin5HandoffRequest } from '@/lib/rin5-internal-auth'
+import { authorizeRin5InternalRequest, parseRin5EditorBaseUrl, parseRin5HandoffRequest } from '@/lib/rin5-internal-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { email, siteId } = parseRin5HandoffRequest(await request.json(), process.env.RIN5_SITE_ID)
+    const editorBaseUrl = parseRin5EditorBaseUrl(process.env.RIN5_EDITOR_BASE_URL)
     const admin = await getSupabaseAdmin()
     if (!admin) throw new Error('Supabase admin is not configured')
 
@@ -34,16 +35,19 @@ export async function POST(request: NextRequest) {
       if (updated.error) throw updated.error
     }
 
-    const origin = new URL(request.url).origin
     const link = await admin.auth.admin.generateLink({
       email,
-      options: { redirectTo: `${origin}/ycode` },
+      options: { redirectTo: `${editorBaseUrl}/ycode` },
       type: 'magiclink',
     })
-    if (link.error || !link.data.properties?.action_link) throw link.error ?? new Error('Magic link was not generated')
+    if (link.error || !link.data.properties?.hashed_token) throw link.error ?? new Error('Magic link was not generated')
+
+    const actionLink = new URL('/ycode/api/auth/confirm', editorBaseUrl)
+    actionLink.searchParams.set('token_hash', link.data.properties.hashed_token)
+    actionLink.searchParams.set('type', 'magiclink')
 
     return NextResponse.json(
-      { actionLink: link.data.properties.action_link, siteId },
+      { actionLink: actionLink.toString(), siteId },
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {

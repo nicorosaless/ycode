@@ -30,3 +30,17 @@ export function parseRin5HandoffRequest(value: unknown, configuredSiteId: string
   }
   return { email, siteId }
 }
+
+export function parseRin5EditorBaseUrl(value: string | undefined): string {
+  try {
+    if (!value) throw new Error('missing')
+    const url = new URL(value)
+    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+    if (url.username || url.password || url.pathname !== '/' || url.search || url.hash || (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback))) {
+      throw new Error('unsafe')
+    }
+    return url.origin
+  } catch {
+    throw new Error('rin5_editor_base_url_invalid')
+  }
+}
