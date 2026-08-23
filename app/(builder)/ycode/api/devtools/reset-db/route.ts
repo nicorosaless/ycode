@@ -14,6 +14,14 @@ export const revalidate = 0;
  * Authentication enforced by proxy.
  */
 export async function POST() {
+  // Destructive dev tooling is never available in a production build.
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json(
+      { error: 'Database reset is disabled outside development' },
+      { status: 403 }
+    );
+  }
+
   try {
     console.log('[POST /ycode/api/devtools/reset-db] Starting database reset...');
 

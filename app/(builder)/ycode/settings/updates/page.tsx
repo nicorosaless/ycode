@@ -135,7 +135,7 @@ export default function UpdatesSettingsPage() {
           <div>
             <FieldLegend>Version status</FieldLegend>
             <FieldDescription>
-              Check if your Ycode installation is up to date with the latest release.
+              Check if your rin5 installation is up to date with the latest release.
             </FieldDescription>
           </div>
 

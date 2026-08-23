@@ -2,15 +2,14 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { applySecurityHeaders } from '@/lib/security-headers-server';
+import { requiredPermission, roleHasPermission } from '@/lib/api-authz';
+import { resolveRole } from '@/lib/roles';
 
 /**
  * Public API routes that skip authentication.
  */
 const PUBLIC_API_PREFIXES = [
-  '/ycode/api/setup/',    // Setup wizard — needed before any user exists
-  '/ycode/api/supabase/', // Supabase config — needed for browser client init
-  '/ycode/api/auth/',     // Auth callbacks and session checks
-  '/ycode/api/v1/',       // Public API — has own API key auth
+  '/ycode/api/v1/', // Public API — has its own API-key authentication
 ];
 
 /**
@@ -20,6 +19,10 @@ const PUBLIC_API_PREFIXES = [
 const PUBLIC_COLLECTION_ITEM_SUFFIXES = ['/items/filter', '/items/load-more'];
 
 const PUBLIC_API_EXACT = [
+  '/ycode/api/setup/status', // Read-only bootstrap state
+  '/ycode/api/supabase/config', // Public anon config used to initialize auth
+  '/ycode/api/auth/callback', // Supabase OAuth/magic-link callback
+  '/ycode/api/auth/session', // Session bootstrap; does not expose other users
   '/ycode/api/revalidate', // Cache revalidation — has own secret token auth
   '/ycode/api/oauth/register', // RFC 7591 Dynamic Client Registration — anonymous
   '/ycode/api/oauth/token',    // OAuth token exchange — auth is via PKCE/refresh
@@ -57,6 +60,11 @@ function getSupabaseEnvConfig(): { url: string; anonKey: string } | null {
 }
 
 function isPublicApiRoute(pathname: string, method: string): boolean {
+  // Credential and migration setup is available only on a local development
+  // instance. Production is provisioned through environment configuration.
+  if (process.env.NODE_ENV === 'development' && pathname.startsWith('/ycode/api/setup/')) {
+    return true;
+  }
   // POST to form-submissions is public (website visitors submitting forms)
   if (pathname === '/ycode/api/form-submissions' && method === 'POST') {
     return true;
@@ -86,8 +94,13 @@ async function verifyApiAuth(request: NextRequest): Promise<NextResponse | null>
 
   const config = getSupabaseEnvConfig();
 
-  // If env vars aren't set (pre-setup or local dev without .env.local), let through
-  if (!config) return null;
+  // A protected route without auth configuration is unavailable, never public.
+  if (!config) {
+    return NextResponse.json(
+      { error: 'Authentication is not configured' },
+      { status: 503 },
+    );
+  }
 
   let response = NextResponse.next({ request });
 
@@ -115,6 +128,20 @@ async function verifyApiAuth(request: NextRequest): Promise<NextResponse | null>
       { error: 'Not authenticated' },
       { status: 401 }
     );
+  }
+
+  // Role-based authorization for API routes (see lib/api-authz.ts).
+  // Preview page routes only require authentication, not a permission.
+  const { pathname } = request.nextUrl;
+  if (pathname.startsWith('/ycode/api') || pathname.startsWith('/api/templates')) {
+    const role = resolveRole(user.app_metadata?.role as string | undefined);
+    const permission = requiredPermission(pathname, request.method);
+    if (!roleHasPermission(role, permission)) {
+      return NextResponse.json(
+        { error: 'Forbidden', required: permission, role },
+        { status: 403 }
+      );
+    }
   }
 
   // Authenticated — pass through with any refreshed cookies

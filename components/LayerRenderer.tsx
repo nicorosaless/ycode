@@ -2678,7 +2678,7 @@ const LayerItemImpl: React.FC<{
 
     // Handle form submission when not in edit mode (preview and published)
     if (htmlTag === 'form' && !isEditMode) {
-      const formId = layer.settings?.id;
+      const formId = layer.settings?.id || layer.id;
       const formSettings = layer.settings?.form;
 
       elementProps.onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -2687,6 +2687,8 @@ const LayerItemImpl: React.FC<{
         const form = e.currentTarget;
         const formData = new FormData(form);
         const payload: Record<string, any> = {};
+        const honeypot = formData.get('rin5_company_website');
+        formData.delete('rin5_company_website');
 
         // Convert FormData to object
         formData.forEach((value, key) => {
@@ -2752,8 +2754,9 @@ const LayerItemImpl: React.FC<{
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              form_id: formId || 'unnamed-form',
+              form_id: formId,
               payload,
+              honeypot,
               metadata: {
                 page_url: typeof window !== 'undefined' ? window.location.href : undefined,
               },
@@ -3630,6 +3633,16 @@ const LayerItemImpl: React.FC<{
     // Regular elements with text and/or children
     return (
       <Tag {...elementProps}>
+        {htmlTag === 'form' && (
+          <input
+            type="text"
+            name="rin5_company_website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="hidden"
+          />
+        )}
         {/* Collaboration indicators - only show in edit mode */}
         {isEditMode && isLockedByOther && (
           <LayerLockIndicator layerId={layer.id} layerName={layer.name} />

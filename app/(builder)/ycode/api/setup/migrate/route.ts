@@ -9,6 +9,10 @@ import { noCache } from '@/lib/api-response';
  * Then runs seed data
  */
 export async function POST() {
+  if (process.env.NODE_ENV !== 'development') {
+    return noCache({ error: 'Interactive migrations are disabled outside development' }, 403);
+  }
+
   try {
     const result = await runMigrations();
 

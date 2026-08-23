@@ -7,6 +7,9 @@ import { runAgent } from '@/lib/agent/runtime';
 import { getAuthUser } from '@/lib/supabase-auth';
 import { getTenantIdFromHeaders } from '@/lib/supabase-server';
 import type { AgentContentBlock, AgentMessage } from '@/lib/agent/providers/types';
+import { RIN5_AI_AGENT_ENABLED } from '@/lib/agent/config';
+
+const FUTURE_TIER_MESSAGE = 'Este tier todavía no está disponible, vendrá en el futuro';
 
 /**
  * POST /ycode/api/ai/chat
@@ -82,6 +85,10 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request): Promise<Response> {
+  if (!RIN5_AI_AGENT_ENABLED) {
+    return NextResponse.json({ error: FUTURE_TIER_MESSAGE }, { status: 403 });
+  }
+
   const tenantId = await getTenantIdFromHeaders();
   if (isRateLimited(tenantId)) {
     return NextResponse.json(

@@ -10,10 +10,19 @@ import { dispatchFormSubmittedEvent } from '@/lib/services/webhookService';
 import { sendFormSubmissionEmail, extractReplyToEmail } from '@/lib/services/emailService';
 import { processAppIntegrations } from '@/lib/apps/integration-service';
 import { noCache } from '@/lib/api-response';
+import { getSupabaseAdmin } from '@/lib/supabase-server';
+import {
+  createSlidingWindowRateLimiter,
+  findPublicFormConfig,
+  isValidFormId,
+  sanitizeFormPayload,
+} from '@/lib/form-submission-security';
 
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+const allowSubmission = createSlidingWindowRateLimiter(10, 60_000);
 
 /**
  * GET /ycode/api/form-submissions
@@ -60,31 +69,58 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate required fields
-    if (!body.form_id) {
-      return NextResponse.json(
-        { error: 'Missing required field: form_id' },
-        { status: 400 }
-      );
+    if (!isValidFormId(body.form_id)) {
+      return NextResponse.json({ error: 'Invalid form_id' }, { status: 400 });
     }
 
-    if (!body.payload || typeof body.payload !== 'object') {
-      return NextResponse.json(
-        { error: 'Missing or invalid field: payload' },
-        { status: 400 }
-      );
+    // A hidden field catches indiscriminate form bots. Return success so they
+    // do not learn which signal triggered the rejection.
+    if (typeof body.honeypot === 'string' && body.honeypot.trim() !== '') {
+      return NextResponse.json({ data: null, message: 'Form submitted successfully' }, { status: 201 });
     }
 
-    // Extract metadata from request if not provided
-    const metadata = body.metadata || {
-      user_agent: request.headers.get('user-agent') || undefined,
-      referrer: request.headers.get('referer') || undefined,
-      // Note: IP is typically handled by the proxy/edge, not available directly
+    const payload = sanitizeFormPayload(body.payload);
+    if (!payload) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
+
+    const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const clientIp = forwardedFor || request.headers.get('x-real-ip') || 'unknown';
+    if (!allowSubmission(`${clientIp}:${body.form_id}`)) {
+      return NextResponse.json({ error: 'Too many submissions' }, { status: 429 });
+    }
+
+    const client = await getSupabaseAdmin();
+    if (!client) {
+      return NextResponse.json({ error: 'Form service unavailable' }, { status: 503 });
+    }
+    const { data: layerRows, error: layersError } = await client
+      .from('page_layers')
+      .select('layers')
+      .is('deleted_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(500);
+    if (layersError) throw new Error(`Failed to validate form: ${layersError.message}`);
+
+    const formConfig = findPublicFormConfig(layerRows ?? [], body.form_id);
+    if (!formConfig) {
+      return NextResponse.json({ error: 'Unknown form_id' }, { status: 404 });
+    }
+
+    // Metadata is derived at the boundary; callers cannot forge headers or
+    // inject arbitrary objects into the stored submission.
+    const requestedPageUrl = typeof body.metadata?.page_url === 'string'
+      ? body.metadata.page_url.slice(0, 2_048)
+      : undefined;
+    const metadata = {
+      user_agent: request.headers.get('user-agent')?.slice(0, 512) || undefined,
+      referrer: request.headers.get('referer')?.slice(0, 2_048) || undefined,
+      page_url: requestedPageUrl,
     };
 
     const submission = await createFormSubmission({
       form_id: body.form_id,
-      payload: body.payload,
+      payload,
       metadata,
     });
 
@@ -92,33 +128,34 @@ export async function POST(request: NextRequest) {
     dispatchFormSubmittedEvent({
       form_id: body.form_id,
       submission_id: submission.id,
-      fields: body.payload,
+      fields: payload,
       metadata,
-    });
+    }).catch((error) => console.error('Failed to dispatch form webhook:', error));
 
     // Send email notification if enabled (fire and forget)
-    if (body.email?.enabled && body.email?.to) {
+    if (formConfig.notification) {
       // Extract reply-to email from form payload (first email field found)
-      const replyTo = extractReplyToEmail(body.payload);
+      const replyTo = extractReplyToEmail(payload);
 
-      sendFormSubmissionEmail(
-        body.email.to,
-        body.email.subject || `New form submission: ${body.form_id}`,
+      void sendFormSubmissionEmail(
+        formConfig.notification.to,
+        formConfig.notification.subject || `New form submission: ${body.form_id}`,
         {
           formId: body.form_id,
           submissionId: submission.id,
-          payload: body.payload,
+          payload,
           metadata: {
             ...metadata,
             submitted_at: submission.created_at,
           },
           replyTo,
         }
-      );
+      ).catch((error) => console.error('Failed to send form email:', error));
     }
 
     // Process app integrations (fire and forget)
-    processAppIntegrations(body.form_id, submission.id, body.payload);
+    void processAppIntegrations(body.form_id, submission.id, payload)
+      .catch((error) => console.error('Failed to process form integrations:', error));
 
     return NextResponse.json(
       { data: submission, message: 'Form submitted successfully' },

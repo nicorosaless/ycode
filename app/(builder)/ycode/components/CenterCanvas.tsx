@@ -1898,7 +1898,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
     zoom,
     layers,
     pageId: currentPageId,
-    onDrop: handleCanvasDrop,
+    onDrop: canEditStructure ? handleCanvasDrop : undefined,
   });
 
   // Handle layer reorder callback for sibling reordering on canvas
@@ -1922,7 +1922,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
     layers,
     pageId: currentPageId,
     selectedLayerId,
-    disabled: isTextEditing,
+    disabled: isTextEditing || !canEditStructure,
     onReorder: handleLayerReorder,
     onLayerSelect: setSelectedLayerId,
   });

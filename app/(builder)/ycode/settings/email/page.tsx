@@ -226,20 +226,20 @@ export default function EmailSettingsPage() {
             </div>
           )}
 
-          {/* Ycode Servers option — disabled on opensource */}
+          {/* rin5 Servers option — disabled on opensource */}
           <div className="relative flex items-start gap-3 rounded-lg border p-4 opacity-50 cursor-not-allowed bg-secondary/20">
             <div className="flex h-5 items-center">
               <div className="size-4 rounded-full border-2 border-muted-foreground/30" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">Ycode</span>
+                <span className="text-sm font-medium text-muted-foreground">rin5</span>
                 <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                   Only available on Cloud
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Managed email delivery powered by Ycode — no configuration required
+                Managed email delivery powered by rin5 — no configuration required
               </p>
             </div>
           </div>

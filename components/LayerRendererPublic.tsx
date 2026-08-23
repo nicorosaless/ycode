@@ -1191,7 +1191,7 @@ const LayerItem: React.FC<{
     }
 
     if (htmlTag === 'form') {
-      const formId = layer.settings?.id;
+      const formId = layer.settings?.id || layer.id;
       const formSettings = layer.settings?.form;
       const isPasswordForm = formSettings?.form_type === 'password_protected';
 
@@ -1251,6 +1251,8 @@ const LayerItem: React.FC<{
 
         const formData = new FormData(form);
         const payload: Record<string, any> = {};
+        const honeypot = formData.get('rin5_company_website');
+        formData.delete('rin5_company_website');
 
         // Convert FormData to object
         formData.forEach((value, key) => {
@@ -1316,8 +1318,9 @@ const LayerItem: React.FC<{
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              form_id: formId || 'unnamed-form',
+              form_id: formId,
               payload,
+              honeypot,
               metadata: {
                 page_url: typeof window !== 'undefined' ? window.location.href : undefined,
               },
@@ -1822,6 +1825,16 @@ const LayerItem: React.FC<{
     // Regular elements with text and/or children
     return (
       <Tag {...elementProps}>
+        {htmlTag === 'form' && (
+          <input
+            type="text"
+            name="rin5_company_website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="hidden"
+          />
+        )}
         {textContent && textContent}
 
         {effectiveChildren && effectiveChildren.length > 0 && (

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Ycode Builder Main Component
+ * rin5 Builder Main Component
  *
  * Three-panel editor layout inspired by modern design tools
  *
@@ -33,6 +33,7 @@ import ProfileContent from '../components/ProfileContent';
 import IntegrationsContent from '../components/IntegrationsContent';
 import MigrationChecker from '@/components/MigrationChecker';
 import BuilderLoading from '@/components/BuilderLoading';
+import BrandLogo from '@/components/BrandLogo';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { checkCircularReference, detachSpecificLayerFromComponent } from '@/lib/component-utils';
@@ -291,7 +292,7 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
   }, [editingComponentId, editingComponentVariantId, currentPageId, setDraftLayers]);
 
   // Import paste: insert layers produced by an import (Webflow / Figma).
-  // Placement mirrors Ycode's own copy/paste: insert inside the selected layer
+  // Placement mirrors rin5's own copy/paste: insert inside the selected layer
   // when it can hold children, otherwise drop in as a sibling next to it; with
   // nothing suitable selected, fall back to the page root (body).
   const insertImportedLayers = useCallback((layers: Layer[], placement?: ExternalPastePlacement) => {
@@ -448,7 +449,7 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
     setSelectedLayerId(layers[0].id);
   }, [canEditStructure, editingComponentId, components, currentPageId, getCurrentLayers, updateCurrentLayers, setSelectedLayerId, pasteInside, pasteAfter]);
 
-  // Normal Ycode paste (internal clipboard) — extracted from keydown so it
+  // Normal rin5 paste (internal clipboard) — extracted from keydown so it
   // can run inside the paste event handler after Figma detection fails.
   const handleNormalPaste = useCallback(() => {
     if (!canEditStructure) return;
@@ -2170,33 +2171,7 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-neutral-950 py-10">
 
-        <svg
-          className="size-5 fill-current absolute bottom-10"
-          viewBox="0 0 24 24"
-          version="1.1" xmlns="http://www.w3.org/2000/svg"
-        >
-          <g
-            id="Symbols" stroke="none"
-            strokeWidth="1" fill="none"
-            fillRule="evenodd"
-          >
-            <g id="Sidebar" transform="translate(-30.000000, -30.000000)">
-              <g id="Ycode">
-                <g transform="translate(30.000000, 30.000000)">
-                  <rect
-                    id="Rectangle" x="0"
-                    y="0" width="24"
-                    height="24"
-                  />
-                  <path
-                    id="CurrentFill" d="M11.4241533,0 L11.4241533,5.85877951 L6.024,8.978 L12.6155735,12.7868008 L10.951,13.749 L23.0465401,6.75101349 L23.0465401,12.6152717 L3.39516096,23.9856666 L3.3703726,24 L3.34318129,23.9827156 L0.96,22.4713365 L0.96,16.7616508 L3.36417551,18.1393242 L7.476,15.76 L0.96,11.9090099 L0.96,6.05375516 L11.4241533,0 Z"
-                    className="fill-current"
-                  />
-                </g>
-              </g>
-            </g>
-          </g>
-        </svg>
+        <BrandLogo className="absolute bottom-10 text-base text-white" />
 
         <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-1 duration-700" style={{ animationFillMode: 'both' }}>
 
@@ -2370,9 +2345,7 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
               />
 
               {/* Right Sidebar - Agent (AI) / Human (properties) switch */}
-              {!isEditor && (
-                <RightPanel onLayerUpdate={handleLayerUpdate} />
-              )}
+              <RightPanel contentOnly={isEditor} onLayerUpdate={handleLayerUpdate} />
             </div>
           </>
         )}

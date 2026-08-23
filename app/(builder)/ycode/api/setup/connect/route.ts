@@ -12,6 +12,10 @@ import type { SupabaseConfig } from '@/types';
  * Test and store Supabase credentials (4 fields)
  */
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV !== 'development') {
+    return noCache({ error: 'Interactive setup is disabled outside development' }, 403);
+  }
+
   try {
     const body = await request.json();
     const { anon_key, service_role_key, connection_url, db_password, supabase_url } = body;

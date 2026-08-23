@@ -39,6 +39,7 @@ import { Separator } from '@/components/ui/separator';
 import { BackupRestoreDialog } from '@/components/project/BackupRestoreDialog';
 import { isCloudVersion } from '@/lib/utils';
 import { useRole } from '@/hooks/use-role';
+import BrandLogo from '@/components/BrandLogo';
 
 interface HeaderBarProps {
   user: User | null;
@@ -160,28 +161,11 @@ export default function HeaderBar({
     return 'dark';
   });
   const [baseUrl, setBaseUrl] = useState<string>('');
-  const [hasUpdate, setHasUpdate] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
 
   // Get current host after mount
   useEffect(() => {
     setBaseUrl(window.location.protocol + '//' + window.location.host);
-  }, []);
-
-  // Check for updates on mount
-  useEffect(() => {
-    const checkForUpdates = async () => {
-      try {
-        const response = await fetch('/ycode/api/updates/check');
-        if (response.ok) {
-          const data = await response.json();
-          setHasUpdate(data.available === true);
-        }
-      } catch (error) {
-        console.error('Failed to check for updates:', error);
-      }
-    };
-    checkForUpdates();
   }, []);
 
   // Get selected locale (computed from subscribed store values)
@@ -401,41 +385,14 @@ export default function HeaderBar({
               variant="secondary" size="sm"
               className="size-8!"
             >
-              <div className="dark:text-white text-secondary-foreground">
-                <svg
-                  className="size-3.5 fill-current" viewBox="0 0 24 24"
-                  version="1.1" xmlns="http://www.w3.org/2000/svg"
-                >
-                  <g
-                    id="Symbols" stroke="none"
-                    strokeWidth="1" fill="none"
-                    fillRule="evenodd"
-                  >
-                    <g id="Sidebar" transform="translate(-30.000000, -30.000000)">
-                      <g id="Ycode">
-                        <g transform="translate(30.000000, 30.000000)">
-                          <rect
-                            id="Rectangle" x="0"
-                            y="0" width="24"
-                            height="24"
-                          />
-                          <path
-                            id="CurrentFill" d="M11.4241533,0 L11.4241533,5.85877951 L6.024,8.978 L12.6155735,12.7868008 L10.951,13.749 L23.0465401,6.75101349 L23.0465401,12.6152717 L3.39516096,23.9856666 L3.3703726,24 L3.34318129,23.9827156 L0.96,22.4713365 L0.96,16.7616508 L3.36417551,18.1393242 L7.476,15.76 L0.96,11.9090099 L0.96,6.05375516 L11.4241533,0 Z"
-                            className="fill-current"
-                          />
-                        </g>
-                      </g>
-                    </g>
-                  </g>
-                </svg>
-              </div>
+              <BrandLogo compact className="text-xs" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {isCloudVersion() && (
               <>
                 <DropdownMenuItem asChild>
-                  <a href="https://dashboard.ycode.cloud/dashboard">
+                  <a href="https://rin5.app/dashboard">
                     Dashboard
                   </a>
                 </DropdownMenuItem>
@@ -637,22 +594,6 @@ export default function HeaderBar({
           </a>
         </Button>
 
-        {hasUpdate && canManageSettings && (
-          <>
-            <div className="h-5">
-              <Separator orientation="vertical" />
-            </div>
-
-            <Button
-              size="xs"
-              variant="default"
-              className="bg-primary/20 hover:bg-primary/30 text-blue-400 hover:text-blue-300"
-              onClick={() => router.push('/ycode/settings/updates')}
-            >
-              Update available
-            </Button>
-          </>
-        )}
       </div>
 
       {/* Right: User & Actions */}
@@ -695,13 +636,15 @@ export default function HeaderBar({
           <Icon name="preview" />
         </Button>
 
-        <PublishPopover
-          isPublishing={isPublishing}
-          setIsPublishing={setIsPublishing}
-          baseUrl={baseUrl}
-          publishedUrl={publishedUrl}
-          onPublishSuccess={onPublishSuccess}
-        />
+        {canManageSettings && (
+          <PublishPopover
+            isPublishing={isPublishing}
+            setIsPublishing={setIsPublishing}
+            baseUrl={baseUrl}
+            publishedUrl={publishedUrl}
+            onPublishSuccess={onPublishSuccess}
+          />
+        )}
 
       </div>
     </header>

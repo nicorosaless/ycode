@@ -71,6 +71,9 @@ export const PROVIDER_KEY_SETTINGS: Record<AgentProviderId, string> = {
 export const SETTING_MODEL = 'ai_model';
 export const SETTING_ENABLED_MODELS = 'ai_enabled_models';
 export const SETTING_AGENT_ENABLED = 'ai_agent_enabled';
+// rin5 Basic exposes the Agent entry point as a future tier, but does not run
+// agent tools yet. Keep this server-owned so a settings mutation cannot enable it.
+export const RIN5_AI_AGENT_ENABLED = false;
 
 /** All settings keys that store a provider secret. */
 export const AI_SECRET_SETTING_KEYS: string[] = Object.values(PROVIDER_KEY_SETTINGS);
@@ -174,7 +177,7 @@ export async function resolveAgentConfig(userId?: string | null): Promise<Resolv
   const configured = AGENT_PROVIDERS.some((provider) => providers[provider.id].apiKey !== null);
   // Opt-out flag: only an explicit `false` disables the agent, so existing
   // projects (no row stored) keep the agent on.
-  const agentEnabled = settings[SETTING_AGENT_ENABLED] !== false;
+  const agentEnabled = RIN5_AI_AGENT_ENABLED && settings[SETTING_AGENT_ENABLED] !== false;
   const enabledModels = sanitizeEnabledModels(settings[SETTING_ENABLED_MODELS]);
 
   let model = asNonEmptyString(settings[SETTING_MODEL])

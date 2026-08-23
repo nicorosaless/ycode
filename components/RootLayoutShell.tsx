@@ -3,8 +3,9 @@ import type { Metadata } from 'next';
 import DarkModeProvider from '@/components/DarkModeProvider';
 
 export const defaultMetadata: Metadata = {
-  title: 'Ycode - Visual Website Builder',
-  description: 'Self-hosted visual website builder',
+  title: 'Editor de webs | rin5',
+  description: 'Edita y previsualiza tu web de rin5.',
+  icons: { icon: '/favicon.ico', apple: '/favicon.ico' },
 };
 
 interface RootLayoutShellProps {

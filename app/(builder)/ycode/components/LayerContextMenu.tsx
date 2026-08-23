@@ -291,7 +291,7 @@ function LayerContextMenuInner({
 
   const handlePasteAfter = () => {
     // A Webflow/Figma copy on the OS clipboard means the freshest copy was
-    // external (an internal copy stamps the OS clipboard with the Ycode marker,
+    // external (an internal copy stamps the OS clipboard with the rin5 marker,
     // which detection ignores), so it wins over a stale internal clipboard —
     // matching the keyboard ⌘V behaviour. Import it as a sibling after target.
     if (hasExternal) {

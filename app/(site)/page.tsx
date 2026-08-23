@@ -145,7 +145,7 @@ export default async function Home() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center p-8 flex flex-col items-center justify-center gap-2">
           <h1 className="text-xl font-semibold text-neutral-900">
-            Welcome to Ycode
+            Bienvenido a rin5
           </h1>
           <Link
             href="/ycode"
@@ -249,8 +249,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
   if (!data) {
     return {
-      title: 'Ycode',
-      description: 'Built with Ycode',
+      title: 'rin5',
+      description: 'Creado con rin5',
     };
   }
 

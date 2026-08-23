@@ -44,8 +44,10 @@ import { Spinner } from '@/components/ui/spinner';
 import FileManagerDialog from '../../components/FileManagerDialog';
 import { toast } from 'sonner';
 import { ASSET_CATEGORIES } from '@/lib/asset-constants';
+import { useRole } from '@/hooks/use-role';
 
 export default function GeneralSettingsPage() {
+  const { canManageSettings } = useRole();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('website');
   const { getSettingByKey, saveSettings } = useSettingsStore();
@@ -78,9 +80,9 @@ export default function GeneralSettingsPage() {
   const [customCodeBody, setCustomCodeBody] = useState(storedCustomCodeBody || '');
   const [isSavingCustomCode, setIsSavingCustomCode] = useState(false);
 
-  // Initialize Ycode badge from store
-  const storedYcodeBadge = getSettingByKey('ycode_badge') as boolean | null;
-  const [ycodeBadge, setYcodeBadge] = useState(storedYcodeBadge ?? true);
+  // Initialize rin5 badge from store
+  const storedrin5Badge = getSettingByKey('ycode_badge') as boolean | null;
+  const [ycodeBadge, setrin5Badge] = useState(storedrin5Badge ?? true);
   const [isSavingWebsite, setIsSavingWebsite] = useState(false);
 
   // Initialize timezone from store (default UTC)
@@ -324,6 +326,7 @@ export default function GeneralSettingsPage() {
 
           <TabsContent value="website" className="mt-2 flex flex-col gap-4">
 
+            {canManageSettings && process.env.NODE_ENV === 'development' && (
             <div className="grid grid-cols-3 gap-10 bg-secondary/20 p-8 rounded-lg">
               <div>
                 <FieldLegend>Main details</FieldLegend>
@@ -362,7 +365,7 @@ export default function GeneralSettingsPage() {
                       />
                     ) : (
                       <Image
-                        src={'/y-filled.svg'}
+                        src={'/favicon.ico'}
                         alt="Favicon preview"
                         width={32}
                         height={32}
@@ -412,7 +415,7 @@ export default function GeneralSettingsPage() {
                       />
                     ) : (
                       <Image
-                        src={'/ycode-webclip.png'}
+                        src={'/favicon.ico'}
                         alt="Web clip preview"
                         width={64}
                         height={64}
@@ -490,17 +493,17 @@ export default function GeneralSettingsPage() {
 
                 <Field orientation="horizontal" className="flex-row-reverse col-span-2">
                   <FieldContent>
-                    <FieldLabel htmlFor="badge">Display the &ldquo;Made in Ycode&rdquo; badge</FieldLabel>
+                    <FieldLabel htmlFor="badge">Display the &ldquo;Made in rin5&rdquo; badge</FieldLabel>
                     <FieldDescription>
                       {isCloudVersion()
                         ? 'Upgrade to a project plan in order to disable the badge.'
-                        : 'Help support Ycode by displaying this badge on your website.'}
+                        : 'Help support rin5 by displaying this badge on your website.'}
                     </FieldDescription>
                   </FieldContent>
                   <Switch
                     id="badge"
                     checked={ycodeBadge}
-                    onCheckedChange={setYcodeBadge}
+                    onCheckedChange={setrin5Badge}
                   />
                 </Field>
 
@@ -517,6 +520,7 @@ export default function GeneralSettingsPage() {
                 </div>
               </div>
             </div>
+            )}
 
             <div className="grid grid-cols-3 gap-10 bg-secondary/20 p-8 rounded-lg">
               <div>
@@ -564,7 +568,7 @@ export default function GeneralSettingsPage() {
                     Google Analytics Measurement ID
                   </FieldLabel>
                   <FieldDescription>
-                    Seamlessly integrate Google Analytics into your Ycode site. As the site owner, you are responsible for ensuring your site complies with privacy regulations, such as GDPR, and handles data appropriately.
+                    Seamlessly integrate Google Analytics into your rin5 site. As the site owner, you are responsible for ensuring your site complies with privacy regulations, such as GDPR, and handles data appropriately.
                   </FieldDescription>
                   <Input
                     id="google-analytics-measurement-id"
@@ -646,7 +650,7 @@ export default function GeneralSettingsPage() {
                   <Tabs value={activeSeoTab} onValueChange={handleSitemapTabChange}>
                     <TabsList className="w-full">
                       <TabsTrigger value="no-sitemap">No sitemap</TabsTrigger>
-                      <TabsTrigger value="ycode-sitemap">Ycode generated</TabsTrigger>
+                      <TabsTrigger value="ycode-sitemap">rin5 generated</TabsTrigger>
                       <TabsTrigger value="custom-sitemap">Custom XML</TabsTrigger>
                     </TabsList>
 
@@ -796,6 +800,7 @@ export default function GeneralSettingsPage() {
       />
 
       {/* Reset Project Confirmation Dialog */}
+      {canManageSettings && process.env.NODE_ENV === 'development' && (
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <DialogContent showCloseButton={false} className="sm:max-w-md">
           <DialogHeader>
@@ -831,6 +836,7 @@ export default function GeneralSettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }
