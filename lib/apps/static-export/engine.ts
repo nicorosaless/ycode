@@ -98,7 +98,7 @@ async function resolvePageOgImage(page: Page): Promise<string | null> {
   }
 }
 
-export async function exportSite(presetJobId?: string): Promise<ExportJob> {
+export async function exportSite(presetJobId?: string, overrideWriters?: readonly Writer[]): Promise<ExportJob> {
   const jobId = presetJobId ?? randomUUID()
   const job: ExportJob = {
     id: jobId,
@@ -115,7 +115,7 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
   try {
     const config = await getExportConfig()
 
-    if (config.outputTargets.length === 0) {
+    if (!overrideWriters && config.outputTargets.length === 0) {
       throw new Error('No output target selected — pick at least one of: local, S3, GitHub')
     }
 
@@ -298,11 +298,13 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
     }
 
     // ---- Flush to every configured target -------------------------------
-    const writers: Writer[] = []
-    for (const target of config.outputTargets) {
-      if (target === 'local') writers.push(createLocalWriter(config))
-      else if (target === 's3') writers.push(await createS3Writer(config))
-      else if (target === 'github') writers.push(await createGithubWriter(config))
+    const writers: Writer[] = overrideWriters ? [...overrideWriters] : []
+    if (!overrideWriters) {
+      for (const target of config.outputTargets) {
+        if (target === 'local') writers.push(createLocalWriter(config))
+        else if (target === 's3') writers.push(await createS3Writer(config))
+        else if (target === 'github') writers.push(await createGithubWriter(config))
+      }
     }
 
     for (const writer of writers) {

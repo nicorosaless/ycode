@@ -19,6 +19,7 @@ const PUBLIC_API_PREFIXES = [
 const PUBLIC_COLLECTION_ITEM_SUFFIXES = ['/items/filter', '/items/load-more'];
 
 const PUBLIC_API_EXACT = [
+  '/ycode/api/rin5/export', // Server-to-server bearer auth in the route itself
   '/ycode/api/setup/status', // Read-only bootstrap state
   '/ycode/api/supabase/config', // Public anon config used to initialize auth
   '/ycode/api/auth/callback', // Supabase OAuth/magic-link callback

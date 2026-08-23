@@ -9,8 +9,6 @@
 
 import path from 'path'
 
-import type { OutputTarget } from '../types'
-
 export interface OutputFile {
   /** Relative key, e.g. "index.html" or "ycode/layouts/assets/foo.webp" */
   key: string
@@ -20,7 +18,7 @@ export interface OutputFile {
 
 export interface Writer {
   /** Human-readable target name for logging. */
-  name: OutputTarget
+  name: string
   /** Writes the file list and returns the count actually written. */
   flush(files: OutputFile[]): Promise<number>
 }
