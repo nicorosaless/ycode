@@ -10,10 +10,9 @@ import { dispatchFormSubmittedEvent } from '@/lib/services/webhookService';
 import { sendFormSubmissionEmail, extractReplyToEmail } from '@/lib/services/emailService';
 import { processAppIntegrations } from '@/lib/apps/integration-service';
 import { noCache } from '@/lib/api-response';
-import { getSupabaseAdmin } from '@/lib/supabase-server';
 import {
+  configuredPublicForm,
   createSlidingWindowRateLimiter,
-  findPublicFormConfig,
   isValidFormId,
   sanitizeFormPayload,
 } from '@/lib/form-submission-security';
@@ -90,19 +89,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many submissions' }, { status: 429 });
     }
 
-    const client = await getSupabaseAdmin();
-    if (!client) {
-      return NextResponse.json({ error: 'Form service unavailable' }, { status: 503 });
-    }
-    const { data: layerRows, error: layersError } = await client
-      .from('page_layers')
-      .select('layers')
-      .is('deleted_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(500);
-    if (layersError) throw new Error(`Failed to validate form: ${layersError.message}`);
-
-    const formConfig = findPublicFormConfig(layerRows ?? [], body.form_id);
+    const formConfig = configuredPublicForm(body.form_id);
     if (!formConfig) {
       return NextResponse.json({ error: 'Unknown form_id' }, { status: 404 });
     }

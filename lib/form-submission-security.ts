@@ -1,11 +1,10 @@
-import type { FormSettings, Layer } from '@/types';
-
 const FORM_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const MAX_PAYLOAD_FIELDS = 100;
 const MAX_FIELD_LENGTH = 10_000;
+const MAX_CONFIG_BYTES = 64 * 1024;
 
 export interface FormNotificationConfig {
-  enabled: boolean;
+  enabled: true;
   to: string;
   subject?: string;
 }
@@ -22,13 +21,11 @@ export function sanitizeFormPayload(value: unknown): Record<string, string | str
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const entries = Object.entries(value);
   if (entries.length === 0 || entries.length > MAX_PAYLOAD_FIELDS) return null;
-
   const sanitized: Record<string, string | string[]> = {};
   for (const [key, fieldValue] of entries) {
     if (!key || key.length > 128 || key === '__proto__' || key === 'constructor') return null;
     const values = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
     if (values.length > 50) return null;
-
     const strings: string[] = [];
     for (const item of values) {
       if (typeof item !== 'string' || item.length > MAX_FIELD_LENGTH) return null;
@@ -39,32 +36,20 @@ export function sanitizeFormPayload(value: unknown): Record<string, string | str
   return sanitized;
 }
 
-export function findPublicFormConfig(layerRows: Array<{ layers?: Layer[] | null }>, formId: string): PublicFormConfig | null {
-  for (const row of layerRows) {
-    const match = findForm(row.layers ?? [], formId);
-    if (!match) continue;
-    return { notification: normalizeNotification(match.settings?.form?.email_notification) };
-  }
-  return null;
-}
-
-function findForm(layers: Layer[], formId: string): Layer | null {
-  for (const layer of layers) {
-    if (layer.name === 'form' && (layer.settings?.id === formId || layer.id === formId)) return layer;
-    const nested = findForm(layer.children ?? [], formId);
-    if (nested) return nested;
-  }
-  return null;
-}
-
-function normalizeNotification(candidate: FormSettings['email_notification']): FormNotificationConfig | null {
-  if (!candidate?.enabled || !isEmail(candidate.to)) return null;
-  const subject = candidate.subject?.trim().slice(0, 200);
-  return {
-    enabled: true,
-    to: candidate.to.trim(),
-    ...(subject ? { subject } : {}),
-  };
+export function configuredPublicForm(formId: string, source: Record<string, string | undefined> = process.env): PublicFormConfig | null {
+  const raw = source.RIN5_FORM_CONFIG_JSON;
+  if (!raw || Buffer.byteLength(raw, 'utf8') > MAX_CONFIG_BYTES) return null;
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const candidate = (parsed as Record<string, unknown>)[formId];
+  if (candidate === null) return { notification: null };
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null;
+  const record = candidate as Record<string, unknown>;
+  if (Object.keys(record).some((key) => key !== 'to' && key !== 'subject')) return null;
+  if (typeof record.to !== 'string' || !isEmail(record.to.trim())) return null;
+  const subject = typeof record.subject === 'string' ? record.subject.trim().slice(0, 200) : '';
+  return { notification: { enabled: true, to: record.to.trim(), ...(subject ? { subject } : {}) } };
 }
 
 function isEmail(value: string): boolean {
