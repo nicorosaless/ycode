@@ -1,3 +1,5 @@
-<svg width="100px" height="100px" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <path d="M47.6006389,0 L47.6006389,24.4115813 L25.107,37.416 L52.563,53.277 L96.0272504,28.1292229 L96.0272504,52.5636321 L14.146504,99.9402775 L14.0432192,100 L13.929922,99.9279817 L4,93.6305688 L4,69.8402116 L14.017398,75.5805176 L31.153,65.665 L4,49.6208746 L4,25.2239798 L47.6006389,0 Z" fill="#000000"></path>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="22" fill="#0b0b0d"/>
+  <rect x="63" y="56" width="20" height="20" rx="4" fill="#87f700"/>
+  <text x="47" y="71" font-family="Inter, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="60" font-weight="700" letter-spacing="-0.03em" fill="#ffffff" text-anchor="middle">r5</text>
 </svg>

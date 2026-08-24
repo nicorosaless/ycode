@@ -4,6 +4,7 @@
  */
 
 const UPSTREAM_REPO = 'ycode/ycode'; // Official Ycode repo
+const TRACK_UPSTREAM_RELEASES = false; // rin5: updates gestionadas por rin5, no por el upstream
 
 export interface CheckUpdatesResult {
   available: boolean;
@@ -44,6 +45,16 @@ function compareVersions(a: string, b: string): number {
  * Check for updates from the official Ycode repository
  */
 export async function checkForUpdates(currentVersion: string): Promise<CheckUpdatesResult> {
+  // rin5: este fork no sigue las releases del Ycode upstream. Las
+  // actualizaciones las gestiona rin5, así que nunca anunciamos updates
+  // (ni enlazamos al GitHub de Ycode desde la UI).
+  if (!TRACK_UPSTREAM_RELEASES) {
+    return {
+      available: false,
+      currentVersion,
+      message: 'Las actualizaciones del editor las gestiona rin5.',
+    };
+  }
   try {
     const response = await fetch(
       `https://api.github.com/repos/${UPSTREAM_REPO}/releases/latest`,

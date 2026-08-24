@@ -474,7 +474,7 @@ export async function loadSchemaInfo(
 
 // ─── Shared Helpers ──────────────────────────────────────────────────
 
-const DEFAULT_PROJECT_NAME = 'ycode-app';
+const DEFAULT_PROJECT_NAME = 'rin5-site';
 
 export async function getProjectName(
   knex: Awaited<ReturnType<typeof getKnexClient>>

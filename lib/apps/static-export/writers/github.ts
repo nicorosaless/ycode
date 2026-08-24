@@ -51,8 +51,8 @@ export async function createGithubWriter(config: ExportConfig): Promise<Writer> 
 
 async function pushViaApi(config: ExportConfig, files: OutputFile[]): Promise<number> {
   const { githubRepo: repo, githubBranch: branch, githubToken: token } = config
-  const authorName = config.githubAuthorName.trim() || 'Ycode Static Export'
-  const authorEmail = config.githubAuthorEmail.trim() || 'static-export@ycode.local'
+  const authorName = config.githubAuthorName.trim() || 'rin5 Static Export'
+  const authorEmail = config.githubAuthorEmail.trim() || 'static-export@rin5.local'
 
   const headers = apiHeaders(token)
 

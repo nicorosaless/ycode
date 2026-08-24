@@ -37,9 +37,9 @@ export interface ExportConfig {
   githubBranch: string
   /** Personal access token with `repo` (or fine-grained Contents:write) scope */
   githubToken: string
-  /** Commit author name. Defaults to "Ycode Static Export" if empty. */
+  /** Commit author name. Defaults to "rin5 Static Export" if empty. */
   githubAuthorName: string
-  /** Commit author email. Defaults to "static-export@ycode.local" if empty. */
+  /** Commit author email. Defaults to "static-export@rin5.local" if empty. */
   githubAuthorEmail: string
 }
 
