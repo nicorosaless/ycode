@@ -54,7 +54,7 @@ export default function UpdateNotification() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-neutral-900 text-white shadow-lg">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -71,7 +71,7 @@ export default function UpdateNotification() {
               <p className="font-semibold">
                 Hay una actualización del editor disponible.
               </p>
-              <p className="text-sm text-blue-100">
+              <p className="text-sm text-neutral-300">
                 Version {updateInfo.latestVersion} is now available (you have {updateInfo.currentVersion})
               </p>
             </div>
@@ -84,7 +84,7 @@ export default function UpdateNotification() {
                 href={updateInfo.updateInstructions.autoSyncUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                className="bg-[#87f700] text-neutral-950 hover:bg-[#78df00] font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
               >
                 <svg
                   className="w-5 h-5" fill="currentColor"
@@ -103,7 +103,7 @@ export default function UpdateNotification() {
                 href={updateInfo.updateInstructions.autoSyncUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                className="bg-[#87f700] text-neutral-950 hover:bg-[#78df00] font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
               >
                 <svg
                   className="w-5 h-5" fill="currentColor"
@@ -117,14 +117,14 @@ export default function UpdateNotification() {
             
             <button
               onClick={() => setShowInstructions(!showInstructions)}
-              className="text-white hover:text-blue-100 font-medium px-4 py-2 transition-colors whitespace-nowrap"
+              className="text-white hover:text-neutral-300 font-medium px-4 py-2 transition-colors whitespace-nowrap"
             >
               {showInstructions ? 'Hide' : 'How to Update'}
             </button>
 
             <button
               onClick={handleDismiss}
-              className="text-white hover:text-blue-100 p-2 transition-colors"
+              className="text-white hover:text-neutral-300 p-2 transition-colors"
               aria-label="Dismiss"
             >
               <svg
@@ -142,9 +142,9 @@ export default function UpdateNotification() {
 
         {/* Instructions Panel */}
         {showInstructions && (
-          <div className="mt-4 pt-4 border-t border-blue-400">
+          <div className="mt-4 pt-4 border-t border-neutral-700">
             <h3 className="font-semibold mb-2">Update Instructions:</h3>
-            <ol className="space-y-2 text-sm text-blue-50">
+            <ol className="space-y-2 text-sm text-neutral-200">
               {updateInfo.updateInstructions.steps.map((step, index) => (
                 <li key={index} className="flex gap-2">
                   <span className="font-semibold">{index + 1}.</span>
@@ -159,7 +159,7 @@ export default function UpdateNotification() {
                   href={updateInfo.releaseUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-blue-100 hover:text-white underline"
+                  className="inline-flex items-center gap-2 text-sm text-neutral-300 hover:text-white underline"
                 >
                   📝 View release notes
                   <svg
