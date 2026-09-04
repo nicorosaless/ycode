@@ -1,0 +1,31 @@
+# Referencia para levantar la app en contenedor junto a un Supabase local
+# ya arrancado con `supabase start` (este repo trae supabase/config.toml
+# con puertos 573xx para no chocar con los stacks `supabase_*_rin5` /
+# `supabase_*_kora` de este mismo host).
+#
+# El contenedor de la app se conecta al host vía `host.docker.internal`
+# porque Supabase CLI local corre sus propios contenedores en la red
+# default de Docker, no en la red de este compose.
+#
+# Uso:
+#   supabase start   # deja anotados los puertos/keys reales
+#   cp .env.example .env && editar con esos valores
+#   docker compose up --build
+
+services:
+  app:
+    build: .
+    image: ycode-spike:local
+    ports:
+      - "3202:3202"
+    env_file:
+      - .env
+    environment:
+      # Sobrescribe localhost por el host de Docker para llegar a Supabase
+      # local, que corre fuera de esta red de compose.
+      - SUPABASE_URL=http://host.docker.internal:57321
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 768m
+    memswap_limit: 768m
+    restart: unless-stopped
