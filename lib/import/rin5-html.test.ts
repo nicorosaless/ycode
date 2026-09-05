@@ -20,6 +20,7 @@ import {
   resolveBuckets,
   BUCKET_ORDER,
   isSupportedSelector,
+  googleFontsImportHrefs,
 } from '@/lib/import/rin5-html';
 import { cssToClasses } from '@/lib/import/css';
 
@@ -517,4 +518,52 @@ test('el búho casa contra la tarjeta exacta de la generación 188658f6', () => 
     .map((el) => el.tagName.toLowerCase());
   // La etiqueta es el primer hijo y no lleva `margin-top`; el h3 y el p sí.
   assert.deepEqual(matched, ['h3', 'p']);
+});
+
+// Ronda 7 (P-2609/G9): la generación a15ba55c (lead 26, Hipiclub) trae la
+// hoja de Google Fonts con `@import url(…)` dentro de `styles.css`, no con un
+// `<link>` en el `<head>`. La detección solo miraba el HTML, así que el export
+// se llevaba el set de reserva (Inter/Bricolage/Caveat) y ni Fraunces ni
+// Source Sans 3 llegaban a cargarse: con las métricas de otra fuente, cada
+// línea de texto y cada `max-width` en `ch` cambia de tamaño y las nueve
+// secciones de cada página diffean a la vez. 8,36% de diff ponderado.
+
+test('googleFontsImportHrefs saca la hoja de Google Fonts de un @import url()', () => {
+  const css = "@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&display=swap');\n:root{--ink:#111}";
+  assert.deepEqual(googleFontsImportHrefs(css), [
+    'https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&display=swap',
+  ]);
+});
+
+test('googleFontsImportHrefs acepta las tres formas que admite @import', () => {
+  assert.deepEqual(
+    googleFontsImportHrefs('@import url("https://fonts.googleapis.com/css2?family=Inter");'),
+    ['https://fonts.googleapis.com/css2?family=Inter'],
+  );
+  assert.deepEqual(
+    googleFontsImportHrefs('@import url(https://fonts.googleapis.com/css2?family=Inter);'),
+    ['https://fonts.googleapis.com/css2?family=Inter'],
+  );
+  assert.deepEqual(
+    googleFontsImportHrefs('@import "https://fonts.googleapis.com/css2?family=Inter";'),
+    ['https://fonts.googleapis.com/css2?family=Inter'],
+  );
+});
+
+test('googleFontsImportHrefs ignora cualquier @import que no sea de Google Fonts', () => {
+  assert.deepEqual(googleFontsImportHrefs("@import url('./reset.css');"), []);
+  assert.deepEqual(googleFontsImportHrefs('@import url(https://example.com/fonts.css);'), []);
+  assert.deepEqual(googleFontsImportHrefs(':root{--ink:#111}'), []);
+});
+
+test('googleFontsImportHrefs devuelve las varias hojas de una misma CSS sin repetir', () => {
+  const css = [
+    "@import url('https://fonts.googleapis.com/css2?family=Fraunces');",
+    "@import url('https://fonts.googleapis.com/css2?family=Fraunces');",
+    "@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400');",
+  ].join('\n');
+  assert.deepEqual(googleFontsImportHrefs(css), [
+    'https://fonts.googleapis.com/css2?family=Fraunces',
+    'https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400',
+  ]);
 });

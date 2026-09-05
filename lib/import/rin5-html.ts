@@ -599,3 +599,29 @@ export function parseInlineStyle(style: string): Array<[string, string]> {
   }
   return out;
 }
+
+/**
+ * The Google Fonts stylesheets a hand-written sheet pulls in with `@import`.
+ *
+ * The importer used to look for the site's fonts only in `<link>` tags in the
+ * `<head>`, and fell back to a fixed Inter/Bricolage/Caveat set when it found
+ * none. A sheet that imports its families from inside the CSS — which is what
+ * the rin5 generator writes today — therefore exported with fonts nobody asked
+ * for: with different glyph metrics every line box, every wrap point and every
+ * `max-width` in `ch` moves, so the diff lights up on every section of every
+ * page at once (8,36% weighted on generation a15ba55c, P-2609/G9).
+ *
+ * All three `@import` spellings are accepted (`url('…')`, `url("…")`, `url(…)`
+ * and a bare string), because CSS accepts all of them and there is no reason
+ * to make the generator care which one it wrote. Duplicates are dropped,
+ * source order is kept.
+ */
+export function googleFontsImportHrefs(css: string): string[] {
+  const hrefs = new Set<string>();
+  const IMPORT_RE = /@import\s+(?:url\(\s*(?:'([^']*)'|"([^"]*)"|([^)'"]*))\s*\)|'([^']*)'|"([^"]*)")/g;
+  for (const m of css.matchAll(IMPORT_RE)) {
+    const href = (m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5] ?? '').trim();
+    if (/^https?:\/\/fonts\.g(?:oogleapis|static)\.com\//.test(href)) hrefs.add(href);
+  }
+  return [...hrefs];
+}

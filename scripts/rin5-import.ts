@@ -104,6 +104,7 @@ async function main() {
     uaDefaultDecls, shorthandsFor, expandBoxShorthand, parseInlineStyle,
     bucketForMedia, resolveBuckets, BUCKET_ORDER, isSupportedSelector,
     selectorClassNames, relaxStateClasses, STATE_CLASS_PROPS, isHiddenByCascade,
+    googleFontsImportHrefs,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -813,14 +814,29 @@ async function main() {
   const fontLinkTags = [...headSampleHtml.matchAll(
     /<link\b[^>]*href="[^"]*fonts\.g(?:oogleapis|static)\.com[^"]*"[^>]*>/g,
   )].map((m) => m[0]);
-  const FALLBACK_FONTS_HEAD = [
+  // A hand-written sheet is just as likely to pull its families in with
+  // `@import url(…)` from inside the CSS as with a `<link>` in the `<head>` —
+  // the rin5 generator does exactly that. Both spellings have to count, or the
+  // site exports with the fallback families and every text metric on every
+  // page moves at once (see `googleFontsImportHrefs`).
+  const cssFontHrefs: string[] = googleFontsImportHrefs(cssText);
+  const importedFontTags = cssFontHrefs.map((href) => `<link href="${href}" rel="stylesheet">`);
+  const PRECONNECT_TAGS = [
     '<link rel="preconnect" href="https://fonts.googleapis.com">',
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+  ];
+  const FALLBACK_FONTS_HEAD = [
+    ...PRECONNECT_TAGS,
     '<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Caveat:wght@600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">',
   ].join('\n');
-  const fontsHead = fontLinkTags.length > 0 ? fontLinkTags.join('\n') : FALLBACK_FONTS_HEAD;
+  const authorFontTags = fontLinkTags.length > 0
+    ? fontLinkTags
+    : (importedFontTags.length > 0 ? [...PRECONNECT_TAGS, ...importedFontTags] : []);
+  const fontsHead = authorFontTags.length > 0 ? authorFontTags.join('\n') : FALLBACK_FONTS_HEAD;
 
-  const css2LinkHref = fontLinkTags.map((tag) => tag.match(/href="([^"]+)"/)?.[1]).find((h) => h?.includes('css2?'));
+  const css2LinkHref = authorFontTags
+    .map((tag) => tag.match(/href="([^"]+)"/)?.[1])
+    .find((h) => h?.includes('css2?'));
 
   /** Parse a Google Fonts css2 URL (`family=Name:ital,wght@0,400;0,700&family=…`) into per-family weight/variant lists. */
   function parseGoogleFontsCss2Url(href: string): Array<{ family: string; weights: number[]; variants: string[] }> {
