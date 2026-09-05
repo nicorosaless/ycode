@@ -28,6 +28,10 @@ if (process.env.SUPABASE_URL) {
 }
 
 const nextConfig: NextConfig = {
+  // Ship the trimmed server bundle (`.next/standalone`) instead of full
+  // `node_modules` in the Docker runtime stage — see Dockerfile. Measured
+  // impact: P-2609 WS5 ops/README.md.
+  output: 'standalone',
   allowedDevOrigins: ['127.0.0.1', 'localhost', 'ubuntu-devbox.taild86c42.ts.net'],
   trailingSlash: false,
   staticPageGenerationTimeout: 120,
