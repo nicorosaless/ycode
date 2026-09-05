@@ -693,10 +693,29 @@ async function main() {
         }
       } else if (node.nodeType === 1) {
         const childTag = (node as El).tagName.toLowerCase();
+        if (childTag === 'br') {
+          // `collectInline` turns `<br>` into a proper hardBreak, but only on
+          // the rich-text path — and an element drops off that path as soon as
+          // one descendant is blockified. `.locate__panel dd small{display:
+          // block}` does exactly that to `<dd>Rambla…89<br>08917 Badalona…
+          // <small>…</small></dd>`, so the `<br>` was discarded and the two
+          // halves of the address ran together on one line.
+          //
+          // A zero-height block between the two inline runs splits them into
+          // two anonymous block boxes, which is the same line break at the same
+          // line-height. `basis-[100%]` covers the (meaningless but harmless)
+          // case of a `<br>` inside a wrapping flex row.
+          children.push({
+            id: generateId('lyr'),
+            name: 'div',
+            classes: 'block w-full h-[0px] basis-[100%]',
+            customName: 'br',
+          });
+          continue;
+        }
         // Inline unclassed wrappers inside mixed content: recurse contents
         const child = elementToLayer(node as El);
         if (child) children.push(child);
-        void childTag;
       }
     }
     // `::before` goes first, `::after` last — same visual position the
