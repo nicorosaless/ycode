@@ -498,8 +498,16 @@ async function main() {
 
     // Text leaves
     const isHeading = HEADINGS.has(tag);
+    // `dd` (contact/address blocks routinely use `<dd>street<br>zip city</dd>`)
+    // must go through the rich-text path: the generic Containers branch below
+    // drops a bare `<br>` child entirely (it's in the top-of-function
+    // script/style/br/… ignore-list) and turns the two text nodes around it
+    // into separate, unbroken inline spans — "Rambla de Sant Joan, 89" and
+    // "08917 Badalona" run together as "8908917 Badalona" with no line break
+    // and no separating space. `collectInline` (used by the rich-text path)
+    // already turns `<br>` into a proper `hardBreak` node.
     const textish = isHeading || tag === 'p' || tag === 'span' || tag === 'strong' || tag === 'small'
-      || tag === 'td' || tag === 'th' || tag === 'figcaption' || tag === 'h4';
+      || tag === 'td' || tag === 'th' || tag === 'figcaption' || tag === 'h4' || tag === 'dd';
     // A pseudo-element rule (numbered step, bullet, "+"/"–" toggle icon…) wins
     // over rich-text collapse: it needs its own child layer, so the element
     // must stay a container even when its text content alone would collapse.
