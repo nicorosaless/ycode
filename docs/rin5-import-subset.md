@@ -6,11 +6,10 @@
 > deforma en el round-trip import → export, con independencia de lo bien
 > escrito que esté el HTML fuente.
 >
-> Medido sobre `clients/7/site` (autoescuela, 9 páginas) con
-> `scripts/rin5-roundtrip-diff.mjs`. Estado a 2026-09-05, tras la ronda 3:
-> **0,02% de diff ponderado global, ninguna sección por encima de 0,41%**
-> (venía de 11,91% / 49,70%). Evidencia en
-> `~/.rin5/ycode-roundtrip/7-v4/diff-sections/`.
+> Estado a 2026-09-05, tras la **ronda 6**: las tres generaciones reales que
+> seguían por encima del gate quedan en **0,25%, 0,37% y 0,19%** de diff
+> ponderado (venían de 3,67%, 2,63% y 13,45%). Tabla completa y advertencia
+> sobre el cambio de medidor al final del documento.
 
 ## El ciclo, reproducible sin UI
 
@@ -40,7 +39,13 @@ porque explican por qué la columna "no" es ahora mucho más corta:
 2. **Shorthand contra longhand.** El mapa de ganadores va indexado por nombre
    de propiedad, así que `p{margin:0 0 1em}` y `p:last-child{margin-bottom:0}`
    no competían: sobrevivían los dos y ganaba el que Tailwind generase último.
-   `margin`/`padding` se expanden ahora a longhands al parsear.
+   `margin`/`padding` se expanden ahora a longhands al parsear — y desde la
+   ronda 6 también `border`, `border-top/right/bottom/left` y los lógicos
+   `margin-inline`/`margin-block`/`padding-inline`/`padding-block`. Los tres
+   sitios que quedaban con diff alto tropezaban con alguno: `.btn{border:1.5px
+   solid transparent}` contra `.btn--ghost{border-color:…}` dejaba los botones
+   sin borde, y `.wrap{margin-inline:auto}` contra el `margin-left:0` del
+   reset universal descentraba el sitio entero.
 3. **El atributo `style` no estaba en la cascada**, se pegaba detrás como
    clases más. Ahora entra por encima de todo selector.
 4. **`<details>`/`<summary>`** ya tiene equivalente (ver más abajo).
@@ -51,8 +56,17 @@ porque explican por qué la columna "no" es ahora mucho más corta:
 |---|---|
 | Clase única, cadenas de clases, combinadores descendente/hijo/hermano, atributos (`[data-x]`), `:hover` **solo en el sujeto** (`.btn:hover`, no `.card:hover img`) | `::selection`, `::placeholder`, `::marker`, `::first-line`, `::first-letter` |
 | `::before` / `::after` (ver abajo) | `:focus-visible`, `:active` |
-| Selector universal `*` **anclado** en algo: `.stack > * + *` (el "búho"), `.prose * + *` | Un universal **sin anclar** (`*`, `* + *`) — se descarta la regla entera. Es el caso de `*{box-sizing:border-box}`, que el preflight de Tailwind ya aplica |
+| Selector universal `*` **anclado** en algo: `.stack > * + *` (el "búho"), `.prose * + *` | Un universal **combinado** sin anclar (`* + *`, `* > *`) — se descarta la regla entera |
+| El reset universal a secas (`*{margin:0}`), con especificidad 0: por encima de los estilos por defecto del navegador, por debajo de cualquier regla de autor | Su `box-sizing` se sigue tirando: el preflight de Tailwind ya aplica `border-box` y emitirlo en cada capa es ruido sin píxeles detrás |
 | Cualquier selector que el motor de matching (`Element.matches()`) resuelva, dentro de lo anterior | Selectores con `@` embebido (artefactos de parseo) |
+
+**El reset universal también funciona, desde la ronda 6.** `*{margin:0}` es
+medio reset de Meyer y lo escribe cualquier hoja hecha a mano. Descartarlo
+dejaba en pie las semillas del navegador que el importador siembra por tag, así
+que cada `<h2>`, `<p>` y `<ul>` del export llevaba un margen que el original no
+tiene y la página entera se desplazaba hacia abajo: era el 13,4% de diff de la
+generación de Natural Equus. Con especificidad 0 el reset cae exactamente donde
+CSS lo pone y cancela esas semillas sin pisar ninguna regla de autor.
 
 **El "búho" (`.stack > * + *`) funciona.** Descartarlo era el defecto que
 más pixeles movía en la generación 188658f6: es la forma más común de espaciar
@@ -71,12 +85,58 @@ valor, no altera el orden.
 
 ## `@media`
 
+Solo hay **dos buckets**, y son los de Tailwind. Toda `@media (max-width: Npx)`
+del autor cae en uno de los dos según su N:
+
+| Breakpoint del autor | Bucket | Dónde corta de verdad |
+|---|---|---|
+| `max-width` ≤ 767px | `max-md:` | 767px |
+| 768px – 1200px | `max-lg:` | 1023px |
+| > 1200px | — | **se descarta la regla entera** |
+
+**El corte no es el que escribiste.** Un `@media(max-width:900px)` y un
+`@media(max-width:820px)` acaban los dos en `max-lg:`, que corta en 1023px: entre
+900 y 1023 el export ya aplica lo que el original todavía no. A 1440 y a 390 —los
+dos viewports que mide el gate— coinciden, y por eso el diff no lo ve; en las
+anchuras intermedias, no. **Regla para el generador: escribe los breakpoints en
+767px y 1023px**, y tendrás el mismo pixel en los dos lados.
+
+**Dos breakpoints del autor que caen en el mismo bucket se funden.** Natural
+Equus declara 900, 860, 820, 780, 700, 640 y 520px; 900/860/820/780 son todos
+`max-lg:` y 700/640/520 todos `max-md:`, así que de siete escalones quedan dos.
+Dentro de cada bucket gana la última regla, como en la hoja original — pero los
+escalones intermedios desaparecen. Si un layout necesita tres pasos, dos de ellos
+van a llegar juntos.
+
 | Sí | No |
 |---|---|
-| `@media (max-width: Npx)`, mapeado a `max-lg:` (≤1200px) o `max-md:` (≤767px) de Tailwind — **aproximado**, no exacto: un `@media(max-width:720px)` del original y el `max-md:` de Tailwind (≈767px) no cortan en el mismo pixel | `@media (min-width: …)` — se descarta la regla entera |
-| Reglas de `::before`/`::after` dentro de una media query — se mapean al mismo prefijo que las reglas de elementos normales | |
-| | `@supports`, `@keyframes`, `@container`, cualquier otro at-rule |
+| `@media (max-width: Npx)` con las salvedades de arriba | `@media (min-width: …)` — se descarta la regla entera |
+| Reglas de `::before`/`::after` dentro de una media query — se mapean al mismo prefijo que las reglas de elementos normales | Cualquier query que no sea `max-width` sola: `(min-width: A) and (max-width: B)`, `orientation`, `hover`, `pointer` |
+| `grid-template-columns`, `display:none`, spacing y tipografía dentro de una media query: cualquier propiedad, igual que fuera | `@supports`, `@keyframes`, `@container`, cualquier otro at-rule |
 | | `prefers-reduced-motion` — se descarta explícitamente |
+
+### La media query no añade especificidad
+
+Es lo que arregla la ronda 6 y lo que más píxeles movía. En un navegador, estas
+tres reglas dejan **dos columnas** a 390px:
+
+```css
+.split        { grid-template-columns: 1fr 1fr }
+.split.narrow { grid-template-columns: 1.05fr .95fr }
+@media (max-width: 900px) { .split { grid-template-columns: 1fr } }
+```
+
+`.split.narrow` es más específico y la media query no le suma nada a `.split`.
+El importador cascadeaba cada bucket por su cuenta, así que la regla de la media
+query era la única candidata de su bucket, salía como `max-lg:grid-cols-[1fr]` y
+ganaba: el export colapsaba a una columna donde el original no. Nueve páginas de
+Can Nicolau, 13,77% de diff en móvil.
+
+Ahora cada bucket se resuelve como lo haría el navegador a esa anchura —reglas
+base incluidas, compitiendo por especificidad y orden— y solo se emite lo que
+cambia respecto del bucket más ancho. **Regla para el generador:** si quieres que
+una media query gane, dale al menos la misma especificidad que la regla base a
+la que se enfrenta, o no escribas la variante más específica.
 
 ## Pseudo-elementos `::before` / `::after`
 
@@ -179,6 +239,30 @@ Comprobado con Playwright sobre el export de `out-v7`:
 sans-serif`, idéntico al del HTML de entrada (antes daba la pila
 `ui-sans-serif, system-ui, …` de Tailwind).
 
+## Clases de estado que pone el JS
+
+| Sí | No |
+|---|---|
+| **Reveal on scroll.** `.reveal{opacity:0}` + `.reveal.in{opacity:1;transform:none}` + un IntersectionObserver que añade `in`: el importador resuelve el estado **visible** | Cualquier otra clase de estado. Se lee de la misma hoja, pero solo se le hace caso a `opacity`, `transform` y `visibility` |
+| | Estado inicial *oculto* con `display`, `max-height` o `visibility` que el JS abre (`.nav-links.open{display:block}`, acordeones de altura animada): el export se queda en el estado cerrado, que es como carga la página |
+
+Una clase que la hoja comprueba pero que no lleva ningún elemento de ninguna
+página se pone desde script. El importador no puede saber cuál de sus estados
+es "el" estado, así que solo resuelve las tres propiedades que pueden **hacer
+visible** algo: acertar en un menú abierto no vale nada, pero exportar una
+sección con `opacity: 0` y sin nadie que se la quite es contenido que el
+visitante nunca ve.
+
+Eso era exactamente lo que pasaba antes de la ronda 6. El observador del
+`site.js` original no sobrevive al export —Ycode reconstruye el árbol y sus
+selectores dejan de casar—, así que los 19 bloques `.reveal` de Hipiclub salían
+con `opacity-[0]` horneado y en blanco para siempre. No era un desajuste de
+píxeles: era el sitio sin contenido.
+
+**Regla para el generador:** si animas la entrada de un bloque, hazlo con la
+pareja `opacity`/`transform` y nada más. Un reveal que además cambie
+`display`, `height` o `max-height` se exporta cerrado.
+
 ## Scripts / interactividad
 
 | Sí | No |
@@ -277,3 +361,70 @@ mobile); sin diagnosticar.
 
 `out-v7` remedido con este cambio: **1,92%**, idéntico a la ronda 4 — esa hoja
 no usa el búho, así que el cambio es neutro ahí.
+
+## Ronda 6: tres generaciones reales por debajo del gate
+
+Tres generaciones seguían muy por encima del 1% tras la ronda 5. Ninguna de las
+causas era una propiedad mal mapeada: las cuatro son la cascada resolviéndose
+de forma distinta a como la resuelve un navegador.
+
+| # | Causa | Dónde se veía |
+|---|---|---|
+| 1 | **La media query ganaba a un selector más específico.** Cada bucket cascadeaba solo, así que la regla de la `@media` era la única candidata del suyo y salía siempre | Can Nicolau, `.split.narrow` colapsando a una columna en móvil (13,77%) |
+| 2 | **El reset universal `*{margin:0}` se descartaba**, y las semillas del navegador que el importador siembra por tag se quedaban en pie | Natural Equus, la página entera desplazada hacia abajo (13,45%) |
+| 3 | **`border` y `margin-inline` no se partían en longhands**, así que shorthand y longhand no competían y decidía el orden de generación de Tailwind | Natural Equus: botones sin borde, y el `.wrap` descentrado (este segundo solo aparece una vez la causa 2 está arreglada) |
+| 4 | **El reveal on scroll se exportaba invisible para siempre** | Hipiclub, nueve secciones en blanco (2,63% medido, mucho peor de lo que el número decía) |
+
+### El harness cambió, y hay que decirlo
+
+La causa 4 obligó a tocar el medidor. `scripts/rin5-roundtrip-diff.mjs` recorre
+ahora la página entera antes de capturar. Un `fullPage` de un sitio que revela
+al hacer scroll era una referencia que no ve nadie: de los 19 bloques `.reveal`
+de Hipiclub solo dos habían entrado en el viewport de 1000px, así que 17 se
+medían en blanco **en los dos lados** y el diff los daba por buenos.
+
+Eso significa que las cifras de la ronda 6 no son comparables con las de las
+rondas 1–5. La tabla de abajo trae por eso las tres columnas: el mismo export de
+partida medido con el medidor viejo y con el nuevo, y el export de hoy.
+
+| run | páginas | antes (medidor viejo) | antes (medidor nuevo) | después |
+|---|---:|---:|---:|---:|
+| lead 13 · Can Nicolau | 18 | 3,67% | 15,57% | **0,25%** |
+| lead 26 · Hipiclub | 8 | 2,63% | 11,23% | **0,37%** |
+| lead 64 · Natural Equus | 18 | 13,45% | 13,59% | **0,19%** |
+| lead 9 · Severino (control) | 11 | 0,09% | — | **0,22%** |
+| `out-v7` (control) | 9 | 1,92% | — | **1,94%** |
+
+La columna del medidor nuevo es mucho peor que la del viejo en los dos sitios
+con reveal, y prácticamente idéntica en Natural Equus, que no lo usa: es
+exactamente lo que tenía que pasar si el medidor viejo estaba tapando contenido
+invisible y nada más.
+
+Los dos controles se mueven poco y por el medidor, no por el mapeo. `out-v7`
+queda igual (1,92% → 1,94%, ruido) y sigue con lo que la ronda 4 dejó sin
+diagnosticar. Severino sube de 0,09% a 0,22%, y **0,107 de esos 0,13 puntos son
+una sola región**: el `header.site-header` pegajoso y traslúcido, que el
+medidor captura sobre una parte distinta del hero en cada lado. La causa está
+en `html{scroll-behavior:smooth}`, que el importador tira: el original vuelve
+arriba con una animación y el export salta, así que la referencia se fotografía
+a medio camino. Fijar el `scroll-behavior` durante el recorrido lo arregla —y
+deja Hipiclub en 0,01% y Natural Equus en 0,01%— pero hace que el export pierda
+las fotos de hero que carga en diferido, así que se ha descartado. **Defecto
+conocido del medidor, no del importador; sin corregir.**
+
+### Por página y viewport
+
+Todas las páginas del medidor nuevo, antes y después. Ninguna pasa del 2%, y de
+las 74 combinaciones página/viewport, 23 quedan exactamente a 0,00%.
+
+| run | peor página/viewport antes | después |
+|---|---:|---:|
+| lead 13 | index mobile 30,62% | **1,90%** |
+| lead 26 | actividades-ecuestres mobile 25,42% | **1,43%** (index mobile 1,98%) |
+| lead 64 | index desktop 25,46% | **1,54%** |
+
+Lo que queda se concentra en dos regiones, las mismas en los tres runs:
+`section.hero` —la portada a sangre, donde la foto se reescala distinto— y
+`header.site-header`, que es el artefacto del `scroll-behavior` descrito arriba.
+En Can Nicolau esas dos regiones son las cinco peores de las 274 medidas. No
+queda ninguna causa de cascada identificada.
