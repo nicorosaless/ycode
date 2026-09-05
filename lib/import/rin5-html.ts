@@ -193,10 +193,14 @@ export const STATE_CLASS_PROPS: ReadonlySet<string> = new Set(['opacity', 'trans
  *
  * A class that appears in the stylesheet but on no element of any page is by
  * definition set from script. Which of its states is "the" state is not
- * knowable, so the resolution is restricted to `STATE_CLASS_PROPS`: making
- * something visible is the only guess that cannot be worse than not guessing.
- * Nothing else follows the phantom class — `.nav-links.open{display:block}` is
- * read from the same sheet and stays shut, which is what a page loads as.
+ * knowable, so the relaxed rule is doubly fenced: it may only carry
+ * `STATE_CLASS_PROPS`, and it is only consulted for an element that
+ * `isHiddenByCascade` says is invisible without it. Both fences are needed.
+ * The property list on its own let `.nav-links.open{transform:none}` through
+ * and every internal page of the Can Nicolau export shipped with its mobile
+ * menu hanging open — the drawer is parked off-screen with a `translateY`, not
+ * hidden, so nothing was gained by guessing. Fully transparent is the one case
+ * where guessing cannot be worse: there is no other state to be wrong about.
  */
 export function relaxStateClasses(sel: string, present: ReadonlySet<string>): string | null {
   let removed = false;
@@ -213,6 +217,20 @@ export function relaxStateClasses(sel: string, present: ReadonlySet<string>): st
     out.push(stripped);
   }
   return removed ? out.join('') : null;
+}
+
+/**
+ * True when the base cascade leaves the element with nothing on screen at all.
+ *
+ * The gate on `relaxStateClasses`: only an element that is invisible without
+ * its JS state class gets to borrow it. A drawer parked off-screen with a
+ * `transform` is not invisible — it is somewhere, and the page loads with it
+ * there.
+ */
+export function isHiddenByCascade(base: ReadonlyMap<string, CascadeWinner> | undefined): boolean {
+  const opacity = base?.get('opacity')?.value.trim();
+  const visibility = base?.get('visibility')?.value.trim();
+  return opacity === '0' || visibility === 'hidden';
 }
 
 /** A resolved `content` value for a `::before`/`::after` rule. */

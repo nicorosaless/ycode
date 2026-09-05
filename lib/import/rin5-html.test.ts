@@ -14,6 +14,7 @@ import {
   parseInlineStyle,
   bucketForMedia,
   relaxStateClasses,
+  isHiddenByCascade,
   selectorClassNames,
   STATE_CLASS_PROPS,
   resolveBuckets,
@@ -319,6 +320,21 @@ test('STATE_CLASS_PROPS deja fuera lo que abriría un menú cerrado', () => {
   assert.equal(STATE_CLASS_PROPS.has('transform'), true);
   assert.equal(STATE_CLASS_PROPS.has('display'), false);
   assert.equal(STATE_CLASS_PROPS.has('max-height'), false);
+});
+
+// La lista de propiedades no basta. `.nav-links{transform:translateY(-140%)}` +
+// `.nav-links.open{transform:none}` es el cajón del menú móvil de Can Nicolau:
+// `transform` está en la lista, así que sin esta puerta las 18 páginas del
+// export salían con el menú abierto tapando el hero (83% de diff en móvil).
+// Un cajón aparcado fuera de pantalla no es invisible: está en algún sitio.
+
+test('isHiddenByCascade: solo un elemento sin nada en pantalla presta su clase de estado', () => {
+  const win = (value: string) => ({ value, spec: 10, order: 1 });
+  assert.equal(isHiddenByCascade(new Map([['opacity', win('0')]])), true);
+  assert.equal(isHiddenByCascade(new Map([['visibility', win('hidden')]])), true);
+  assert.equal(isHiddenByCascade(new Map([['transform', win('translateY(-140%)')]])), false);
+  assert.equal(isHiddenByCascade(new Map([['opacity', win('1')]])), false);
+  assert.equal(isHiddenByCascade(undefined), false);
 });
 
 // ── El atajo `border` compite con `border-color` (P-2609/G9, ronda 6) ──

@@ -103,7 +103,7 @@ async function main() {
     resolvePseudoContent, parseCounterReset, parseCounterIncrement, pseudoHasVisualBox, isInlineCollapsible,
     uaDefaultDecls, shorthandsFor, expandBoxShorthand, parseInlineStyle,
     bucketForMedia, resolveBuckets, BUCKET_ORDER, isSupportedSelector,
-    selectorClassNames, relaxStateClasses, STATE_CLASS_PROPS,
+    selectorClassNames, relaxStateClasses, STATE_CLASS_PROPS, isHiddenByCascade,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -303,6 +303,10 @@ async function main() {
   // properties that can make something visible. Without this the export bakes
   // `opacity-[0]` and the block never comes back: the observer's selectors do
   // not survive Ycode rebuilding the tree.
+  //
+  // They are kept apart from `rules` because `computeBuckets` only consults
+  // them for an element the rest of the cascade leaves invisible — see
+  // `isHiddenByCascade`.
   const classesInUse = new Set<string>();
   for (const file of fs.readdirSync(SITE_DIR).filter((f) => f.endsWith('.html'))) {
     const html = fs.readFileSync(path.join(SITE_DIR, file), 'utf8');
@@ -319,8 +323,7 @@ async function main() {
     if (decls.length === 0) continue;
     stateRules.push({ ...r, sel: relaxed, decls });
   }
-  rules.push(...stateRules);
-  if (stateRules.length > 0) console.log(`Resolved ${stateRules.length} JS state-class rule(s) to their visible state`);
+  if (stateRules.length > 0) console.log(`Found ${stateRules.length} JS state-class rule(s) that can restore visibility`);
 
   // ───────────────────────── 3. Element → classes ─────────────────────────
   type El = Element & { matches: (s: string) => boolean };
@@ -374,7 +377,15 @@ async function main() {
         plain.push({ bucket: '', spec: INLINE_SPECIFICITY, order: INLINE_SPECIFICITY, decls });
       }
     }
-    for (const [bucket, map] of resolveBuckets(plain)) buckets[bucket] = map;
+    let resolved = resolveBuckets(plain);
+    // Only now, and only if the element has nothing on screen, does a JS state
+    // class get a say: `.reveal` resolves to `opacity: 0`, so `.reveal.in` is
+    // consulted; `.nav-links`, parked off-screen with a `transform`, does not.
+    if (isHiddenByCascade(resolved.get(''))) {
+      const matched = stateRules.filter((r) => matchesSafe(el, r.sel));
+      if (matched.length > 0) resolved = resolveBuckets([...plain, ...matched]);
+    }
+    for (const [bucket, map] of resolved) buckets[bucket] = map;
     // Withdraw any UA seed the author has already covered with a shorthand.
     // Specificity can't do this on its own: `padding-left` (seed) and
     // `padding` (author) are different keys in this map, so both survive and
