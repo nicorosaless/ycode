@@ -60,3 +60,53 @@ test('color/border-color with an rgba() value has no unescaped spaces left', () 
   assert.equal(cls, 'bg-[rgba(35,71,55,.15)]');
   assert.doesNotMatch(cls, /\s/);
 });
+
+// P-2609/G9: the rin5 generator writes `--f-body: "Source Sans 3", system-ui,
+// sans-serif`, and the importer resolves the custom property and strips every
+// quote before handing the declaration over (quotes can't ride inside a class
+// attribute unescaped). `3` is not a valid CSS identifier, so Chromium threw
+// the whole `font-family: Source Sans 3,system-ui,sans-serif` declaration away
+// and the entire body fell back to the system font — 6,3% weighted round-trip
+// diff, against 0,23% for the same site with a digit-free family name.
+// Any family that isn't a single valid CSS identifier is re-quoted here.
+test('a font family that is not a valid CSS identifier is emitted quoted', () => {
+  assert.deepEqual(
+    cssToClasses('font-family: "Source Sans 3", system-ui, sans-serif'),
+    ["font-['Source_Sans_3',system-ui,sans-serif]"],
+  );
+  // Same value after the importer's quote-stripping pass — the case actually measured.
+  assert.deepEqual(
+    cssToClasses('font-family: Source Sans 3,system-ui,sans-serif'),
+    ["font-['Source_Sans_3',system-ui,sans-serif]"],
+  );
+  assert.deepEqual(
+    cssToClasses('font-family: IBM Plex Sans, sans-serif'),
+    ["font-['IBM_Plex_Sans',sans-serif]"],
+  );
+  assert.deepEqual(
+    cssToClasses('font-family: Noto Sans JP, sans-serif'),
+    ["font-['Noto_Sans_JP',sans-serif]"],
+  );
+});
+
+test('a single-identifier family and the generic keywords stay unquoted', () => {
+  assert.deepEqual(
+    cssToClasses('font-family: "Archivo", system-ui, sans-serif'),
+    ['font-[Archivo,system-ui,sans-serif]'],
+  );
+  // `-apple-system` is a valid identifier (single leading hyphen + letter) and
+  // only resolves to the system font unquoted, so it must not be re-quoted.
+  assert.deepEqual(
+    cssToClasses('font-family: -apple-system, ui-sans-serif, monospace'),
+    ['font-[-apple-system,ui-sans-serif,monospace]'],
+  );
+});
+
+test('a family with non-ASCII or a leading digit is quoted too', () => {
+  assert.deepEqual(cssToClasses('font-family: Ñandú Sans, serif'), ["font-['Ñandú_Sans',serif]"]);
+  assert.deepEqual(cssToClasses('font-family: 3Suisses, serif'), ["font-['3Suisses',serif]"]);
+});
+
+test('a quote inside a family name is escaped so the arbitrary value stays parseable', () => {
+  assert.deepEqual(cssToClasses("font-family: Nico's Sans, serif"), ["font-['Nico\\'s_Sans',serif]"]);
+});

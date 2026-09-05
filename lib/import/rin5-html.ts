@@ -8,6 +8,75 @@
  * closure; nothing here touches CSS cascade resolution or Ycode's schema.
  */
 
+/**
+ * The Tailwind variant prefix a rule's `@media` context maps to. `''` is the
+ * base sheet, outside any at-rule.
+ */
+export type CssBucket = '' | 'max-lg:' | 'max-md:';
+
+/** The order buckets have to be emitted in: base first, widest query last. */
+export const BUCKET_ORDER: readonly CssBucket[] = ['', 'max-lg:', 'max-md:'];
+
+/**
+ * Map an `@media` parameter string to the Tailwind `max-*` variant that
+ * approximates it, or `null` for a query this importer doesn't represent
+ * (`min-width`, `print`, feature queries).
+ *
+ * Approximate on purpose: Tailwind's `max-md:` cuts at 767px, so a source
+ * `@media (max-width: 760px)` lands on it and the two don't break at the same
+ * pixel. Documented in `docs/rin5-import-subset.md`.
+ */
+export function bucketForMedia(params: string): CssBucket | null {
+  const m = params.match(/max-width:\s*(\d+)px/);
+  if (!m) return null;
+  const px = parseInt(m[1], 10);
+  if (px <= 767) return 'max-md:';
+  if (px <= 1200) return 'max-lg:';
+  return null;
+}
+
+/** The declaration that won for one property inside one bucket. */
+export interface CascadeWinner {
+  value: string;
+  spec: number;
+  order: number;
+}
+
+/** A parsed rule, already matched against its subject element. */
+export interface BucketedRule {
+  bucket: CssBucket;
+  spec: number;
+  order: number;
+  decls: ReadonlyArray<readonly [string, string]>;
+}
+
+/**
+ * Resolve a list of matching rules into one winner map per media bucket.
+ *
+ * Each bucket cascades on its own, exactly like the element path in
+ * `scripts/rin5-import.ts`: a `max-md:` declaration must not overwrite the
+ * base one, because the two become separate Tailwind utilities and the
+ * variant, not the declaration order, decides which applies.
+ *
+ * Pseudo-element rules used to skip this and collapse into a single cascade,
+ * so `.nav a.active::after{display:block}` lost to the `display:none` that
+ * `@media (max-width:760px)` declares later in the file and the active-link
+ * underline vanished on desktop too (P-2609/G9).
+ */
+export function resolveBuckets(rules: Iterable<BucketedRule>): Map<CssBucket, Map<string, CascadeWinner>> {
+  const buckets = new Map<CssBucket, Map<string, CascadeWinner>>();
+  for (const rule of rules) {
+    let map = buckets.get(rule.bucket);
+    if (!map) { map = new Map(); buckets.set(rule.bucket, map); }
+    for (const [prop, value] of rule.decls) {
+      const prev = map.get(prop);
+      if (prev && (prev.spec > rule.spec || (prev.spec === rule.spec && prev.order > rule.order))) continue;
+      map.set(prop, { value, spec: rule.spec, order: rule.order });
+    }
+  }
+  return buckets;
+}
+
 /** A resolved `content` value for a `::before`/`::after` rule. */
 export type PseudoContent =
   | { kind: 'text'; text: string }

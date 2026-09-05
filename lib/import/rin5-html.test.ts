@@ -12,7 +12,11 @@ import {
   shorthandsFor,
   expandBoxShorthand,
   parseInlineStyle,
+  bucketForMedia,
+  resolveBuckets,
+  BUCKET_ORDER,
 } from '@/lib/import/rin5-html';
+import { cssToClasses } from '@/lib/import/css';
 
 test('resolvePseudoContent: literal string content, quotes and escapes stripped', () => {
   assert.deepEqual(resolvePseudoContent('"→"', new Map()), { kind: 'text', text: '→' });
@@ -257,4 +261,54 @@ test('parseInlineStyle: empty, trailing-semicolon and valueless input', () => {
   assert.deepEqual(parseInlineStyle('color:red;'), [['color', 'red']]);
   assert.deepEqual(parseInlineStyle('color'), []);
   assert.deepEqual(parseInlineStyle('color:'), []);
+});
+
+// ── Media-query buckets, for pseudo-element rules too (P-2609/G9) ──
+//
+// `.nav a.active::after` is declared `display:block` in the base sheet and
+// `display:none` inside `@media (max-width:760px)`. The importer collapsed
+// every `::before`/`::after` rule into one cascade regardless of the at-rule
+// it came from, so the media rule — later in the file — simply won and the
+// active-link underline disappeared on desktop as well.
+
+test('bucketForMedia maps a max-width query to the Tailwind max-* variant it approximates', () => {
+  assert.equal(bucketForMedia('(max-width: 760px)'), 'max-md:');
+  assert.equal(bucketForMedia('(max-width: 767px)'), 'max-md:');
+  assert.equal(bucketForMedia('(max-width: 960px)'), 'max-lg:');
+  assert.equal(bucketForMedia('(min-width: 768px)'), null);
+  assert.equal(bucketForMedia('print'), null);
+});
+
+test('resolveBuckets keeps a media-query declaration out of the base bucket', () => {
+  const buckets = resolveBuckets([
+    { bucket: '', spec: 2001, order: 1, decls: [['content', '""'], ['display', 'block'], ['height', '3px']] },
+    { bucket: 'max-md:', spec: 2001, order: 2, decls: [['display', 'none']] },
+  ]);
+  assert.equal(buckets.get('')?.get('display')?.value, 'block');
+  assert.equal(buckets.get('max-md:')?.get('display')?.value, 'none');
+  assert.equal(buckets.get('max-md:')?.has('height'), false);
+});
+
+test('resolveBuckets resolves specificity and order inside each bucket independently', () => {
+  const buckets = resolveBuckets([
+    { bucket: '', spec: 1000, order: 1, decls: [['color', 'red']] },
+    { bucket: '', spec: 2000, order: 2, decls: [['color', 'green']] },
+    { bucket: '', spec: 1000, order: 3, decls: [['color', 'blue']] },
+  ]);
+  assert.equal(buckets.get('')?.get('color')?.value, 'green');
+});
+
+test('the .nav a.active::after case ends up as an unprefixed block plus a max-md:hidden', () => {
+  const buckets = resolveBuckets([
+    { bucket: '', spec: 2001, order: 1, decls: [['display', 'block'], ['height', '3px']] },
+    { bucket: 'max-md:', spec: 2001, order: 2, decls: [['display', 'none']] },
+  ]);
+  const classes: string[] = [];
+  for (const bucket of BUCKET_ORDER) {
+    const map = buckets.get(bucket);
+    if (!map) continue;
+    const decls = [...map].map(([p, w]) => `${p}: ${w.value}`).join('; ');
+    classes.push(...cssToClasses(decls).map((c) => bucket + c));
+  }
+  assert.deepEqual(classes, ['block', 'h-[3px]', 'max-md:hidden']);
 });

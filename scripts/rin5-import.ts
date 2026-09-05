@@ -25,6 +25,9 @@ moduleProto.require = function patchedRequire(this: unknown, id: string): unknow
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+// Type-only: erased at compile time, so it doesn't trip the `server-only`
+// require-patch that the rest of this script installs before loading anything.
+import type { BucketedRule, CascadeWinner, CssBucket } from '../lib/import/rin5-html';
 
 if (!process.env.RIN5_SITE_DIR) throw new Error('RIN5_SITE_DIR is required');
 const SITE_DIR = path.resolve(process.env.RIN5_SITE_DIR);
@@ -72,21 +75,16 @@ const UA_SPECIFICITY = -1;
  */
 const INLINE_SPECIFICITY = Number.MAX_SAFE_INTEGER;
 
-interface CssRule {
+interface CssRule extends BucketedRule {
   sel: string;
   hover: boolean;
-  bucket: '' | 'max-lg:' | 'max-md:';
-  spec: number;
-  order: number;
   decls: Array<[string, string]>;
 }
 
-interface PseudoRule {
+interface PseudoRule extends BucketedRule {
   /** Subject selector with the trailing `::before`/`::after` stripped. */
   sel: string;
   pseudo: 'before' | 'after';
-  spec: number;
-  order: number;
   decls: Array<[string, string]>;
 }
 
@@ -97,15 +95,6 @@ function specificity(sel: string): number {
   return ids * 1_000_000 + classes * 1_000 + types;
 }
 
-function bucketForMedia(params: string): '' | 'max-lg:' | 'max-md:' | null {
-  const m = params.match(/max-width:\s*(\d+)px/);
-  if (!m) return null;
-  const px = parseInt(m[1], 10);
-  if (px <= 767) return 'max-md:';
-  if (px <= 1200) return 'max-lg:';
-  return null;
-}
-
 async function main() {
   const { parseHTML } = await import('linkedom');
   const postcss = (await import('postcss')).default;
@@ -113,6 +102,7 @@ async function main() {
   const {
     resolvePseudoContent, parseCounterReset, parseCounterIncrement, pseudoHasVisualBox, isInlineCollapsible,
     uaDefaultDecls, shorthandsFor, expandBoxShorthand, parseInlineStyle,
+    bucketForMedia, resolveBuckets, BUCKET_ORDER,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -224,7 +214,7 @@ async function main() {
   let order = 0;
   root.walkRules((r) => {
     const parent = r.parent as { type?: string; name?: string; params?: string };
-    let bucket: '' | 'max-lg:' | 'max-md:' = '';
+    let bucket: CssBucket = '';
     if (parent?.type === 'atrule') {
       if (parent.name !== 'media') return;
       if (/prefers-reduced-motion/.test(parent.params || '')) return;
@@ -263,6 +253,7 @@ async function main() {
         pseudoRules.push({
           sel: subject,
           pseudo: pseudoMatch[2] as 'before' | 'after',
+          bucket,
           spec: specificity(subject),
           order: order++,
           decls: pseudoDecls,
@@ -303,7 +294,7 @@ async function main() {
     try { return el.matches(sel); } catch { return false; }
   };
 
-  interface Winner { value: string; spec: number; order: number }
+  type Winner = CascadeWinner;
 
   const computeBuckets = (el: El): Record<string, Map<string, Winner>> => {
     const buckets: Record<string, Map<string, Winner>> = {};
@@ -461,18 +452,16 @@ async function main() {
     for (const r of counterIncrements) if (matchesSafe(el, r.sel)) counters.set(r.name, (counters.get(r.name) ?? 0) + r.amount);
   };
 
-  const pseudoBucketFor = (el: El, pseudo: 'before' | 'after'): Map<string, Winner> | undefined => {
-    let map: Map<string, Winner> | undefined;
-    for (const r of pseudoRules) {
-      if (r.pseudo !== pseudo || !matchesSafe(el, r.sel)) continue;
-      map ??= new Map();
-      for (const [prop, rawVal] of r.decls) {
-        const prev = map.get(prop);
-        if (prev && (prev.spec > r.spec || (prev.spec === r.spec && prev.order > r.order))) continue;
-        map.set(prop, { value: rawVal, spec: r.spec, order: r.order });
-      }
-    }
-    return map;
+  // One winner map per media bucket, exactly like `computeBuckets` does for real
+  // elements. Collapsing all of them into a single cascade is what made
+  // `.nav a.active::after{display:block}` lose to the `display:none` that
+  // `@media (max-width:760px)` declares later in the sheet: the pseudo-element
+  // came out `hidden` at every width and the active-link underline disappeared
+  // on desktop as well (P-2609/G9).
+  const pseudoBucketsFor = (el: El, pseudo: 'before' | 'after'): Map<CssBucket, Map<string, Winner>> | undefined => {
+    const matched = pseudoRules.filter((r) => r.pseudo === pseudo && matchesSafe(el, r.sel));
+    if (matched.length === 0) return undefined;
+    return resolveBuckets(matched);
   };
 
   // Synthesizes a child layer for a `::before`/`::after` rule: a text leaf for
@@ -482,15 +471,24 @@ async function main() {
   // used only for hover transitions). Must run after `applyCounterMutations(el)`
   // for this element so `counter()` reads this element's own increment.
   const synthesizePseudoLayer = (el: El, pseudo: 'before' | 'after'): Layer | null => {
-    const map = pseudoBucketFor(el, pseudo);
-    if (!map) return null;
-    const resolved = resolvePseudoContent(map.get('content')?.value, counters);
+    const buckets = pseudoBucketsFor(el, pseudo);
+    if (!buckets) return null;
+    // `content` and the visual-box test look across every bucket: whether the
+    // pseudo-element exists at all is one decision for the whole layer, even
+    // when only a media query declares it. Only the styling is per-bucket.
+    const contentWinner = BUCKET_ORDER.map((b) => buckets.get(b)?.get('content')).find(Boolean);
+    const resolved = resolvePseudoContent(contentWinner?.value, counters);
     if (resolved.kind === 'skip') return null;
-    if (resolved.kind === 'empty' && !pseudoHasVisualBox([...map.keys()].filter((p) => p !== 'content'))) return null;
+    const allProps = BUCKET_ORDER.flatMap((b) => [...(buckets.get(b)?.keys() ?? [])]);
+    if (resolved.kind === 'empty' && !pseudoHasVisualBox(allProps.filter((p) => p !== 'content'))) return null;
 
-    const stylingMap = new Map(map);
-    stylingMap.delete('content');
-    const classes = bucketToClasses(stylingMap).join(' ');
+    const classes = [...new Set(BUCKET_ORDER.flatMap((bucket) => {
+      const map = buckets.get(bucket);
+      if (!map) return [];
+      const stylingMap = new Map(map);
+      stylingMap.delete('content');
+      return bucketToClasses(stylingMap).map((c) => bucket + c);
+    }))].join(' ');
     if (resolved.kind === 'empty') return { id: generateId('lyr'), name: 'div', classes };
     return {
       id: generateId('lyr'),

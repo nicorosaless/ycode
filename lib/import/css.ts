@@ -131,6 +131,63 @@ function arb(val: string): string {
   return val.replace(/\s+/g, '_');
 }
 
+/**
+ * A font family name that CSS accepts unquoted: one `<custom-ident>`, i.e. an
+ * optional single leading hyphen, then a letter, then letters/digits/hyphens.
+ *
+ * Anything else — a space, a digit-starting token, a non-ASCII character, `--`
+ * — has to be a quoted `<string>` or the browser throws the whole declaration
+ * away. Generic keywords (`sans-serif`, `system-ui`, `ui-monospace`) and the
+ * `-apple-system` system-font keyword all match, and must stay unquoted:
+ * quoting them turns a keyword into the name of a font nobody has installed.
+ */
+const UNQUOTED_FONT_FAMILY_RE = /^-?[A-Za-z][A-Za-z0-9-]*$/;
+
+/** Split a comma-separated list at top level, ignoring commas inside `()`. */
+function splitTopLevelCommas(val: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of val) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) { parts.push(current); current = ''; continue; }
+    current += ch;
+  }
+  parts.push(current);
+  return parts;
+}
+
+/**
+ * Serialise a `font-family` list for a Tailwind `font-[…]` arbitrary value.
+ *
+ * The rin5 generator writes `--f-body: "Source Sans 3", system-ui, sans-serif`
+ * and `scripts/rin5-import.ts` strips every quote before it gets here, because
+ * a raw `"` can't ride inside a `class="…"` attribute. That left
+ * `font-family: Source Sans 3,system-ui,sans-serif`, where `3` is not a valid
+ * identifier: Chromium discards the *entire* declaration and the whole body
+ * falls back to the system font. Measured on `out-v7`: 6,3% weighted
+ * round-trip diff, against 0,23% for the same site with a digit-free family
+ * name (P-2609/G9).
+ *
+ * So families are re-quoted here, with single quotes — Tailwind un-escapes
+ * `_` back to a space inside the string, and `'` survives a double-quoted HTML
+ * class attribute where `"` would not.
+ */
+function fontFamilyArb(val: string): string {
+  return splitTopLevelCommas(val)
+    .map((raw) => {
+      const family = raw.trim().replace(/^["']|["']$/g, '').trim();
+      if (!family) return '';
+      // A `var()`/`local()` leftover is not a name — pass it through untouched.
+      if (family.includes('(')) return arb(family);
+      if (UNQUOTED_FONT_FAMILY_RE.test(family)) return family;
+      return `'${arb(family.replace(/(['\\])/g, '\\$1'))}'`;
+    })
+    .filter(Boolean)
+    .join(',');
+}
+
 /** Map a single `prop: value` declaration to zero or more Tailwind classes. */
 function mapDeclaration(prop: string, val: string): string[] {
   const out: string[] = [];
@@ -224,9 +281,7 @@ function mapDeclaration(prop: string, val: string): string[] {
     // pixel diff on any page with a fluid-type heading).
     case 'font-size': out.push(`text-[${arb(val)}]`); break;
     case 'font-weight': out.push(`font-[${val}]`); break;
-    case 'font-family':
-      out.push(`font-[${val.replace(/,\s*/g, ',').replace(/\s+/g, '_')}]`);
-      break;
+    case 'font-family': out.push(`font-[${fontFamilyArb(val)}]`); break;
     case 'color': out.push(`text-[${arb(val)}]`); break;
     case 'line-height': out.push(`leading-[${arb(val)}]`); break;
     case 'letter-spacing': out.push(`tracking-[${arb(val)}]`); break;

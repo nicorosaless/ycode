@@ -66,6 +66,7 @@ valor, no altera el orden.
 | Sí | No |
 |---|---|
 | `@media (max-width: Npx)`, mapeado a `max-lg:` (≤1200px) o `max-md:` (≤767px) de Tailwind — **aproximado**, no exacto: un `@media(max-width:720px)` del original y el `max-md:` de Tailwind (≈767px) no cortan en el mismo pixel | `@media (min-width: …)` — se descarta la regla entera |
+| Reglas de `::before`/`::after` dentro de una media query — se mapean al mismo prefijo que las reglas de elementos normales | |
 | | `@supports`, `@keyframes`, `@container`, cualquier otro at-rule |
 | | `prefers-reduced-motion` — se descarta explícitamente |
 
@@ -81,6 +82,17 @@ valor, no altera el orden.
 `::before`/`::after` ganan sobre el colapso a texto enriquecido: un elemento
 que de otro modo colapsaría a una sola capa de texto se queda como
 contenedor si su pseudo-elemento genera una capa real.
+
+**Las media queries también valen para un pseudo-elemento.** La cascada de
+`::before`/`::after` se resuelve por bucket igual que la de un elemento real,
+así que `.nav a.active::after{display:block}` en la hoja base y
+`display:none` dentro de `@media (max-width:760px)` salen como
+`block … max-md:hidden`, no como un `hidden` incondicional. Antes se
+fundían en una sola cascada y ganaba la regla de la media query por ser
+posterior en el fichero: el subrayado del enlace activo desaparecía también
+en escritorio. Comprobado con Playwright sobre el export de `out-v7`: la capa
+del `::after` computa `display:block` a 1440 y `display:none` a 390, lo mismo
+que el pseudo-elemento del HTML de entrada.
 
 ## Colapso inline → texto enriquecido
 
@@ -132,6 +144,33 @@ texto pegadas sin salto — ya no existe para ningún tag.
 |---|---|
 | Fuentes de Google Fonts servidas por un `<link href="https://fonts.googleapis.com/css2?family=...">` en el `<head>` de cualquier página — se detectan por URL, no por regla CSS | `@font-face` con archivo propio auto-hospedado — no se lee; si no hay ningún link de Google Fonts, cae a un set fijo (Inter/Bricolage Grotesque/Caveat) que probablemente no es el de tu sitio |
 
+**Los nombres de fuente con dígitos, espacios o acentos ya no son un
+problema; la restricción "sin dígitos en el nombre de la fuente" queda
+retirada.** Lo era: el generador escribe `--f-body: "Source Sans 3",
+system-ui, sans-serif`, el importador resuelve la custom property y quita
+todas las comillas (un `"` no cabe dentro de un `class="…"`), y la utilidad
+salía como `font-[Source_Sans_3,system-ui,sans-serif]` → `font-family: Source
+Sans 3,system-ui,sans-serif`. `3` no es un identificador CSS válido, así que
+Chromium descartaba **la declaración entera** y todo el cuerpo caía a la
+fuente por defecto de Tailwind. Medido sobre `out-v7`: 7,75% de diff
+ponderado global, contra 0,23% con el mismo sitio y un nombre sin dígitos.
+
+`lib/import/css.ts` reescribe ahora la lista: cada familia que no sea un
+único identificador CSS válido (`/^-?[A-Za-z][A-Za-z0-9-]*$/`) se emite entre
+comillas simples y con `_` por espacio —
+`font-['Source_Sans_3',system-ui,sans-serif]`, que Tailwind compila a
+`font-family: 'Source Sans 3',system-ui,sans-serif`. Se usan comillas simples
+a propósito: sobreviven dentro de un atributo `class="…"`, las dobles no.
+Las palabras clave genéricas (`sans-serif`, `system-ui`, `ui-monospace`) y
+`-apple-system` sí son identificadores válidos y se dejan **sin** comillas —
+entrecomillarlas convertiría una palabra clave en el nombre de una fuente que
+nadie tiene instalada.
+
+Comprobado con Playwright sobre el export de `out-v7`:
+`getComputedStyle(document.body).fontFamily` da `"Source Sans 3", system-ui,
+sans-serif`, idéntico al del HTML de entrada (antes daba la pila
+`ui-sans-serif, system-ui, …` de Tailwind).
+
 ## Scripts / interactividad
 
 | Sí | No |
@@ -172,3 +211,43 @@ residuales conocidas están nombradas arriba con su elemento y su regla:
 
 Ninguna de las dos es CSS mal mapeado: son consecuencias del modelo de capas.
 Las reglas para el generador que se derivan de ellas están en sus secciones.
+
+## Ronda 4, medida sobre `out-v7`
+
+Las cifras de arriba son de `clients/7/site`, escrito a mano. La ronda 4 mide
+el sitio que produce hoy el pipeline de generación de rin5
+(`~/.rin5/bench/out-v7/run-1/output/site`, 9 páginas), que usa **Source Sans
+3** como fuente de cuerpo y tiene el `::after` del enlace de navegación activo
+apagado por media query. Los dos defectos que se corrigen en esta ronda están
+descritos en sus secciones; ninguno se veía en `clients/7`.
+
+`npm run rin5:roundtrip --schema cliente_a` + `scripts/rin5-roundtrip-diff.mjs`
+sobre las 9 páginas, viewports 1440 y 390:
+
+| página | viewport | antes | después |
+|---|---|---:|---:|
+| index | desktop | 7,35% | 1,20% |
+| index | mobile | 10,03% | 0,43% |
+| consulta-tus-notas | desktop | 4,71% | 2,59% |
+| consulta-tus-notas | mobile | 11,38% | 2,31% |
+| contacto | desktop | 4,63% | 2,37% |
+| contacto | mobile | 10,01% | 1,83% |
+| permiso-a2 | desktop | 7,20% | 2,02% |
+| permiso-a2 | mobile | 7,46% | 1,78% |
+| permiso-clase-a | desktop | 7,96% | 2,10% |
+| permiso-clase-a | mobile | 11,32% | 1,83% |
+| permiso-clase-a1 | desktop | 5,14% | 2,11% |
+| permiso-clase-a1 | mobile | 10,09% | 1,87% |
+| permiso-clase-b | desktop | 8,82% | 2,02% |
+| permiso-clase-b | mobile | 9,15% | 1,74% |
+| permisos | desktop | 8,37% | 2,42% |
+| permisos | mobile | 12,18% | 1,37% |
+| test-online-dgt | desktop | 5,17% | 2,74% |
+| test-online-dgt | mobile | 11,29% | 2,07% |
+
+**Global ponderado: 7,75% → 1,92%.** El `header.site-header` de las nueve
+páginas pasa a 0,00% en escritorio (era donde vivía el subrayado perdido).
+
+**Sigue por encima del gate del 1%**, y lo que queda ya no es tipografía: en
+escritorio se concentra en la segunda `section.section` de cada página (5,8–7,7%)
+y en `footer.site-footer` (5,3%). No se ha diagnosticado en esta ronda.
