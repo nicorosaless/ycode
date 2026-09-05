@@ -299,6 +299,48 @@ test('resolveBuckets resolves specificity and order inside each bucket independe
   assert.equal(buckets.get('')?.get('color')?.value, 'green');
 });
 
+// ── La media query no añade especificidad (P-2609/G9, ronda 6) ──
+//
+// `.split{grid-template-columns:1fr 1fr}` + `.split.narrow{…1.05fr .95fr}` y,
+// dentro de `@media(max-width:900px)`, `.split{grid-template-columns:1fr}`.
+// En un navegador, a 390px gana `.split.narrow`: la media query no suma
+// especificidad. El importador cascadeaba cada bucket por separado, así que la
+// regla de la media query era la única candidata de su bucket y salía como
+// `max-lg:grid-cols-[1fr]`, que sí ganaba. Medido en la generación de Can
+// Nicolau: el `.split` de nueve páginas colapsaba a una columna en el export y
+// no en el original (13,8% de diff en móvil).
+
+test('a media-query rule does not beat a more specific base rule at that width', () => {
+  const buckets = resolveBuckets([
+    { bucket: '', spec: 10, order: 1, decls: [['grid-template-columns', '1fr 1fr']] },
+    { bucket: '', spec: 20, order: 2, decls: [['grid-template-columns', '1.05fr .95fr']] },
+    { bucket: 'max-lg:', spec: 10, order: 3, decls: [['grid-template-columns', '1fr']] },
+  ]);
+  assert.equal(buckets.get('')?.get('grid-template-columns')?.value, '1.05fr .95fr');
+  assert.equal(buckets.get('max-lg:')?.get('grid-template-columns'), undefined);
+});
+
+test('a media-query rule still wins over a base rule of the same specificity', () => {
+  const buckets = resolveBuckets([
+    { bucket: '', spec: 10, order: 1, decls: [['grid-template-columns', '1fr 1fr']] },
+    { bucket: 'max-lg:', spec: 10, order: 2, decls: [['grid-template-columns', '1fr']] },
+  ]);
+  assert.equal(buckets.get('')?.get('grid-template-columns')?.value, '1fr 1fr');
+  assert.equal(buckets.get('max-lg:')?.get('grid-template-columns')?.value, '1fr');
+});
+
+test('the narrowest bucket inherits the wider one and only emits what changes', () => {
+  const buckets = resolveBuckets([
+    { bucket: '', spec: 10, order: 1, decls: [['padding', '40px'], ['color', 'red']] },
+    { bucket: 'max-lg:', spec: 10, order: 2, decls: [['padding', '20px']] },
+    { bucket: 'max-md:', spec: 10, order: 3, decls: [['color', 'blue']] },
+  ]);
+  // `padding` cambia una sola vez: `max-md:` hereda los 20px de `max-lg:`.
+  assert.equal(buckets.get('max-lg:')?.get('padding')?.value, '20px');
+  assert.equal(buckets.get('max-md:')?.has('padding'), false);
+  assert.equal(buckets.get('max-md:')?.get('color')?.value, 'blue');
+});
+
 test('the .nav a.active::after case ends up as an unprefixed block plus a max-md:hidden', () => {
   const buckets = resolveBuckets([
     { bucket: '', spec: 2001, order: 1, decls: [['display', 'block'], ['height', '3px']] },

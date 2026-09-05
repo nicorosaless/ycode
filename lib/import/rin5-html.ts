@@ -51,30 +51,68 @@ export interface BucketedRule {
 }
 
 /**
+ * Which buckets' rules are live at the width each bucket describes. A
+ * `max-lg:` viewport still sees every base rule; a `max-md:` one sees the base
+ * sheet *and* the `max-lg:` query, because 767px is also below 1200px.
+ */
+const RULES_LIVE_AT: Readonly<Record<CssBucket, readonly CssBucket[]>> = {
+  '': [''],
+  'max-lg:': ['', 'max-lg:'],
+  'max-md:': ['', 'max-lg:', 'max-md:'],
+};
+
+/**
  * Resolve a list of matching rules into one winner map per media bucket.
  *
- * Each bucket cascades on its own, exactly like the element path in
- * `scripts/rin5-import.ts`: a `max-md:` declaration must not overwrite the
- * base one, because the two become separate Tailwind utilities and the
- * variant, not the declaration order, decides which applies.
+ * Each bucket is the cascade *as a browser would resolve it at that width* —
+ * every rule live there competing by specificity and declaration order — minus
+ * whatever the next wider bucket already says. What comes back is therefore a
+ * delta: base carries the full winner map, `max-lg:` only the properties that
+ * change below 1200px, `max-md:` only those that change again below 767px.
+ * That is exactly the shape Tailwind variants need, and it keeps a `max-md:`
+ * declaration from overwriting the base one, which is why pseudo-element rules
+ * were pulled into this in the first place (`.nav a.active::after` lost its
+ * `display:block` to a `display:none` declared later inside a media query).
  *
- * Pseudo-element rules used to skip this and collapse into a single cascade,
- * so `.nav a.active::after{display:block}` lost to the `display:none` that
- * `@media (max-width:760px)` declares later in the file and the active-link
- * underline vanished on desktop too (P-2609/G9).
+ * The delta is what round 6 fixed. A media query adds **no specificity**: with
+ * `.split{grid-template-columns:1fr 1fr}`, `.split.narrow{…1.05fr .95fr}` and
+ * `@media(max-width:900px){.split{…1fr}}`, a browser at 390px still paints two
+ * columns, because `.split.narrow` is the more specific selector. Cascading
+ * each bucket in isolation left the media rule unopposed in its own bucket, so
+ * the importer emitted `max-lg:grid-cols-[1fr]` and the export collapsed to one
+ * column where the original does not.
  */
 export function resolveBuckets(rules: Iterable<BucketedRule>): Map<CssBucket, Map<string, CascadeWinner>> {
-  const buckets = new Map<CssBucket, Map<string, CascadeWinner>>();
+  const byBucket = new Map<CssBucket, BucketedRule[]>();
   for (const rule of rules) {
-    let map = buckets.get(rule.bucket);
-    if (!map) { map = new Map(); buckets.set(rule.bucket, map); }
-    for (const [prop, value] of rule.decls) {
-      const prev = map.get(prop);
-      if (prev && (prev.spec > rule.spec || (prev.spec === rule.spec && prev.order > rule.order))) continue;
-      map.set(prop, { value, spec: rule.spec, order: rule.order });
-    }
+    const list = byBucket.get(rule.bucket);
+    if (list) list.push(rule);
+    else byBucket.set(rule.bucket, [rule]);
   }
-  return buckets;
+
+  const out = new Map<CssBucket, Map<string, CascadeWinner>>();
+  let wider: Map<string, CascadeWinner> | null = null;
+  for (const bucket of BUCKET_ORDER) {
+    const effective = new Map<string, CascadeWinner>();
+    for (const live of RULES_LIVE_AT[bucket]) {
+      for (const rule of byBucket.get(live) ?? []) {
+        for (const [prop, value] of rule.decls) {
+          const prev = effective.get(prop);
+          if (prev && (prev.spec > rule.spec || (prev.spec === rule.spec && prev.order > rule.order))) continue;
+          effective.set(prop, { value, spec: rule.spec, order: rule.order });
+        }
+      }
+    }
+
+    const emitted = new Map<string, CascadeWinner>();
+    for (const [prop, winner] of effective) {
+      if (wider?.get(prop)?.value === winner.value) continue;
+      emitted.set(prop, winner);
+    }
+    if (emitted.size > 0) out.set(bucket, emitted);
+    wider = effective;
+  }
+  return out;
 }
 
 /**

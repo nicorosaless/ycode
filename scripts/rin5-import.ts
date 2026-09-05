@@ -297,7 +297,14 @@ async function main() {
   type Winner = CascadeWinner;
 
   const computeBuckets = (el: El): Record<string, Map<string, Winner>> => {
+    // Everything that isn't a `:hover` rule goes through `resolveBuckets`, which
+    // resolves each media bucket as the browser would at that width — base rules
+    // included — and hands back only what changes from the wider bucket. Hover
+    // keeps its own per-bucket cascade: a `hover:` utility only ever paints on
+    // top of the resting state, so it has nothing to inherit.
+    const plain: BucketedRule[] = [];
     const buckets: Record<string, Map<string, Winner>> = {};
+
     // Seed the base bucket with the browser's own defaults for this tag before
     // any author rule. Ycode's output is reset by Tailwind preflight, so a
     // source stylesheet that ships no reset of its own (the rin5 reference
@@ -307,16 +314,13 @@ async function main() {
     // them below every author declaration, exactly where the UA origin sits.
     const uaDecls = uaDefaultDecls(el.tagName);
     if (uaDecls.length > 0) {
-      const base = (buckets[''] ??= new Map());
-      for (const [prop, value] of uaDecls) {
-        base.set(prop, { value, spec: UA_SPECIFICITY, order: UA_SPECIFICITY });
-      }
+      plain.push({ bucket: '', spec: UA_SPECIFICITY, order: UA_SPECIFICITY, decls: uaDecls });
     }
     for (const r of rules) {
       const subject = r.hover ? r.sel.replace(/:hover/g, '') : r.sel;
       if (!matchesSafe(el, subject)) continue;
-      const key = (r.hover ? 'hover:' : '') + r.bucket;
-      const map = (buckets[key] ??= new Map());
+      if (!r.hover) { plain.push(r); continue; }
+      const map = (buckets['hover:' + r.bucket] ??= new Map());
       for (const [prop, rawVal] of r.decls) {
         const prev = map.get(prop);
         if (prev && (prev.spec > r.spec || (prev.spec === r.spec && prev.order > r.order))) continue;
@@ -331,12 +335,12 @@ async function main() {
     // of `h3{font-size:clamp(…)}` instead of 28px.
     const styleAttr = el.getAttribute('style');
     if (styleAttr) {
-      const base = (buckets[''] ??= new Map());
-      for (const [prop, value] of parseInlineStyle(styleAttr)) {
-        if (DROP_PROPS.has(prop)) continue;
-        base.set(prop, { value, spec: INLINE_SPECIFICITY, order: INLINE_SPECIFICITY });
+      const decls = parseInlineStyle(styleAttr).filter(([prop]) => !DROP_PROPS.has(prop));
+      if (decls.length > 0) {
+        plain.push({ bucket: '', spec: INLINE_SPECIFICITY, order: INLINE_SPECIFICITY, decls });
       }
     }
+    for (const [bucket, map] of resolveBuckets(plain)) buckets[bucket] = map;
     // Withdraw any UA seed the author has already covered with a shorthand.
     // Specificity can't do this on its own: `padding-left` (seed) and
     // `padding` (author) are different keys in this map, so both survive and
