@@ -66,7 +66,12 @@ const createConfig = (): Knex.Config => {
 
       return connectionParams;
     },
-    searchPath: [schema],
+    // `extensions` is where Supabase installs pgcrypto: a migration calling
+    // `digest()` fails with `function digest(...) does not exist` if the only
+    // entry is the tenant schema. `public` is deliberately NOT on the path —
+    // a table missing from the tenant schema must fail loudly, not silently
+    // resolve to another tenant's leftovers in `public`.
+    searchPath: [schema, 'extensions'],
     migrations: {
       directory: path.join(process.cwd(), 'database/migrations'),
       extension: 'ts',

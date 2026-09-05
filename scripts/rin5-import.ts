@@ -130,7 +130,7 @@ async function main() {
   const db = knexMod.default({
     client: 'pg',
     connection: process.env.SUPABASE_CONNECTION_URL,
-    searchPath: [resolveDbSchema()],
+    searchPath: [resolveDbSchema(), 'extensions'],
   });
   const supabase = createClient(SUPABASE_URL, SECRET, {
     auth: { persistSession: false },
@@ -944,7 +944,14 @@ async function main() {
   await db.destroy();
 }
 
-main().catch((err) => {
+/**
+ * Exposed so `scripts/rin5-roundtrip.ts` can await the import instead of
+ * racing it: importing this module is what starts the work, and without a
+ * handle to wait on, publish and export would run against a half-written site.
+ */
+export const imported = main();
+
+imported.catch((err) => {
   console.error(err);
   process.exit(1);
 });

@@ -10,7 +10,14 @@ enabled = true
 port = 57321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` and `graphql_public` schemas are included by default.
-schemas = ["public", "graphql_public"]
+#
+# Multi-tenant (P-2609, WS5): every rin5 client gets one Postgres schema in this
+# shared stack, and PostgREST only answers for schemas listed here — a schema
+# that exists but is not listed returns `PGRST106`, not an empty result. On the
+# self-hosted stack this is the `PGRST_DB_SCHEMAS` env var of the `rest`
+# container; here it is this line, applied with `supabase stop && supabase start`.
+# `cliente_a`/`cliente_b` are the two tenants the isolation test uses.
+schemas = ["public", "graphql_public", "cliente_a", "cliente_b"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
