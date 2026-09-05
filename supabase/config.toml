@@ -17,7 +17,7 @@ port = 57321
 # self-hosted stack this is the `PGRST_DB_SCHEMAS` env var of the `rest`
 # container; here it is this line, applied with `supabase stop && supabase start`.
 # `cliente_a`/`cliente_b` are the two tenants the isolation test uses.
-schemas = ["public", "graphql_public", "cliente_a", "cliente_b"]
+schemas = ["public", "graphql_public", "cliente_a", "cliente_b", "rin5_roundtrip"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
