@@ -534,6 +534,61 @@ async function main() {
 
     if (tag === 'hr') return { id: generateId('lyr'), name: 'hr', classes };
 
+    // `<details>`/`<summary>`: Ycode has no native disclosure widget, but it does
+    // have exactly the primitive this needs — a `click` interaction with a
+    // `display` tween, which the static export ships as a ~40-line runtime
+    // (`INTERACTIONS_BOOT_SCRIPT` in lib/apps/static-export/document.ts). Map the
+    // `<summary>` to the trigger and every sibling to a target that starts
+    // hidden, and the export reproduces the closed-by-default accordion the
+    // source renders — including the `+` marker, because `.faq summary::after`
+    // matches a closed `<details>` while `.faq details[open] summary::after`
+    // does not, and the importer resolves the cascade against the real DOM.
+    //
+    // Two things the model can't carry (see docs/rin5-import-subset.md): the
+    // marker doesn't flip to `–` on open (`[open]` state styling has no
+    // equivalent), and a viewport resize re-applies the on-load hidden state,
+    // closing an open panel.
+    if (tag === 'details') {
+      const summaryEl = Array.from(el.children).find(
+        (c) => (c as El).tagName.toLowerCase() === 'summary',
+      ) as El | undefined;
+      const panelEls = Array.from(el.children).filter((c) => c !== summaryEl) as El[];
+
+      if (summaryEl && panelEls.length > 0) {
+        const summaryLayer = elementToLayer(summaryEl);
+        const panelLayers = panelEls.map((c) => elementToLayer(c)).filter((l): l is Layer => !!l);
+
+        if (summaryLayer && panelLayers.length > 0) {
+          summaryLayer.interactions = [{
+            id: generateId('int'),
+            trigger: 'click',
+            // No breakpoint restriction: a disclosure is a disclosure at every
+            // width. `yoyo` is what makes the second click close it again.
+            timeline: { breakpoints: [], repeat: 0, yoyo: true },
+            tweens: panelLayers.map((panel) => ({
+              id: generateId('twn'),
+              layer_id: panel.id,
+              position: 0,
+              duration: 0,
+              ease: 'none',
+              from: { display: 'hidden' },
+              to: { display: 'visible' },
+              // `on-load` is what paints the closed state before first paint;
+              // without it every answer renders open and only hides on click.
+              apply_styles: { display: 'on-load' },
+            })),
+          }] as Layer['interactions'];
+
+          return {
+            id: generateId('lyr'),
+            name: 'div',
+            classes,
+            children: [summaryLayer, ...panelLayers],
+          };
+        }
+      }
+    }
+
     // Text leaves
     const isHeading = HEADINGS.has(tag);
     // `dd` (contact/address blocks routinely use `<dd>street<br>zip city</dd>`)
