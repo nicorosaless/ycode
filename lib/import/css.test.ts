@@ -35,3 +35,28 @@ test('a full hero figure declaration block keeps all three together', () => {
   assert.ok(classes.includes('aspect-[4/5]'));
   assert.ok(classes.includes('overflow-hidden'));
 });
+
+// P-2609/G9: `.wrap{width:min(100% - 2.5rem,var(--container))}` is the outer
+// container behind almost every section in the rin5 reference client. The
+// literal spaces `min()` puts around its own arguments used to split this
+// into several broken Tailwind class tokens the same way `clamp()` broke
+// font-size (see the fix above it in css.ts) — the class silently never
+// applied, the container lost its max-width/centering, and every section
+// rendered full width with different text wrapping than the source page.
+// Measured as the single largest remaining cause of round-trip pixel diff
+// once the pseudo-element and inline-collapse fixes landed.
+test('width/height with a min()/max()/clamp() value survive as one escaped arbitrary utility', () => {
+  assert.deepEqual(cssToClasses('width: min(100% - 2.5rem, 1220px)'), ['w-[min(100%_-_2.5rem,1220px)]']);
+  assert.deepEqual(cssToClasses('height: clamp(200px, 40vw, 480px)'), ['h-[clamp(200px,40vw,480px)]']);
+  assert.deepEqual(cssToClasses('width: 100%'), ['w-full']);
+});
+
+test('padding/margin shorthand with a function value is kept as a single side, not split on its internal spaces', () => {
+  assert.deepEqual(cssToClasses('padding: min(1rem, 4vw)'), ['p-[min(1rem,4vw)]']);
+});
+
+test('color/border-color with an rgba() value has no unescaped spaces left', () => {
+  const [cls] = cssToClasses('background-color: rgba(35, 71, 55, .15)');
+  assert.equal(cls, 'bg-[rgba(35,71,55,.15)]');
+  assert.doesNotMatch(cls, /\s/);
+});

@@ -23,7 +23,13 @@ export interface CssToClassesOptions {
 }
 
 function parseSpacingShorthand(val: string, prefix: string, sides: [string, string, string, string]): string[] {
-  const parts = val.split(/\s+/);
+  // A CSS function (`min()`/`max()`/`clamp()`/`calc()`) can contain literal
+  // spaces around its own arguments — splitting on whitespace would slice it
+  // into several bogus "shorthand" parts. Treat the whole value as a single
+  // side in that case; multi-side shorthand with a function inside one side
+  // (`padding: min(1rem,2vw) 0`) is rare enough to be out of scope (documented
+  // in docs/rin5-import-subset.md).
+  const parts = (val.includes('(') ? [val] : val.split(/\s+/)).map(arb);
   if (parts.length === 1) return [`${prefix}-[${parts[0]}]`];
   if (parts.length === 2) return [
     `${sides[0]}-[${parts[0]}]`, `${sides[1]}-[${parts[1]}]`,
@@ -165,39 +171,49 @@ function mapDeclaration(prop: string, val: string): string[] {
 
   // Per-side border width (border-top-width → border-t-[…]).
   const sideBorderWidth = prop.match(/^border-(top|right|bottom|left)-width$/);
-  if (sideBorderWidth) { out.push(`border-${SIDE_ABBR[sideBorderWidth[1]]}-[${val}]`); return out; }
+  if (sideBorderWidth) { out.push(`border-${SIDE_ABBR[sideBorderWidth[1]]}-[${arb(val)}]`); return out; }
 
   switch (prop) {
-    case 'gap': out.push(`gap-[${val}]`); break;
-    case 'row-gap': case 'grid-row-gap': out.push(`gap-y-[${val}]`); break;
-    case 'column-gap': case 'grid-column-gap': out.push(`gap-x-[${val}]`); break;
+    case 'gap': out.push(`gap-[${arb(val)}]`); break;
+    case 'row-gap': case 'grid-row-gap': out.push(`gap-y-[${arb(val)}]`); break;
+    case 'column-gap': case 'grid-column-gap': out.push(`gap-x-[${arb(val)}]`); break;
     case 'grid-gap': out.push(`gap-[${arb(val)}]`); break;
     case 'grid-template-columns': out.push(`grid-cols-[${arb(val)}]`); break;
     case 'grid-template-rows': out.push(`grid-rows-[${arb(val)}]`); break;
     case 'padding':
       out.push(...parseSpacingShorthand(val, 'p', ['pt', 'pr', 'pb', 'pl']));
       break;
-    case 'padding-top': out.push(`pt-[${val}]`); break;
-    case 'padding-right': out.push(`pr-[${val}]`); break;
-    case 'padding-bottom': out.push(`pb-[${val}]`); break;
-    case 'padding-left': out.push(`pl-[${val}]`); break;
+    case 'padding-top': out.push(`pt-[${arb(val)}]`); break;
+    case 'padding-right': out.push(`pr-[${arb(val)}]`); break;
+    case 'padding-bottom': out.push(`pb-[${arb(val)}]`); break;
+    case 'padding-left': out.push(`pl-[${arb(val)}]`); break;
     case 'margin':
       out.push(...parseSpacingShorthand(val, 'm', ['mt', 'mr', 'mb', 'ml']));
       break;
-    case 'margin-top': out.push(`mt-[${val}]`); break;
-    case 'margin-right': out.push(`mr-[${val}]`); break;
-    case 'margin-bottom': out.push(`mb-[${val}]`); break;
-    case 'margin-left': out.push(`ml-[${val}]`); break;
+    case 'margin-top': out.push(`mt-[${arb(val)}]`); break;
+    case 'margin-right': out.push(`mr-[${arb(val)}]`); break;
+    case 'margin-bottom': out.push(`mb-[${arb(val)}]`); break;
+    case 'margin-left': out.push(`ml-[${arb(val)}]`); break;
+    // `width: min(100% - 2.5rem, 1220px)` (the ubiquitous "wrap" container
+    // pattern behind almost every section in the rin5 reference client) has
+    // the exact same unescaped-space problem `font-size: clamp(…)` had: the
+    // literal spaces around `-`/`,` split `w-[min(100% - 2.5rem,1220px)]`
+    // into several broken class tokens, so the class silently never applied
+    // — the container lost its max-width and centering, every section
+    // rendered full-bleed, and text reflowed onto different line breaks
+    // throughout the whole site. Measured as the single largest remaining
+    // contributor to the round-trip diff after the pseudo-element and
+    // inline-collapse fixes (P-2609/G9).
     case 'width':
-      out.push(val === '100%' ? 'w-full' : `w-[${val}]`);
+      out.push(val === '100%' ? 'w-full' : `w-[${arb(val)}]`);
       break;
     case 'height':
-      out.push(val === '100%' ? 'h-full' : val === 'auto' ? 'h-auto' : `h-[${val}]`);
+      out.push(val === '100%' ? 'h-full' : val === 'auto' ? 'h-auto' : `h-[${arb(val)}]`);
       break;
-    case 'min-width': out.push(`min-w-[${val}]`); break;
-    case 'min-height': out.push(`min-h-[${val}]`); break;
-    case 'max-width': out.push(`max-w-[${val}]`); break;
-    case 'max-height': out.push(`max-h-[${val}]`); break;
+    case 'min-width': out.push(`min-w-[${arb(val)}]`); break;
+    case 'min-height': out.push(`min-h-[${arb(val)}]`); break;
+    case 'max-width': out.push(`max-w-[${arb(val)}]`); break;
+    case 'max-height': out.push(`max-h-[${arb(val)}]`); break;
     // `clamp(2.6rem, 5vw + 1rem, 4.75rem)`-style responsive font sizes are
     // common in modern hand-written CSS and contain literal spaces around
     // the `+`/`-` in the calc-like middle argument. Unlike box-shadow/
@@ -211,32 +227,32 @@ function mapDeclaration(prop: string, val: string): string[] {
     case 'font-family':
       out.push(`font-[${val.replace(/,\s*/g, ',').replace(/\s+/g, '_')}]`);
       break;
-    case 'color': out.push(`text-[${val}]`); break;
-    case 'line-height': out.push(`leading-[${val}]`); break;
-    case 'letter-spacing': out.push(`tracking-[${val}]`); break;
-    case 'background-color': out.push(`bg-[${val}]`); break;
-    case 'border-radius': out.push(`rounded-[${val}]`); break;
-    case 'border-top-left-radius': out.push(`rounded-tl-[${val}]`); break;
-    case 'border-top-right-radius': out.push(`rounded-tr-[${val}]`); break;
-    case 'border-bottom-right-radius': out.push(`rounded-br-[${val}]`); break;
-    case 'border-bottom-left-radius': out.push(`rounded-bl-[${val}]`); break;
-    case 'border-width': out.push(`border-[${val}]`); break;
-    case 'border-color': out.push(`border-[${val}]`); break;
+    case 'color': out.push(`text-[${arb(val)}]`); break;
+    case 'line-height': out.push(`leading-[${arb(val)}]`); break;
+    case 'letter-spacing': out.push(`tracking-[${arb(val)}]`); break;
+    case 'background-color': out.push(`bg-[${arb(val)}]`); break;
+    case 'border-radius': out.push(`rounded-[${arb(val)}]`); break;
+    case 'border-top-left-radius': out.push(`rounded-tl-[${arb(val)}]`); break;
+    case 'border-top-right-radius': out.push(`rounded-tr-[${arb(val)}]`); break;
+    case 'border-bottom-right-radius': out.push(`rounded-br-[${arb(val)}]`); break;
+    case 'border-bottom-left-radius': out.push(`rounded-bl-[${arb(val)}]`); break;
+    case 'border-width': out.push(`border-[${arb(val)}]`); break;
+    case 'border-color': out.push(`border-[${arb(val)}]`); break;
     case 'border-style':
       if (BORDER_STYLE_VALUES.has(val)) out.push(`border-${val}`);
       break;
     case 'border': {
       const m = val.match(/^(\S+)\s+(solid|dashed|dotted|double|none)\s+(.+)$/);
-      if (m) { out.push(`border-[${m[1]}]`, `border-${m[2]}`, `border-[${m[3]}]`); }
+      if (m) { out.push(`border-[${arb(m[1])}]`, `border-${m[2]}`, `border-[${arb(m[3])}]`); }
       else if (val === 'none') out.push('border-none');
       break;
     }
-    case 'opacity': out.push(`opacity-[${val}]`); break;
-    case 'top': out.push(`top-[${val}]`); break;
-    case 'right': out.push(`right-[${val}]`); break;
-    case 'bottom': out.push(`bottom-[${val}]`); break;
-    case 'left': out.push(`left-[${val}]`); break;
-    case 'z-index': out.push(`z-[${val}]`); break;
+    case 'opacity': out.push(`opacity-[${arb(val)}]`); break;
+    case 'top': out.push(`top-[${arb(val)}]`); break;
+    case 'right': out.push(`right-[${arb(val)}]`); break;
+    case 'bottom': out.push(`bottom-[${arb(val)}]`); break;
+    case 'left': out.push(`left-[${arb(val)}]`); break;
+    case 'z-index': out.push(`z-[${arb(val)}]`); break;
     case 'overflow-x':
       if (['hidden', 'auto', 'scroll', 'visible'].includes(val)) out.push(`overflow-x-${val}`);
       break;
@@ -250,8 +266,8 @@ function mapDeclaration(prop: string, val: string): string[] {
     case 'background-image': out.push(`bg-[${arb(val)}]`); break;
     case 'flex-grow': out.push(val === '0' ? 'grow-0' : 'grow'); break;
     case 'flex-shrink': out.push(val === '0' ? 'shrink-0' : 'shrink'); break;
-    case 'flex-basis': out.push(val === 'auto' ? 'basis-auto' : `basis-[${val}]`); break;
-    case 'order': out.push(`order-[${val}]`); break;
+    case 'flex-basis': out.push(val === 'auto' ? 'basis-auto' : `basis-[${arb(val)}]`); break;
+    case 'order': out.push(`order-[${arb(val)}]`); break;
     // ── Punch-list: frequent Webflow-isms ──
     case 'transition-duration': out.push(`duration-[${arb(val)}]`); break;
     case 'transition-delay': out.push(`delay-[${arb(val)}]`); break;
