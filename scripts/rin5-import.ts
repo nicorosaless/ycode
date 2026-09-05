@@ -91,6 +91,7 @@ async function main() {
   const knexMod = await import('knex');
   const sharp = (await import('sharp')).default;
   const { createClient } = await import('@supabase/supabase-js');
+  const { generateCSSForPage, generateAndSaveDraftCSS } = await import('../lib/server/cssGenerator');
 
   const SUPABASE_URL = process.env.SUPABASE_URL!;
   const SECRET = process.env.SUPABASE_SECRET_KEY!;
@@ -422,6 +423,17 @@ async function main() {
     }
     const customId = el.getAttribute('id');
     if (customId) layer.attributes = { ...layer.attributes, id: customId };
+    // Carry over data-*/aria-* attributes verbatim: the source site's mobile
+    // menu (site.js) drives itself purely off `[data-nav]`/`[data-nav-toggle]`
+    // + `data-open`/`aria-expanded`, so without these the re-imported script
+    // has nothing to attach to. Boolean/no-value attributes (`data-nav`) come
+    // back from linkedom as an empty string, which is fine for `[attr]`
+    // selectors and `getAttribute('data-nav')` presence checks.
+    for (const attr of Array.from((el as unknown as Element).attributes)) {
+      if (attr.name.startsWith('aria-') || attr.name.startsWith('data-')) {
+        layer.attributes = { ...layer.attributes, [attr.name]: attr.value };
+      }
+    }
 
     const children: Layer[] = [];
     for (const node of Array.from(el.childNodes)) {
@@ -464,11 +476,88 @@ async function main() {
     console.log(`  soft-deleted ${oldPages.length} pre-existing pages`);
   }
 
-  const fontsHead = [
+  // ───────────────────────── 4b. Fonts detection ─────────────────────────
+  // Read the site's own Google Fonts <link> tags instead of a hardcoded
+  // Inter/Bricolage/Caveat list — that list was never the family the source
+  // site actually used (--font-sans/--font-serif vary per client), so the
+  // <head> never loaded the fonts the CSS asked for and the browser silently
+  // fell back to its default sans/serif, which is a large source of pixel
+  // diff on any text-heavy page.
+  const anyHtmlFile = fs.readdirSync(SITE_DIR).find((f) => f.endsWith('.html'));
+  const headSampleHtml = anyHtmlFile ? fs.readFileSync(path.join(SITE_DIR, anyHtmlFile), 'utf8') : '';
+  const fontLinkTags = [...headSampleHtml.matchAll(
+    /<link\b[^>]*href="[^"]*fonts\.g(?:oogleapis|static)\.com[^"]*"[^>]*>/g,
+  )].map((m) => m[0]);
+  const FALLBACK_FONTS_HEAD = [
     '<link rel="preconnect" href="https://fonts.googleapis.com">',
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
     '<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Caveat:wght@600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">',
   ].join('\n');
+  const fontsHead = fontLinkTags.length > 0 ? fontLinkTags.join('\n') : FALLBACK_FONTS_HEAD;
+
+  const css2LinkHref = fontLinkTags.map((tag) => tag.match(/href="([^"]+)"/)?.[1]).find((h) => h?.includes('css2?'));
+
+  /** Parse a Google Fonts css2 URL (`family=Name:ital,wght@0,400;0,700&family=…`) into per-family weight/variant lists. */
+  function parseGoogleFontsCss2Url(href: string): Array<{ family: string; weights: number[]; variants: string[] }> {
+    const query = (href.split('?')[1] || '').replace(/&amp;/g, '&');
+    const params = new URLSearchParams(query);
+    return params.getAll('family').map((spec) => {
+      const [rawFamily, axesSpec] = spec.split(':');
+      const family = rawFamily.replace(/\+/g, ' ');
+      if (!axesSpec) return { family, weights: [400], variants: ['regular'] };
+      const [axesNamesPart, valuesPart] = axesSpec.split('@');
+      const axisNames = (axesNamesPart || '').split(',').filter(Boolean);
+      const weights = new Set<number>();
+      const variants = new Set<string>();
+      for (const tuple of (valuesPart || '').split(';').filter(Boolean)) {
+        const vals = tuple.split(',');
+        const rec: Record<string, string> = {};
+        axisNames.forEach((axis, i) => { rec[axis] = vals[i]; });
+        const wght = rec.wght ? parseInt(rec.wght, 10) : 400;
+        const ital = rec.ital === '1';
+        weights.add(wght);
+        variants.add(ital ? `${wght}italic` : (wght === 400 ? 'regular' : String(wght)));
+      }
+      return { family, weights: [...weights].sort((a, b) => a - b), variants: [...variants] };
+    });
+  }
+
+  // `--font-sans`/`--font-serif`/`--font-mono` custom properties tell us which
+  // detected family plays which role, so the `fonts` table category matches
+  // (purely metadata — the arbitrary `font-[…]` utilities already embed the
+  // full literal stack — but rin5-import should still leave the fonts table
+  // in the shape a human editing in Ycode would expect).
+  const categoryByFamilyLower = new Map<string, string>();
+  for (const [varName, varValue] of vars) {
+    if (!varName.startsWith('--font-')) continue;
+    const category = varName.includes('serif') ? 'serif' : varName.includes('mono') ? 'monospace' : 'sans-serif';
+    const m = varValue.match(/^"?([^",]+)"?/);
+    if (m) categoryByFamilyLower.set(m[1].trim().toLowerCase(), category);
+  }
+
+  const detectedFonts = css2LinkHref
+    ? parseGoogleFontsCss2Url(css2LinkHref).map((f) => ({
+      name: f.family.toLowerCase().replace(/\s+/g, '-'),
+      family: f.family,
+      category: categoryByFamilyLower.get(f.family.toLowerCase()) || 'sans-serif',
+      weights: f.weights,
+      variants: f.variants,
+    }))
+    : null;
+
+  // Mobile-menu behavior (`[data-nav-toggle]` / `[data-nav]` / `data-open`)
+  // lives in a tiny site-wide script, not a Ycode component. Ycode's static
+  // export has no generic "attach this script to every page" mechanism
+  // outside of `settings.custom_code`, which is per-page — so the script is
+  // duplicated into every page's `custom_code.body` verbatim (same content
+  // the source site itself served) rather than mapped onto Ycode's own nav
+  // component, which does not model this toggle behavior. Element attributes
+  // it depends on (`data-nav`, `data-nav-toggle`) are carried over by the
+  // generic data-*/aria-* passthrough in `elementToLayerInner` above.
+  const siteJsPath = path.join(SITE_DIR, 'site.js');
+  const siteJsBody = fs.existsSync(siteJsPath)
+    ? `<script>${fs.readFileSync(siteJsPath, 'utf8')}</script>`
+    : '';
 
   let orderIdx = 0;
   const importedPages: Array<{ id: string; slug: string; name: string }> = [];
@@ -479,7 +568,7 @@ async function main() {
     const isIndex = base === 'index';
     const slug = isIndex ? '' : base;
     const title = document.querySelector('title')?.textContent?.trim() || base;
-    const name = isIndex ? 'Inicio' : (title.split(/[—|]/)[0].trim() || base);
+    const name = isIndex ? 'Inicio' : (title.split(/[—|·]/)[0].trim() || base);
     const description = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
     const noindex = /noindex/.test(document.querySelector('meta[name="robots"]')?.getAttribute('content') || '');
 
@@ -495,7 +584,7 @@ async function main() {
 
     const settings = {
       seo: { title, description, image: null, noindex },
-      custom_code: { head: fontsHead, body: '' },
+      custom_code: { head: fontsHead, body: siteJsBody },
     };
     const metaHash = generatePageMetadataHash({
       name, slug, settings, is_index: isIndex, is_dynamic: false, error_page: null,
@@ -522,14 +611,40 @@ async function main() {
     });
     importedPages.push({ id: page.id, slug, name });
     console.log(`  ✓ ${file} → /${slug} (${name})`);
+
+    // Compile this page's Tailwind classes into page_layers.generated_css.
+    // Not strictly what feeds the export bundle (see draft_css note below),
+    // but it keeps per-page content_hash / builder-canvas CSS consistent with
+    // how the app itself generates CSS after any layer edit.
+    await generateCSSForPage(page.id);
   }
 
+  // The static-export pipeline (lib/apps/static-export/engine.ts) injects the
+  // `published_css` *setting*, not any single page's `generated_css` — and
+  // `published_css` is just a copy of the `draft_css` setting made at publish
+  // time (lib/services/settingsService.ts). `draft_css` itself is a full
+  // recompile across every draft page + component (generateAndSaveDraftCSS),
+  // not an aggregate of the per-page columns above. Without this call
+  // `draft_css` stays whatever it was before this import (typically empty),
+  // publish would copy nothing into `published_css`, and the export would
+  // ship zero Tailwind rules — which was the dominant cause of the measured
+  // 26-74% pixel diff.
+  await generateAndSaveDraftCSS();
+
   // ───────────────────────── 6. Fonts ─────────────────────────
-  const fonts = [
+  const fonts = detectedFonts ?? [
     { name: 'inter', family: 'Inter', category: 'sans-serif', weights: [400, 500, 600, 700], variants: ['regular', '500', '600', '700'] },
     { name: 'bricolage-grotesque', family: 'Bricolage Grotesque', category: 'sans-serif', weights: [700, 800], variants: ['700', '800'] },
     { name: 'caveat', family: 'Caveat', category: 'handwriting', weights: [600], variants: ['600'] },
   ];
+  // Drop stale font rows from a previous run whose detected family list
+  // doesn't match this one (e.g. re-importing a different client site).
+  const keepFontNames = fonts.map((f) => f.name);
+  const staleFonts = await db('fonts').where({ is_published: false }).whereNull('deleted_at').whereNotIn('name', keepFontNames);
+  if (staleFonts.length > 0) {
+    await db('fonts').whereIn('id', staleFonts.map((f) => f.id)).update({ deleted_at: now });
+    console.log(`  soft-deleted ${staleFonts.length} stale font row(s)`);
+  }
   for (const f of fonts) {
     const exists = await db('fonts').where({ name: f.name, is_published: false }).whereNull('deleted_at').first();
     if (exists) continue;
