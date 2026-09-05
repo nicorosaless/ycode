@@ -103,6 +103,7 @@ async function main() {
     resolvePseudoContent, parseCounterReset, parseCounterIncrement, pseudoHasVisualBox, isInlineCollapsible,
     uaDefaultDecls, shorthandsFor, expandBoxShorthand, parseInlineStyle,
     bucketForMedia, resolveBuckets, BUCKET_ORDER, isSupportedSelector,
+    selectorClassNames, relaxStateClasses, STATE_CLASS_PROPS,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -293,6 +294,33 @@ async function main() {
     }
   });
   console.log(`Parsed ${rules.length} CSS rule entries`);
+
+  // Reveal-on-scroll. A class the stylesheet tests for but that no element of
+  // any page carries is set from script — `.reveal.in` is the pattern every
+  // generated sheet uses. Those rules are replayed with the phantom classes
+  // taken out of the selector so they reach their subject, keeping the original
+  // specificity (`.reveal.in` still outranks `.reveal`) and carrying only the
+  // properties that can make something visible. Without this the export bakes
+  // `opacity-[0]` and the block never comes back: the observer's selectors do
+  // not survive Ycode rebuilding the tree.
+  const classesInUse = new Set<string>();
+  for (const file of fs.readdirSync(SITE_DIR).filter((f) => f.endsWith('.html'))) {
+    const html = fs.readFileSync(path.join(SITE_DIR, file), 'utf8');
+    for (const m of html.matchAll(/\sclass\s*=\s*"([^"]*)"/g)) {
+      for (const name of m[1].split(/\s+/)) if (name) classesInUse.add(name);
+    }
+  }
+  const stateRules: CssRule[] = [];
+  for (const r of rules) {
+    if (!selectorClassNames(r.sel).some((name) => !classesInUse.has(name))) continue;
+    const relaxed = relaxStateClasses(r.sel, classesInUse);
+    if (!relaxed) continue;
+    const decls = r.decls.filter(([prop]) => STATE_CLASS_PROPS.has(prop));
+    if (decls.length === 0) continue;
+    stateRules.push({ ...r, sel: relaxed, decls });
+  }
+  rules.push(...stateRules);
+  if (stateRules.length > 0) console.log(`Resolved ${stateRules.length} JS state-class rule(s) to their visible state`);
 
   // ───────────────────────── 3. Element → classes ─────────────────────────
   type El = Element & { matches: (s: string) => boolean };

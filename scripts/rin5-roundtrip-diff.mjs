@@ -123,6 +123,25 @@ async function screenshotRegions(page, url, viewportWidth) {
   await page.goto(url, { waitUntil: 'networkidle' });
   await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
 
+  // Walk the whole page before capturing, half a viewport at a time.
+  // A `fullPage` screenshot of a page that reveals on scroll is otherwise a
+  // reference nobody ever sees: `.reveal{opacity:0}` plus an
+  // IntersectionObserver means only what has actually been inside the 1000px
+  // viewport is visible, so on the Hipiclub bundle 17 of 19 revealed blocks
+  // were captured blank while a real visitor sees every one of them. The dwell
+  // is not decoration — jumping a full viewport per frame let the observer
+  // coalesce the moves and still left 17 blocks hidden.
+  await page.evaluate(async () => {
+    const step = Math.max(1, Math.round(window.innerHeight / 2));
+    for (let y = 0; y < document.body.scrollHeight + step; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+    window.scrollTo(0, 0);
+    // Long enough for the slowest reveal transition in these sheets (0.7s).
+    await new Promise((resolve) => setTimeout(resolve, 900));
+  });
+
   // Page-relative boxes (getBoundingClientRect + scroll offset), not
   // `elementHandle.screenshot()` after `scrollIntoViewIfNeeded()`: with a
   // `position:sticky` header (both bundles have one), repeatedly scrolling

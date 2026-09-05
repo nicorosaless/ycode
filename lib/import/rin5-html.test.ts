@@ -13,6 +13,9 @@ import {
   expandBoxShorthand,
   parseInlineStyle,
   bucketForMedia,
+  relaxStateClasses,
+  selectorClassNames,
+  STATE_CLASS_PROPS,
   resolveBuckets,
   BUCKET_ORDER,
   isSupportedSelector,
@@ -282,6 +285,40 @@ test('parseInlineStyle: empty, trailing-semicolon and valueless input', () => {
   assert.deepEqual(parseInlineStyle('color:red;'), [['color', 'red']]);
   assert.deepEqual(parseInlineStyle('color'), []);
   assert.deepEqual(parseInlineStyle('color:'), []);
+});
+
+// ── Reveal on scroll: la clase que pone el JS (P-2609/G9, ronda 6) ──
+//
+// `.reveal{opacity:0}` + `.reveal.in{opacity:1}` y un IntersectionObserver que
+// añade `in`. El importador lee un documento estático, así que horneaba
+// `opacity-[0]` y en el export —donde el observador ya no casa— la sección se
+// quedaba invisible para siempre. Nueve secciones de Hipiclub salían como una
+// banda crema vacía.
+
+test('relaxStateClasses resuelve la clase que el HTML nunca lleva', () => {
+  const present = new Set(['reveal', 'section', 'step']);
+  assert.equal(relaxStateClasses('.reveal.in', present), '.reveal');
+  assert.equal(relaxStateClasses('.section .step.in', present), '.section .step');
+  assert.equal(relaxStateClasses('.reveal.in > .step', present), '.reveal > .step');
+});
+
+test('relaxStateClasses no toca un selector que ya casa, ni inventa uno vacío', () => {
+  const present = new Set(['reveal']);
+  assert.equal(relaxStateClasses('.reveal', present), null);
+  assert.equal(relaxStateClasses('.in', present), null, 'un compound que solo es estado no deja selector');
+  assert.equal(relaxStateClasses('.reveal .in', present), null);
+});
+
+test('selectorClassNames lista las clases que el selector comprueba', () => {
+  assert.deepEqual(selectorClassNames('.nav-links.open a'), ['nav-links', 'open']);
+  assert.deepEqual(selectorClassNames('a[data-x] > *'), []);
+});
+
+test('STATE_CLASS_PROPS deja fuera lo que abriría un menú cerrado', () => {
+  assert.equal(STATE_CLASS_PROPS.has('opacity'), true);
+  assert.equal(STATE_CLASS_PROPS.has('transform'), true);
+  assert.equal(STATE_CLASS_PROPS.has('display'), false);
+  assert.equal(STATE_CLASS_PROPS.has('max-height'), false);
 });
 
 // ── El atajo `border` compite con `border-color` (P-2609/G9, ronda 6) ──

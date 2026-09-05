@@ -159,6 +159,62 @@ export function isSupportedSelector(sel: string): boolean {
   return SELECTOR_ANCHOR_RE.test(s);
 }
 
+/** Every class name a selector tests for, in source order and with repeats. */
+export function selectorClassNames(sel: string): string[] {
+  return [...sel.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
+}
+
+/**
+ * The properties a JS-toggled state class is allowed to resolve.
+ *
+ * Deliberately short. See `relaxStateClasses` for why the list cannot simply be
+ * "all of them".
+ */
+export const STATE_CLASS_PROPS: ReadonlySet<string> = new Set(['opacity', 'transform', 'visibility']);
+
+/**
+ * Rewrite a selector as if the given classes were present on the element, or
+ * `null` when nothing changes or when a compound is nothing but state classes.
+ *
+ * This is how the importer represents reveal-on-scroll, the one JS-driven
+ * pattern every generated sheet uses:
+ *
+ * ```css
+ * .reveal    { opacity: 0; transform: translateY(22px); transition: … }
+ * .reveal.in { opacity: 1; transform: none }
+ * ```
+ *
+ * `in` is never written in the HTML — an IntersectionObserver adds it when the
+ * block scrolls into view. The importer reads a static document, so it only
+ * ever saw `.reveal` and baked `opacity-[0]` into the layer. The class never
+ * arrives in the export (Ycode rebuilds the tree, and the observer's selectors
+ * no longer match), so the block stays invisible for good: nine sections of the
+ * Hipiclub generation exported as an empty cream band, 2,63% weighted.
+ *
+ * A class that appears in the stylesheet but on no element of any page is by
+ * definition set from script. Which of its states is "the" state is not
+ * knowable, so the resolution is restricted to `STATE_CLASS_PROPS`: making
+ * something visible is the only guess that cannot be worse than not guessing.
+ * Nothing else follows the phantom class — `.nav-links.open{display:block}` is
+ * read from the same sheet and stays shut, which is what a page loads as.
+ */
+export function relaxStateClasses(sel: string, present: ReadonlySet<string>): string | null {
+  let removed = false;
+  const compounds = sel.trim().split(/(\s*[>+~]\s*|\s+)/);
+  const out: string[] = [];
+  for (const compound of compounds) {
+    if (!compound || /^\s*[>+~]?\s*$/.test(compound)) { out.push(compound); continue; }
+    const stripped = compound.replace(/\.([\w-]+)/g, (match, name: string) => {
+      if (present.has(name)) return match;
+      removed = true;
+      return '';
+    });
+    if (stripped === '') return null;
+    out.push(stripped);
+  }
+  return removed ? out.join('') : null;
+}
+
 /** A resolved `content` value for a `::before`/`::after` rule. */
 export type PseudoContent =
   | { kind: 'text'; text: string }
