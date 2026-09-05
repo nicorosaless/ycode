@@ -19,6 +19,7 @@ import path from 'path'
 import { base62ToUuid } from '@/lib/convertion-utils'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 
+import type { OriginalAsset } from './original-assets'
 import { mediaContentType, type OutputFile } from './writers/types'
 
 /**
@@ -148,4 +149,55 @@ export async function collectPublicAssets(urlPaths: string[]): Promise<OutputFil
     }
   }
   return out
+}
+
+/**
+ * Bundle rin5-imported assets at `assets/<filename>` with their original
+ * bytes (`RIN5_EXPORT_ORIGINAL_ASSETS=1`, see `./original-assets`).
+ *
+ * Scans the already-rewritten HTML rather than shipping the whole asset table,
+ * so an export only carries what its pages actually reference. Bytes come
+ * straight from Supabase Storage — the same path `collectSupabaseAssets` uses,
+ * which never goes through Sharp — so what lands on disk is byte-identical to
+ * what `scripts/rin5-import.ts` uploaded.
+ */
+export async function collectOriginalAssets(
+  htmlOutputs: OutputFile[],
+  assets: Map<string, OriginalAsset>,
+): Promise<OutputFile[]> {
+  const wanted = new Map<string, OriginalAsset>()
+  for (const asset of assets.values()) {
+    const marker = `/${asset.outputKey}`
+    if (htmlOutputs.some((f) => typeof f.body === 'string' && f.body.includes(marker))) {
+      wanted.set(asset.outputKey, asset)
+    }
+  }
+  if (wanted.size === 0) return []
+
+  const queue = Array.from(wanted.values())
+  const results: OutputFile[] = []
+  let cursor = 0
+  const workers = Array.from({ length: Math.min(PROXY_FETCH_CONCURRENCY, queue.length) }, async () => {
+    while (cursor < queue.length) {
+      const asset = queue[cursor++]
+      try {
+        const response = await fetch(asset.publicUrl)
+        if (!response.ok) {
+          console.warn(`[Static Export] HTTP ${response.status} fetching ${asset.filename}`)
+          continue
+        }
+        results.push({
+          key: asset.outputKey,
+          body: Buffer.from(await response.arrayBuffer()),
+          contentType: asset.mimeType || mediaContentType(asset.outputKey),
+        })
+      } catch (err) {
+        console.warn(
+          `[Static Export] Fetch failed for ${asset.outputKey}: ${err instanceof Error ? err.message : err}`,
+        )
+      }
+    }
+  })
+  await Promise.all(workers)
+  return results
 }

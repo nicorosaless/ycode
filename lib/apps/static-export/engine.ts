@@ -26,7 +26,15 @@ import { getSupabaseAdmin } from '@/lib/supabase-server'
 
 import type { Locale, Page, PageFolder } from '@/types'
 
-import { collectPublicAssets, collectSupabaseAssets } from './asset-bundler'
+import { collectPublicAssets, collectSupabaseAssets, collectOriginalAssets } from './asset-bundler'
+import {
+  buildOriginalAssetMap,
+  isOriginalAssetsMode,
+  rewriteToOriginalAssets,
+  RIN5_IMPORT_ASSET_SOURCE,
+  type AssetRow,
+  type OriginalAsset,
+} from './original-assets'
 import { getExportConfig, saveLastExportJob } from './config'
 import { buildDocument, SWIPER_CSS_PATH } from './document'
 import {
@@ -51,7 +59,7 @@ import { createS3Writer } from './writers/s3'
  *
  * Handles both bundled asset paths and internal page links.
  */
-const ABSOLUTE_ASSET_RE = /(?<=["'\s,=])\/(?=a\/[A-Za-z0-9]{22}\/|ycode\/layouts\/assets\/|swiper-minimal\.css)/g
+const ABSOLUTE_ASSET_RE = /(?<=["'\s,=(])\/(?=a\/[A-Za-z0-9]{22}\/|assets\/|ycode\/layouts\/assets\/|swiper-minimal\.css)/g
 const INTERNAL_LINK_RE = /href="\/([^"]*?)"/g
 
 function relativizePaths(html: string, outputKey: string): string {
@@ -63,6 +71,9 @@ function relativizePaths(html: string, outputKey: string): string {
   result = result.replace(INTERNAL_LINK_RE, (_match, path: string) => {
     if (/^a\/[A-Za-z0-9]{22}\//.test(path)) return `href="${prefix}${path}"`
     if (path.startsWith('ycode/layouts/assets/')) return `href="${prefix}${path}"`
+    // `assets/…` only appears under RIN5_EXPORT_ORIGINAL_ASSETS; it's a file,
+    // not a route, so it must not grow an `/index.html`.
+    if (path.startsWith('assets/')) return `href="${prefix}${path}"`
 
     const hashIdx = path.indexOf('#')
     const pathPart = hashIdx >= 0 ? path.slice(0, hashIdx) : path
@@ -199,6 +210,27 @@ export async function exportSite(presetJobId?: string, overrideWriters?: readonl
       fontPreloads = getCustomFontPreloads(fonts)
     }
 
+    // ---- Original-bytes asset mode (rin5 round-trip, opt-in) ------------
+    // Loaded once up front: the rewrite runs per page, but the asset table
+    // doesn't change mid-export.
+    let originalAssets: Map<string, OriginalAsset> = new Map()
+    if (isOriginalAssetsMode(process.env)) {
+      const { data: assetRows, error: assetsError } = await client
+        .from('assets')
+        .select('id, filename, mime_type, storage_path, public_url')
+        .eq('source', RIN5_IMPORT_ASSET_SOURCE)
+        .eq('is_published', true)
+        .is('deleted_at', null)
+      if (assetsError) {
+        throw new Error(`Failed to fetch rin5-imported assets: ${assetsError.message}`)
+      }
+      originalAssets = buildOriginalAssetMap((assetRows ?? []) as AssetRow[])
+      console.log(
+        `[Static Export] RIN5_EXPORT_ORIGINAL_ASSETS: serving ${originalAssets.size} imported asset(s) ` +
+          'from assets/<filename> with their original bytes',
+      )
+    }
+
     // ---- Render every page (default locale + per non-default locale) ----
     const outputs: OutputFile[] = []
     const referencedAssetPaths = new Set<string>()
@@ -209,7 +241,7 @@ export async function exportSite(presetJobId?: string, overrideWriters?: readonl
       try {
         for await (const resolved of resolvePages(page, folders, pages, ctx)) {
           yieldedAny = true
-          const html = buildDocument({
+          const rendered = buildDocument({
             page: resolved.page,
             bodyHtml: resolved.bodyHtml,
             bodyClasses: resolved.bodyClasses,
@@ -226,6 +258,11 @@ export async function exportSite(presetJobId?: string, overrideWriters?: readonl
             pageCustomCodeHead: resolved.pageCustomCodeHead,
             pageCustomCodeBody: resolved.pageCustomCodeBody,
           })
+
+          // Swap Ycode's image-proxy URLs for the original `assets/<filename>`
+          // paths before anything else reads the document — the collectors and
+          // the relativizer below both work off the final string.
+          const html = rewriteToOriginalAssets(rendered, originalAssets)
 
           // Collect Ycode's built-in placeholder URLs referenced from this
           // page so we can ship them alongside the HTML for fully
@@ -287,6 +324,15 @@ export async function exportSite(presetJobId?: string, overrideWriters?: readonl
     if (referencedAssetPaths.size > 0) {
       const assetFiles = await collectPublicAssets(Array.from(referencedAssetPaths))
       outputs.push(...assetFiles)
+    }
+
+    // ---- Bundle the original bytes of every rewritten asset -------------
+    if (originalAssets.size > 0) {
+      const originalFiles = await collectOriginalAssets(
+        outputs.filter((o) => o.key.endsWith('.html')),
+        originalAssets,
+      )
+      outputs.push(...originalFiles)
     }
 
     // ---- Bundle referenced Supabase-hosted assets -----------------------
