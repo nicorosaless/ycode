@@ -297,3 +297,31 @@ export function expandBoxShorthand(prop: string, value: string): Array<[string, 
     [`${prop}-left`, left + suffix],
   ];
 }
+
+/**
+ * Parse a `style` attribute into cascade-ready declarations.
+ *
+ * The importer used to hand the attribute straight to `cssToClasses` and append
+ * the result after everything else. That reads like it should win, but the
+ * classes all land in one flat `class` attribute where order means nothing —
+ * the winner is whichever utility Tailwind generated last. An inline style
+ * outranks every selector in real CSS, so it belongs in the same winner map as
+ * the rest, just at the top.
+ *
+ * `margin`/`padding` come back expanded for the same reason they do in
+ * `expandBoxShorthand`.
+ */
+export function parseInlineStyle(style: string): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  for (const decl of style.split(';')) {
+    const colon = decl.indexOf(':');
+    if (colon === -1) continue;
+    const prop = decl.slice(0, colon).trim().toLowerCase();
+    const value = decl.slice(colon + 1).trim();
+    if (!prop || !value) continue;
+    const expanded = expandBoxShorthand(prop, value);
+    if (expanded) out.push(...expanded);
+    else out.push([prop, value]);
+  }
+  return out;
+}

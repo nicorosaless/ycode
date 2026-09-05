@@ -11,6 +11,7 @@ import {
   uaDefaultDecls,
   shorthandsFor,
   expandBoxShorthand,
+  parseInlineStyle,
 } from '@/lib/import/rin5-html';
 
 test('resolvePseudoContent: literal string content, quotes and escapes stripped', () => {
@@ -233,4 +234,27 @@ test('expandBoxShorthand: leaves anything that is not a box shorthand alone', ()
   assert.equal(expandBoxShorthand('margin-top', '1em'), null);
   assert.equal(expandBoxShorthand('border', '1px solid red'), null);
   assert.equal(expandBoxShorthand('gap', '1rem 2rem'), null);
+});
+
+test('parseInlineStyle: declarations, with margin/padding already expanded', () => {
+  // `<h3 style="font-family:var(--font-serif);font-size:1.75rem">` in
+  // permiso-a.html. The importer used to append inline styles as extra classes
+  // after the cascade instead of putting them *in* it, so `text-[1.75rem]` and
+  // the `h3{font-size:clamp(…)}` class both reached the output and Tailwind's
+  // generation order picked the loser: 21.6px instead of 28px.
+  assert.deepEqual(parseInlineStyle('font-family:var(--font-serif);font-size:1.75rem'), [
+    ['font-family', 'var(--font-serif)'],
+    ['font-size', '1.75rem'],
+  ]);
+  assert.deepEqual(parseInlineStyle('margin:0 auto'), [
+    ['margin-top', '0'], ['margin-right', 'auto'], ['margin-bottom', '0'], ['margin-left', 'auto'],
+  ]);
+});
+
+test('parseInlineStyle: empty, trailing-semicolon and valueless input', () => {
+  assert.deepEqual(parseInlineStyle(''), []);
+  assert.deepEqual(parseInlineStyle('  '), []);
+  assert.deepEqual(parseInlineStyle('color:red;'), [['color', 'red']]);
+  assert.deepEqual(parseInlineStyle('color'), []);
+  assert.deepEqual(parseInlineStyle('color:'), []);
 });

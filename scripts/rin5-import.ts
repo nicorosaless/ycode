@@ -65,6 +65,13 @@ const DROP_PROPS = new Set([
  */
 const UA_SPECIFICITY = -1;
 
+/**
+ * Cascade weight of a `style` attribute: above every selector, since
+ * `specificity()` tops out at the id count times a million and no real
+ * selector carries thousands of ids.
+ */
+const INLINE_SPECIFICITY = Number.MAX_SAFE_INTEGER;
+
 interface CssRule {
   sel: string;
   hover: boolean;
@@ -105,7 +112,7 @@ async function main() {
   const { cssToClasses } = await import('../lib/import/css');
   const {
     resolvePseudoContent, parseCounterReset, parseCounterIncrement, pseudoHasVisualBox, isInlineCollapsible,
-    uaDefaultDecls, shorthandsFor, expandBoxShorthand,
+    uaDefaultDecls, shorthandsFor, expandBoxShorthand, parseInlineStyle,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -315,6 +322,20 @@ async function main() {
         map.set(prop, { value: rawVal, spec: r.spec, order: r.order });
       }
     }
+    // A `style` attribute outranks every selector. It used to be appended to the
+    // class list after the cascade instead of taking part in it — which reads
+    // like it should win, but the classes all end up in one flat attribute
+    // where order means nothing and Tailwind's generation order picks the
+    // winner. Measured: `<h3 style="font-size:1.75rem">` rendered at the 21.6px
+    // of `h3{font-size:clamp(…)}` instead of 28px.
+    const styleAttr = el.getAttribute('style');
+    if (styleAttr) {
+      const base = (buckets[''] ??= new Map());
+      for (const [prop, value] of parseInlineStyle(styleAttr)) {
+        if (DROP_PROPS.has(prop)) continue;
+        base.set(prop, { value, spec: INLINE_SPECIFICITY, order: INLINE_SPECIFICITY });
+      }
+    }
     // Withdraw any UA seed the author has already covered with a shorthand.
     // Specificity can't do this on its own: `padding-left` (seed) and
     // `padding` (author) are different keys in this map, so both survive and
@@ -354,8 +375,6 @@ async function main() {
       const prefix = key.startsWith('hover:') ? 'hover:' : key;
       out.push(...bucketToClasses(map).map((c) => (prefix ? prefix + c : c)));
     }
-    const styleAttr = el.getAttribute('style');
-    if (styleAttr) out.push(...cssToClasses(rewriteUrls(resolveVars(styleAttr))));
     return [...new Set(out)].join(' ');
   };
 
