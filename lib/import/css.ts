@@ -198,7 +198,15 @@ function mapDeclaration(prop: string, val: string): string[] {
     case 'min-height': out.push(`min-h-[${val}]`); break;
     case 'max-width': out.push(`max-w-[${val}]`); break;
     case 'max-height': out.push(`max-h-[${val}]`); break;
-    case 'font-size': out.push(`text-[${val}]`); break;
+    // `clamp(2.6rem, 5vw + 1rem, 4.75rem)`-style responsive font sizes are
+    // common in modern hand-written CSS and contain literal spaces around
+    // the `+`/`-` in the calc-like middle argument. Unlike box-shadow/
+    // background-image/transform above, this case used to emit `val` raw —
+    // the unescaped space split the Tailwind arbitrary value into multiple
+    // broken class tokens, so `clamp()` headings silently lost their
+    // font-size rule (dominant cause of the P-2609 rin5-import round-trip
+    // pixel diff on any page with a fluid-type heading).
+    case 'font-size': out.push(`text-[${arb(val)}]`); break;
     case 'font-weight': out.push(`font-[${val}]`); break;
     case 'font-family':
       out.push(`font-[${val.replace(/,\s*/g, ',').replace(/\s+/g, '_')}]`);
