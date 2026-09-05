@@ -66,6 +66,15 @@ interface CssRule {
   decls: Array<[string, string]>;
 }
 
+interface PseudoRule {
+  /** Subject selector with the trailing `::before`/`::after` stripped. */
+  sel: string;
+  pseudo: 'before' | 'after';
+  spec: number;
+  order: number;
+  decls: Array<[string, string]>;
+}
+
 function specificity(sel: string): number {
   const ids = (sel.match(/#[\w-]+/g) || []).length;
   const classes = (sel.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+(\([^)]*\))?/g) || []).length;
@@ -86,6 +95,9 @@ async function main() {
   const { parseHTML } = await import('linkedom');
   const postcss = (await import('postcss')).default;
   const { cssToClasses } = await import('../lib/import/css');
+  const {
+    resolvePseudoContent, parseCounterReset, parseCounterIncrement, pseudoHasVisualBox, isInlineCollapsible,
+  } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
   const knexMod = await import('knex');
@@ -173,7 +185,16 @@ async function main() {
       return a ? `url(${a.public_url})` : m;
     });
 
+  // `content` is meaningless as a Tailwind class on a real element (DROP_PROPS
+  // still drops it there) but is exactly what a `::before`/`::after` rule needs
+  // to synthesize — kept for pseudoRules only, see PSEUDO_DROP_PROPS below.
+  const PSEUDO_DROP_PROPS = new Set([...DROP_PROPS].filter((p) => p !== 'content'));
+  const PSEUDO_SUFFIX_RE = /(::?(before|after))$/;
+
   const rules: CssRule[] = [];
+  const pseudoRules: PseudoRule[] = [];
+  const counterResets: Array<{ sel: string; name: string; value: number }> = [];
+  const counterIncrements: Array<{ sel: string; name: string; amount: number }> = [];
   let order = 0;
   root.walkRules((r) => {
     const parent = r.parent as { type?: string; name?: string; params?: string };
@@ -186,16 +207,35 @@ async function main() {
       bucket = b;
     }
     const decls: Array<[string, string]> = [];
+    const pseudoDecls: Array<[string, string]> = [];
     r.walkDecls((d) => {
       if (d.prop.startsWith('--')) return;
+      if (!PSEUDO_DROP_PROPS.has(d.prop)) pseudoDecls.push([d.prop, d.value + (d.important ? ' !important' : '')]);
+      if (d.prop === 'counter-reset' || d.prop === 'counter-increment') return;
       if (DROP_PROPS.has(d.prop)) return;
       decls.push([d.prop, d.value + (d.important ? ' !important' : '')]);
     });
-    if (decls.length === 0) return;
 
     for (const rawSel of r.selector.split(',')) {
       const sel = rawSel.trim();
       if (!sel || sel === ':root') continue;
+
+      const pseudoMatch = sel.match(PSEUDO_SUFFIX_RE);
+      if (pseudoMatch) {
+        const subject = sel.slice(0, sel.length - pseudoMatch[0].length);
+        // Same disallow-list as regular selectors, applied to the subject part.
+        if (/::|:focus-visible|:active|@|\*/.test(subject)) continue;
+        if (pseudoDecls.length === 0) continue;
+        pseudoRules.push({
+          sel: subject,
+          pseudo: pseudoMatch[2] as 'before' | 'after',
+          spec: specificity(subject),
+          order: order++,
+          decls: pseudoDecls,
+        });
+        continue;
+      }
+
       if (/::|:focus-visible|:active|@|\*/.test(sel)) continue;
       const hover = sel.includes(':hover');
       if (hover) {
@@ -203,6 +243,21 @@ async function main() {
         const lastToken = sel.split(/[\s>+~]+/).filter(Boolean).pop() || '';
         if (!lastToken.includes(':hover')) continue;
       }
+      // `counter-reset`/`counter-increment` never produce a Tailwind class (they're
+      // dropped from `decls` above) but still tell us which elements start/advance
+      // a `counter()` used by a descendant's `::before` — captured separately so
+      // `.step::before{content:counter(step,decimal-leading-zero)}` renders "01..04"
+      // instead of being silently skipped along with the rest of `::before`.
+      r.walkDecls((d) => {
+        if (d.prop === 'counter-reset') {
+          const parsed = parseCounterReset(d.value);
+          if (parsed) counterResets.push({ sel, ...parsed });
+        } else if (d.prop === 'counter-increment') {
+          const parsed = parseCounterIncrement(d.value);
+          if (parsed) counterIncrements.push({ sel, ...parsed });
+        }
+      });
+      if (decls.length === 0) continue;
       rules.push({ sel, hover, bucket, spec: specificity(sel), order: order++, decls });
     }
   });
@@ -264,6 +319,8 @@ async function main() {
     const disp = buckets['']?.get('display')?.value;
     return !!disp && disp !== 'inline';
   };
+  const displayOf = (el: El): string | undefined => computeBuckets(el)['']?.get('display')?.value;
+  const collapseCtx = { isBlockified: (el: El) => isBlockified(el), displayOf: (el: El) => displayOf(el) };
 
   // ───────────────────────── 4. HTML → layers ─────────────────────────
   const rewriteHref = (href: string): string => {
@@ -273,15 +330,9 @@ async function main() {
     return href;
   };
 
-  const isTextLeaf = (el: El): boolean => {
-    for (const child of el.querySelectorAll('*')) {
-      const tag = child.tagName.toLowerCase();
-      if (!INLINE_OK.has(tag)) return false;
-      if (child.getAttribute('class')) return false;
-      if (tag !== 'br' && isBlockified(child as El)) return false;
-    }
-    return true;
-  };
+  // See lib/import/rin5-html.ts: also blockifies a bare inline child that has
+  // no `display` rule of its own but sits directly inside a flex/grid parent.
+  const isTextLeaf = (el: El): boolean => isInlineCollapsible(el, INLINE_OK, collapseCtx);
 
   type Mark = { type: string; attrs?: Record<string, unknown> };
   const collectInline = (node: Node, marks: Mark[]): Array<Record<string, unknown>> => {
@@ -324,6 +375,65 @@ async function main() {
 
   type Layer = Record<string, any>;
 
+  // CSS counters (`.steps{counter-reset:step}` / `.step{counter-increment:step}`)
+  // are a single flat namespace here — good enough for the one-level, non-nested
+  // shape seen in practice (numbered step lists). Cleared per page in the page
+  // loop below; mutated in document order as elementToLayerInner visits each
+  // element, mirroring how the browser evaluates counters top-down.
+  const counters = new Map<string, number>();
+  const applyCounterMutations = (el: El): void => {
+    for (const r of counterResets) if (matchesSafe(el, r.sel)) counters.set(r.name, r.value);
+    for (const r of counterIncrements) if (matchesSafe(el, r.sel)) counters.set(r.name, (counters.get(r.name) ?? 0) + r.amount);
+  };
+
+  const pseudoBucketFor = (el: El, pseudo: 'before' | 'after'): Map<string, Winner> | undefined => {
+    let map: Map<string, Winner> | undefined;
+    for (const r of pseudoRules) {
+      if (r.pseudo !== pseudo || !matchesSafe(el, r.sel)) continue;
+      map ??= new Map();
+      for (const [prop, rawVal] of r.decls) {
+        const prev = map.get(prop);
+        if (prev && (prev.spec > r.spec || (prev.spec === r.spec && prev.order > r.order))) continue;
+        map.set(prop, { value: rawVal, spec: r.spec, order: r.order });
+      }
+    }
+    return map;
+  };
+
+  // Synthesizes a child layer for a `::before`/`::after` rule: a text leaf for
+  // literal/`counter()` content, an empty decorative layer for `content:""`
+  // that still carries a background/border, or nothing at all (out-of-subset
+  // constructs like `attr()`/`url()`, or purely decorative-but-invisible rules
+  // used only for hover transitions). Must run after `applyCounterMutations(el)`
+  // for this element so `counter()` reads this element's own increment.
+  const synthesizePseudoLayer = (el: El, pseudo: 'before' | 'after'): Layer | null => {
+    const map = pseudoBucketFor(el, pseudo);
+    if (!map) return null;
+    const resolved = resolvePseudoContent(map.get('content')?.value, counters);
+    if (resolved.kind === 'skip') return null;
+    if (resolved.kind === 'empty' && !pseudoHasVisualBox([...map.keys()].filter((p) => p !== 'content'))) return null;
+
+    const stylingMap = new Map(map);
+    stylingMap.delete('content');
+    const classes = bucketToClasses(stylingMap).join(' ');
+    if (resolved.kind === 'empty') return { id: generateId('lyr'), name: 'div', classes };
+    return {
+      id: generateId('lyr'),
+      name: 'span',
+      classes,
+      restrictions: { editText: true },
+      variables: { text: richTextFromString(resolved.text) },
+    };
+  };
+
+  // Counters are already mutated for `el` by the time this runs (see the call
+  // to `applyCounterMutations` at the top of `elementToLayerInner`), so this
+  // reuses the exact same skip/empty/text decision `synthesizePseudoLayer`
+  // makes — an element whose only pseudo rule is invisible (no text, no box)
+  // still collapses to a text leaf as before.
+  const hasPseudoLayer = (el: El): boolean =>
+    synthesizePseudoLayer(el, 'before') !== null || synthesizePseudoLayer(el, 'after') !== null;
+
   const sanitizeSvg = (el: El): void => {
     el.querySelectorAll('script').forEach((s) => s.remove());
     const walk = (node: Element) => {
@@ -348,6 +458,7 @@ async function main() {
     const tag = el.tagName.toLowerCase();
     if (['script', 'style', 'link', 'meta', 'br', 'title'].includes(tag)) return null;
 
+    applyCounterMutations(el);
     const classes = computeClasses(el);
 
     if (tag === 'svg') {
@@ -389,7 +500,10 @@ async function main() {
     const isHeading = HEADINGS.has(tag);
     const textish = isHeading || tag === 'p' || tag === 'span' || tag === 'strong' || tag === 'small'
       || tag === 'td' || tag === 'th' || tag === 'figcaption' || tag === 'h4';
-    if (textish && isTextLeaf(el) && (el.textContent || '').trim()) {
+    // A pseudo-element rule (numbered step, bullet, "+"/"–" toggle icon…) wins
+    // over rich-text collapse: it needs its own child layer, so the element
+    // must stay a container even when its text content alone would collapse.
+    if (textish && isTextLeaf(el) && !hasPseudoLayer(el) && (el.textContent || '').trim()) {
       const layer: Layer = {
         id: generateId('lyr'),
         name: isHeading ? 'heading' : (tag === 'span' || tag === 'strong' ? 'span' : 'text'),
@@ -457,6 +571,13 @@ async function main() {
         void childTag;
       }
     }
+    // `::before` goes first, `::after` last — same visual position the
+    // pseudo-element occupies relative to the element's real content.
+    const beforeLayer = synthesizePseudoLayer(el, 'before');
+    if (beforeLayer) children.unshift(beforeLayer);
+    const afterLayer = synthesizePseudoLayer(el, 'after');
+    if (afterLayer) children.push(afterLayer);
+
     layer.children = children;
     return layer;
   };
@@ -562,6 +683,7 @@ async function main() {
   let orderIdx = 0;
   const importedPages: Array<{ id: string; slug: string; name: string }> = [];
   for (const file of htmlFiles.sort()) {
+    counters.clear();
     const html = fs.readFileSync(path.join(SITE_DIR, file), 'utf8');
     const { document } = parseHTML(html);
     const base = file.replace(/\.html$/, '');
