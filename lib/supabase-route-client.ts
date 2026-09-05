@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { credentials } from './credentials';
 import { parseSupabaseConfig } from './supabase-config-parser';
+import { dbSchemaForClient } from './tenant';
 import type { SupabaseConfig } from '@/types';
 
 /**
@@ -20,6 +21,7 @@ export async function createRouteClient() {
   const cookieStore = await cookies();
 
   return createServerClient(parsed.projectUrl, parsed.anonKey, {
+    db: { schema: dbSchemaForClient() },
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value;

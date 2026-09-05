@@ -7,6 +7,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { createFont } from '@/lib/repositories/fontRepository';
 import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { tenantStoragePath } from '@/lib/tenant';
 import { mapExtensionToFontFormat } from '@/lib/font-utils';
 import type { Font } from '@/types';
 
@@ -38,7 +39,7 @@ export async function uploadFontFile(
     // Generate storage path
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 15);
-    const storagePath = `${STORAGE_FOLDERS.FONTS}/${timestamp}-${random}.${extension}`;
+    const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.FONTS}/${timestamp}-${random}.${extension}`);
 
     // Upload to Supabase Storage
     const arrayBuffer = await file.arrayBuffer();

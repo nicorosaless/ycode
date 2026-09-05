@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { credentials } from './credentials';
 import { parseSupabaseConfig } from './supabase-config-parser';
+import { dbSchemaForClient, resolveDbSchema } from './tenant';
 import type { SupabaseConfig, SupabaseCredentials } from '@/types';
 import { withLimit } from './supabase-limiter';
 
@@ -69,7 +70,8 @@ export async function getSupabaseAdmin(tenantId?: string): Promise<SupabaseClien
     return null;
   }
 
-  const credKey = `${creds.projectUrl}:${creds.serviceRoleKey}`;
+  const schema = resolveDbSchema();
+  const credKey = `${creds.projectUrl}:${creds.serviceRoleKey}:${schema}`;
   if (globalForSupabase.__supabaseClient && globalForSupabase.__supabaseCredKey === credKey) {
     return globalForSupabase.__supabaseClient;
   }
@@ -82,6 +84,9 @@ export async function getSupabaseAdmin(tenantId?: string): Promise<SupabaseClien
       autoRefreshToken: false,
       persistSession: false,
     },
+    // Every table this client touches lives in the tenant's schema, which
+    // PostgREST only reaches if it is listed in PGRST_DB_SCHEMAS.
+    db: { schema: dbSchemaForClient() },
     global: { fetch: limitedFetch },
   });
 
@@ -104,6 +109,7 @@ export async function testSupabaseConnection(
         autoRefreshToken: false,
         persistSession: false,
       },
+      db: { schema: dbSchemaForClient() },
     });
 
     const { error } = await client.auth.admin.listUsers({

@@ -10,6 +10,7 @@ import type { Knex } from 'knex';
 import { getKnexClient, closeKnexClient, testKnexConnection } from '../knex-client';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { tenantStoragePath } from '@/lib/tenant';
 import { migrations } from '../migrations-loader';
 import { guardKnexForMigrationReplay } from '@/lib/migration-replay-guard';
 
@@ -601,7 +602,7 @@ export function generateStoragePath(originalPath: string): string {
   const extension = originalPath.split('.').pop() || 'bin';
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 15);
-  return `${STORAGE_FOLDERS.WEBSITE}/${timestamp}-${random}.${extension}`;
+  return tenantStoragePath(`${STORAGE_FOLDERS.WEBSITE}/${timestamp}-${random}.${extension}`);
 }
 
 // ─── Asset File Helpers ──────────────────────────────────────────────

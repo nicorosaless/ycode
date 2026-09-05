@@ -7,6 +7,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { credentials } from '@/lib/credentials';
 import { parseSupabaseConfig } from '@/lib/supabase-config-parser';
+import { dbSchemaForClient } from '@/lib/tenant';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { SupabaseConfig } from '@/types';
 
@@ -28,6 +29,7 @@ export async function getAuthUser(): Promise<AuthResult | null> {
     const cookieStore = await cookies();
 
     const client = createServerClient(parsed.projectUrl, parsed.anonKey, {
+      db: { schema: dbSchemaForClient() },
       cookies: {
         getAll() {
           return cookieStore.getAll();

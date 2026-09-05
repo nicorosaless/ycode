@@ -88,3 +88,17 @@ export function isEmailAllowed(email: string | null | undefined, allowed: readon
   if (!email) return false
   return allowed.includes(email.trim().toLowerCase())
 }
+
+/**
+ * The tenant schema in the shape supabase-js's generics expect.
+ *
+ * `SupabaseClient` is parameterised by its schema name, and this codebase
+ * types every client as the default `'public'`. A schema read at runtime is a
+ * plain `string`, which widens that generic and breaks every call site. The
+ * tables are identical in every tenant schema — that is the whole point of the
+ * model — so the literal is asserted back here, in one place, instead of
+ * threading a type parameter through the entire repository.
+ */
+export function dbSchemaForClient(env: TenantEnv = process.env): 'public' {
+  return resolveDbSchema(env) as 'public'
+}

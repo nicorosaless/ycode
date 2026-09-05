@@ -120,12 +120,22 @@ async function main() {
   const sharp = (await import('sharp')).default;
   const { createClient } = await import('@supabase/supabase-js');
   const { generateCSSForPage, generateAndSaveDraftCSS } = await import('../lib/server/cssGenerator');
+  const { dbSchemaForClient, resolveDbSchema, tenantStoragePath } = await import('../lib/tenant');
 
   const SUPABASE_URL = process.env.SUPABASE_URL!;
   const SECRET = process.env.SUPABASE_SECRET_KEY!;
   const PUBLIC_BASE = (process.env.ASSET_PUBLIC_BASE || SUPABASE_URL).replace(/\/$/, '');
-  const db = knexMod.default({ client: 'pg', connection: process.env.SUPABASE_CONNECTION_URL });
-  const supabase = createClient(SUPABASE_URL, SECRET, { auth: { persistSession: false } });
+  // This script writes straight to the tenant's schema and to its own folder
+  // inside the shared `assets` bucket — see lib/tenant.ts.
+  const db = knexMod.default({
+    client: 'pg',
+    connection: process.env.SUPABASE_CONNECTION_URL,
+    searchPath: [resolveDbSchema()],
+  });
+  const supabase = createClient(SUPABASE_URL, SECRET, {
+    auth: { persistSession: false },
+    db: { schema: dbSchemaForClient() },
+  });
 
   // ───────────────────────── 1. Upload assets ─────────────────────────
   const assetMap = new Map<string, { id: string; public_url: string }>();
@@ -151,7 +161,7 @@ async function main() {
     } catch { /* ignore */ }
 
     const ext = path.extname(file).slice(1);
-    const storagePath = `website/${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${ext}`;
+    const storagePath = tenantStoragePath(`website/${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${ext}`);
     const { error } = await supabase.storage.from('assets').upload(storagePath, buf, { contentType: mime });
     if (error) throw new Error(`upload ${file}: ${error.message}`);
 

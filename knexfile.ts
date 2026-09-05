@@ -2,6 +2,7 @@ import type { Knex } from 'knex';
 import path from 'path';
 import { credentials } from './lib/credentials.ts';
 import { parseSupabaseConfig } from './lib/supabase-config-parser.ts';
+import { resolveDbSchema } from './lib/tenant.ts';
 import type { SupabaseConfig } from './types/index.ts';
 
 /**
@@ -9,6 +10,13 @@ import type { SupabaseConfig } from './types/index.ts';
  *
  * This configuration is used to run migrations programmatically
  * against the user's Supabase PostgreSQL database.
+ *
+ * Multi-tenant (P-2609): every query and every migration runs inside
+ * `RIN5_DB_SCHEMA` — `searchPath` puts it first for the schema builder, and
+ * `migrations.schemaName` keeps this tenant's `migrations` table with its own
+ * tables instead of in `public`, where two clients would overwrite each
+ * other's batch history. The schema is created on connect because knex has no
+ * hook that runs before the migrator reads that table.
  */
 
 /**
@@ -35,8 +43,21 @@ async function getSupabaseConnectionParams() {
   };
 }
 
+/**
+ * Create the tenant schema on the first query of every pooled connection.
+ * `CREATE SCHEMA IF NOT EXISTS` is idempotent and costs one round trip per
+ * connection, which is the price of not needing a provisioning step before
+ * `migrate:latest` can run against a brand-new client.
+ */
+const ensureSchema = (schema: string) =>
+  (connection: { query: (sql: string, cb: (err: Error | null) => void) => void }, done: (err?: Error | null) => void) => {
+    if (schema === 'public') return done();
+    connection.query(`CREATE SCHEMA IF NOT EXISTS "${schema}"`, (err) => done(err));
+  };
+
 const createConfig = (): Knex.Config => {
   const isVercel = process.env.VERCEL === '1';
+  const schema = resolveDbSchema();
 
   return {
     client: 'pg',
@@ -45,12 +66,15 @@ const createConfig = (): Knex.Config => {
 
       return connectionParams;
     },
+    searchPath: [schema],
     migrations: {
       directory: path.join(process.cwd(), 'database/migrations'),
       extension: 'ts',
       tableName: 'migrations',
+      schemaName: schema,
     },
     pool: isVercel ? {
+      afterCreate: ensureSchema(schema),
       min: 0,
       max: 1,
       acquireTimeoutMillis: 10000,
@@ -59,6 +83,7 @@ const createConfig = (): Knex.Config => {
       reapIntervalMillis: 1000,
       createRetryIntervalMillis: 200,
     } : {
+      afterCreate: ensureSchema(schema),
       min: 0,
       max: 3,
       idleTimeoutMillis: 30000,

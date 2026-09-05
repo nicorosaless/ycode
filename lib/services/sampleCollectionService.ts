@@ -10,6 +10,7 @@ import { findStatusFieldId } from '@/lib/collection-field-utils';
 import { createAsset } from '@/lib/repositories/assetRepository';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { tenantStoragePath } from '@/lib/tenant';
 import { getSampleCollectionById } from '@/lib/sample-collections';
 import type { SampleCollectionDefinition, SampleFieldDefinition, SampleItemDefinition } from '@/lib/sample-collections';
 import type { Asset, Collection, CollectionField, CollectionItemWithValues } from '@/types';
@@ -185,7 +186,7 @@ async function getOrUploadSampleImage(filename: string): Promise<Asset> {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 15);
   const ext = path.extname(filename).slice(1) || 'jpg';
-  const storagePath = `${STORAGE_FOLDERS.WEBSITE}/${timestamp}-${random}.${ext}`;
+  const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.WEBSITE}/${timestamp}-${random}.${ext}`);
 
   const { data, error } = await supabase.storage
     .from(STORAGE_BUCKET)

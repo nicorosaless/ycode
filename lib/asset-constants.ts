@@ -3,6 +3,7 @@
  * Shared constants for asset categorization and storage (no dependencies to avoid circular imports)
  */
 
+import { tenantStoragePath } from '@/lib/tenant';
 import type { AssetCategory } from '@/types';
 
 /**
@@ -97,12 +98,16 @@ export function getAcceptString(category?: AssetCategory): string {
   return ALLOWED_MIME_TYPES[category].join(',');
 }
 
-/** Generate a unique storage path for a file upload */
+/**
+ * Generate a unique storage path for a file upload.
+ * Scoped to the tenant prefix so two clients sharing the `assets` bucket can
+ * never land on the same object (see lib/tenant.ts).
+ */
 export function generateStoragePath(filename: string, folder: string = STORAGE_FOLDERS.WEBSITE): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 15);
   const fileExtension = filename.split('.').pop() || '';
-  return `${folder}/${timestamp}-${random}.${fileExtension}`;
+  return tenantStoragePath(`${folder}/${timestamp}-${random}.${fileExtension}`);
 }
 
 /** Extract the display name from a filename (strip extension) */

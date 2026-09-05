@@ -5,6 +5,7 @@
 
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { tenantStoragePath } from '@/lib/tenant';
 import sharp from 'sharp';
 
 /**
@@ -34,7 +35,7 @@ export async function uploadThumbnail(componentId: string, imageBuffer: Buffer):
   }
 
   const webpBuffer = await convertToWebP(imageBuffer);
-  const storagePath = `${STORAGE_FOLDERS.COMPONENTS}/${componentId}.webp`;
+  const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.COMPONENTS}/${componentId}.webp`);
 
   const { data, error } = await client.storage
     .from(STORAGE_BUCKET)
@@ -66,7 +67,7 @@ export async function deleteThumbnail(componentId: string): Promise<void> {
     throw new Error('Supabase not configured');
   }
 
-  const storagePath = `${STORAGE_FOLDERS.COMPONENTS}/${componentId}.webp`;
+  const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.COMPONENTS}/${componentId}.webp`);
 
   const { error } = await client.storage
     .from(STORAGE_BUCKET)

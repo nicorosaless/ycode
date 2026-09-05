@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 import { applySecurityHeaders } from '@/lib/security-headers-server';
 import { requiredPermission, roleHasPermission } from '@/lib/api-authz';
 import { resolveRole } from '@/lib/roles';
+import { isEmailAllowed, resolveAllowedEmails } from '@/lib/tenant';
 
 /**
  * Public API routes that skip authentication.
@@ -130,6 +131,17 @@ async function verifyApiAuth(request: NextRequest): Promise<NextResponse | null>
     return NextResponse.json(
       { error: 'Not authenticated' },
       { status: 401 }
+    );
+  }
+
+  // Tenant authorization (P-2609). GoTrue is global to the shared Supabase
+  // stack, so a user created for another client's container holds a perfectly
+  // valid session here. `RIN5_ALLOWED_EMAILS` is the only thing that keeps
+  // them out of this client's site; unset means single-tenant, everyone in.
+  if (!isEmailAllowed(user.email, resolveAllowedEmails())) {
+    return NextResponse.json(
+      { error: 'Forbidden', reason: 'email_not_allowed_for_this_site' },
+      { status: 403 }
     );
   }
 

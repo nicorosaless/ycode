@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { SUPABASE_IN_FILTER_CHUNK_SIZE, SUPABASE_QUERY_LIMIT, SUPABASE_WRITE_BATCH_SIZE } from '@/lib/supabase-constants';
 import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { tenantStoragePath } from '@/lib/tenant';
 import { cleanupOrphanedStorageFiles } from '@/lib/storage-utils';
 import { chunk } from '@/lib/utils';
 import { generateAssetContentHash } from '../hash-utils';
@@ -665,7 +666,7 @@ export async function uploadFile(file: File): Promise<{ path: string; url: strin
 
   // Sanitize filename to remove spaces and special characters
   const sanitizedName = sanitizeFilename(file.name);
-  const storagePath = `${STORAGE_FOLDERS.WEBSITE}/${Date.now()}-${sanitizedName}`;
+  const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.WEBSITE}/${Date.now()}-${sanitizedName}`);
 
   const { data, error } = await client.storage
     .from(STORAGE_BUCKET)

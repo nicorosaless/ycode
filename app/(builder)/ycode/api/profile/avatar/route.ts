@@ -3,6 +3,7 @@ import { noCache } from '@/lib/api-response';
 import { getAuthUser } from '@/lib/supabase-auth';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { tenantStoragePath } from '@/lib/tenant';
 import { generateId } from '@/lib/utils';
 import sharp from 'sharp';
 
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
       .toBuffer();
 
     // Create storage path: avatars/{userId}-{randomId}.webp
-    const storagePath = `${STORAGE_FOLDERS.AVATARS}/${generateId(auth.user.id)}.webp`;
+    const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.AVATARS}/${generateId(auth.user.id)}.webp`);
 
     // Delete old avatar if exists
     const oldAvatarUrl = auth.user.user_metadata?.avatar_url;

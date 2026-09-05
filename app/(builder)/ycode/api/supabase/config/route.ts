@@ -1,6 +1,7 @@
 import { credentials } from '@/lib/credentials';
 import { parseSupabaseConfig } from '@/lib/supabase-config-parser';
 import { noCache } from '@/lib/api-response';
+import { resolveDbSchema } from '@/lib/tenant';
 import type { SupabaseConfig } from '@/types';
 
 // Disable caching for this route
@@ -10,8 +11,12 @@ export const revalidate = 0;
 /**
  * GET /ycode/api/supabase/config
  *
- * Returns public Supabase configuration (URL and anon key only)
- * Used by browser client for authentication
+ * Returns public Supabase configuration (URL, anon key and tenant schema)
+ * Used by browser client for authentication.
+ *
+ * The schema travels through this endpoint rather than a NEXT_PUBLIC_ build
+ * variable so one image can serve every client: the container's environment
+ * decides which schema its browser bundle talks to, at runtime.
  */
 export async function GET() {
   try {
@@ -42,6 +47,7 @@ export async function GET() {
       data: {
         url: parsed.projectUrl,
         anonKey: parsed.anonKey,
+        schema: resolveDbSchema(),
       },
     });
   } catch (error) {

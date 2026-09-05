@@ -12,8 +12,15 @@
 import { createBrowserClient as createSupabaseBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+/** Shape of `/ycode/api/supabase/config`. `schema` is the tenant's Postgres schema. */
+interface BrowserSupabaseConfig {
+  url: string;
+  anonKey: string;
+  schema?: string;
+}
+
 let browserClient: SupabaseClient | null = null;
-let configPromise: Promise<{ url: string; anonKey: string } | null> | null = null;
+let configPromise: Promise<BrowserSupabaseConfig | null> | null = null;
 
 /**
  * Reset cached client and config.
@@ -29,7 +36,7 @@ export function resetBrowserClient(): void {
  * Get config from API endpoint.
  * Cached to avoid multiple requests. Returns null if not configured (404).
  */
-async function getSupabaseConfig(): Promise<{ url: string; anonKey: string } | null> {
+async function getSupabaseConfig(): Promise<BrowserSupabaseConfig | null> {
   if (!configPromise) {
     configPromise = fetch('/ycode/api/supabase/config')
       .then(async (res) => {
@@ -69,7 +76,11 @@ async function getOrCreateClient(): Promise<SupabaseClient | null> {
   const config = await getSupabaseConfig();
   if (!config) return null;
 
-  browserClient = createSupabaseBrowserClient(config.url, config.anonKey);
+  // The schema is a runtime value; see `dbSchemaForClient` in lib/tenant.ts
+  // for why the generic is asserted back to the default instead of threaded.
+  browserClient = createSupabaseBrowserClient(config.url, config.anonKey, {
+    db: { schema: (config.schema || 'public') as 'public' },
+  });
   return browserClient;
 }
 

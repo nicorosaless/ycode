@@ -1,6 +1,7 @@
 import { getKnexClient, closeKnexClient, testKnexConnection } from '../knex-client';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { tenantStoragePath } from '@/lib/tenant';
 import { migrations } from '../migrations-loader';
 import { guardKnexForMigrationReplay } from '@/lib/migration-replay-guard';
 import { YCODE_EXTERNAL_API_URL } from '@/lib/config';
@@ -170,7 +171,7 @@ async function copyTemplateAssetsToUserStorage(knex: ReturnType<typeof getKnexCl
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 15);
       const extension = asset.filename.split('.').pop() || 'bin';
-      const storagePath = `${STORAGE_FOLDERS.WEBSITE}/${timestamp}-${random}.${extension}`;
+      const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.WEBSITE}/${timestamp}-${random}.${extension}`);
 
       // Upload to user's storage
       const { data, error } = await supabase.storage
@@ -237,7 +238,7 @@ async function copyTemplateAssetsToUserStorage(knex: ReturnType<typeof getKnexCl
         const timestamp = Date.now();
         const random = Math.random().toString(36).substring(2, 15);
         const extension = font.kind || 'woff2';
-        const storagePath = `${STORAGE_FOLDERS.WEBSITE}/fonts/${timestamp}-${random}.${extension}`;
+        const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.WEBSITE}/fonts/${timestamp}-${random}.${extension}`);
 
         const { data, error } = await supabase.storage
           .from(STORAGE_BUCKET)

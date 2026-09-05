@@ -25,6 +25,7 @@ import {
   generateAssetContentHash,
   generateCollectionItemContentHash,
 } from '../../lib/hash-utils';
+import { dbSchemaForClient } from '../../lib/tenant';
 
 const PAGE_SIZE = 1000;
 
@@ -62,6 +63,7 @@ async function getSupabaseClient(): Promise<SupabaseClient> {
   }
 
   return createClient(projectUrl, config.serviceRoleKey, {
+    db: { schema: dbSchemaForClient() },
     auth: {
       autoRefreshToken: false,
       persistSession: false,
