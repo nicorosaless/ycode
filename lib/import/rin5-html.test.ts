@@ -15,6 +15,7 @@ import {
   bucketForMedia,
   resolveBuckets,
   BUCKET_ORDER,
+  isSupportedSelector,
 } from '@/lib/import/rin5-html';
 import { cssToClasses } from '@/lib/import/css';
 
@@ -311,4 +312,49 @@ test('the .nav a.active::after case ends up as an unprefixed block plus a max-md
     classes.push(...cssToClasses(decls).map((c) => bucket + c));
   }
   assert.deepEqual(classes, ['block', 'h-[3px]', 'max-md:hidden']);
+});
+
+// ── El selector "búho" (P-2609/G9) ──
+//
+// `.stack > * + { margin-top: 1rem }` — el patrón de espaciado vertical más
+// común en CSS escrito a mano — se descartaba entero porque el filtro de
+// selectores rechazaba cualquier cosa que contuviera `*`. En la generación
+// 188658f6 eso dejaba las tarjetas `.panel.stack` sin separación entre la
+// etiqueta, el `h3` y el `p`, y las regiones `section.section-tint` eran las
+// peores del round-trip (hasta 13,3%).
+//
+// Lo que sí hay que seguir descartando es un `*` sin anclar: `*{box-sizing:
+// border-box}` está en todas estas hojas y emitirlo como clase en cada capa
+// es ruido puro (el preflight de Tailwind ya lo aplica).
+
+test('isSupportedSelector acepta el búho anclado en una clase', () => {
+  assert.equal(isSupportedSelector('.stack > * + *'), true);
+  assert.equal(isSupportedSelector('.prose * + *'), true);
+  assert.equal(isSupportedSelector('.panel .tag'), true);
+  assert.equal(isSupportedSelector('[data-x]'), true);
+});
+
+test('isSupportedSelector descarta un universal sin anclar y lo que ya estaba fuera del subset', () => {
+  assert.equal(isSupportedSelector('*'), false);
+  assert.equal(isSupportedSelector('* + *'), false);
+  assert.equal(isSupportedSelector('* > *'), false);
+  assert.equal(isSupportedSelector(''), false);
+  assert.equal(isSupportedSelector('a:focus-visible'), false);
+  assert.equal(isSupportedSelector('a:active'), false);
+  assert.equal(isSupportedSelector('p::selection'), false);
+});
+
+test('el búho casa contra la tarjeta exacta de la generación 188658f6', () => {
+  const { document } = parseHTML(
+    '<div class="panel stack">' +
+    '<span class="tag">Excursiones</span>' +
+    '<h3>Salidas en grupo o personalizadas</h3>' +
+    '<p>Para empresas o eventos.</p>' +
+    '</div>',
+  );
+  const matched = [...document.querySelectorAll('*')]
+    .filter((el) => el.matches('.stack > * + *'))
+    .map((el) => el.tagName.toLowerCase());
+  // La etiqueta es el primer hijo y no lleva `margin-top`; el h3 y el p sí.
+  assert.deepEqual(matched, ['h3', 'p']);
 });

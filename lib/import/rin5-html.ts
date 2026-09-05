@@ -77,6 +77,43 @@ export function resolveBuckets(rules: Iterable<BucketedRule>): Map<CssBucket, Ma
   return buckets;
 }
 
+/**
+ * Constructs the importer has no representation for. `::` covers every
+ * pseudo-element other than `::before`/`::after` (those are pulled out of the
+ * selector before this runs), and `@` catches at-rule text that leaks into a
+ * selector when a stylesheet is malformed.
+ */
+const UNSUPPORTED_SELECTOR_RE = /::|:focus-visible|:active|@/;
+
+/**
+ * A class, id, attribute or tag anywhere in the selector — i.e. something that
+ * ties the rule to a part of the document instead of to everything in it.
+ */
+const SELECTOR_ANCHOR_RE = /[.#[]|(^|[\s>+~])[a-zA-Z][\w-]*/;
+
+/**
+ * True when the cascade should take this selector into account.
+ *
+ * The universal selector used to disqualify a rule outright, which threw away
+ * `.stack > * + * { margin-top: 1rem }` — the "lobotomised owl", the most
+ * common way hand-written CSS spaces a stack of siblings. Measured on the
+ * 188658f6 generation: every `.panel.stack` card lost the separation between
+ * its tag, its `h3` and its `p`, and the `section.section-tint` regions were
+ * the worst of the whole round-trip (up to 13,3%).
+ *
+ * `*` is fine for the matcher — `Element.matches()` resolves it like a browser
+ * — as long as the rule is anchored to something. What stays out is a bare
+ * universal: `* { box-sizing: border-box }` sits in every one of these
+ * stylesheets, Tailwind's preflight already applies it, and turning it into a
+ * class on every single layer would be noise with no pixel behind it.
+ */
+export function isSupportedSelector(sel: string): boolean {
+  const s = sel.trim();
+  if (!s) return false;
+  if (UNSUPPORTED_SELECTOR_RE.test(s)) return false;
+  return SELECTOR_ANCHOR_RE.test(s);
+}
+
 /** A resolved `content` value for a `::before`/`::after` rule. */
 export type PseudoContent =
   | { kind: 'text'; text: string }

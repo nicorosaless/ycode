@@ -102,7 +102,7 @@ async function main() {
   const {
     resolvePseudoContent, parseCounterReset, parseCounterIncrement, pseudoHasVisualBox, isInlineCollapsible,
     uaDefaultDecls, shorthandsFor, expandBoxShorthand, parseInlineStyle,
-    bucketForMedia, resolveBuckets, BUCKET_ORDER,
+    bucketForMedia, resolveBuckets, BUCKET_ORDER, isSupportedSelector,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -247,8 +247,8 @@ async function main() {
       const pseudoMatch = sel.match(PSEUDO_SUFFIX_RE);
       if (pseudoMatch) {
         const subject = sel.slice(0, sel.length - pseudoMatch[0].length);
-        // Same disallow-list as regular selectors, applied to the subject part.
-        if (/::|:focus-visible|:active|@|\*/.test(subject)) continue;
+        // Same support test as regular selectors, applied to the subject part.
+        if (!isSupportedSelector(subject)) continue;
         if (pseudoDecls.length === 0) continue;
         pseudoRules.push({
           sel: subject,
@@ -261,7 +261,7 @@ async function main() {
         continue;
       }
 
-      if (/::|:focus-visible|:active|@|\*/.test(sel)) continue;
+      if (!isSupportedSelector(sel)) continue;
       const hover = sel.includes(':hover');
       if (hover) {
         // Only subject-level hover (`.btn:hover`), not ancestor hover (`.card:hover img`)

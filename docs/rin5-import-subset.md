@@ -51,8 +51,16 @@ porque explican por qué la columna "no" es ahora mucho más corta:
 |---|---|
 | Clase única, cadenas de clases, combinadores descendente/hijo/hermano, atributos (`[data-x]`), `:hover` **solo en el sujeto** (`.btn:hover`, no `.card:hover img`) | `::selection`, `::placeholder`, `::marker`, `::first-line`, `::first-letter` |
 | `::before` / `::after` (ver abajo) | `:focus-visible`, `:active` |
-| Selector universal `*` como parte del selector | igual, se descarta la regla entera |
+| Selector universal `*` **anclado** en algo: `.stack > * + *` (el "búho"), `.prose * + *` | Un universal **sin anclar** (`*`, `* + *`) — se descarta la regla entera. Es el caso de `*{box-sizing:border-box}`, que el preflight de Tailwind ya aplica |
 | Cualquier selector que el motor de matching (`Element.matches()`) resuelva, dentro de lo anterior | Selectores con `@` embebido (artefactos de parseo) |
+
+**El "búho" (`.stack > * + *`) funciona.** Descartarlo era el defecto que
+más pixeles movía en la generación 188658f6: es la forma más común de espaciar
+una pila de hermanos en CSS escrito a mano, y sin él cada tarjeta
+`.panel.stack` perdía la separación entre su etiqueta, su `h3` y su `p` — las
+regiones `section.section-tint` llegaban al 13,3%. Lo único que sigue fuera es
+un universal sin anclar, porque emitir `[box-sizing:border-box]` en cada una de
+las capas del sitio es ruido sin ningún pixel detrás.
 
 La resolución de cascada (especificidad, orden de declaración) es real —
 usa el DOM, no una aproximación — así que dentro de lo soportado el ganador
@@ -251,3 +259,21 @@ páginas pasa a 0,00% en escritorio (era donde vivía el subrayado perdido).
 **Sigue por encima del gate del 1%**, y lo que queda ya no es tipografía: en
 escritorio se concentra en la segunda `section.section` de cada página (5,8–7,7%)
 y en `footer.site-footer` (5,3%). No se ha diagnosticado en esta ronda.
+
+## Ronda 5: el búho, medido sobre una generación real
+
+Run `~/.rin5/runtime/generation/188658f6-559a-4590-9ade-8287eb3d3609`
+(hípica, 12 páginas), `roundtrip-src` como entrada, schema `rin5_roundtrip`:
+
+| | antes | después |
+|---|---:|---:|
+| **global ponderado** | **1,41%** | **0,09%** |
+| peor región `section.section-tint` | 13,31% (actividades mobile) | 1,19% |
+| regiones exactamente a 0,00% | — | 69 de 152 |
+
+Única causa: `.stack > * + * { margin-top: 1rem }` se descartaba por contener
+`*`. Peor región que queda, 5,44% (`band-dark` de `momentos-severino` en
+mobile); sin diagnosticar.
+
+`out-v7` remedido con este cambio: **1,92%**, idéntico a la ronda 4 — esa hoja
+no usa el búho, así que el cambio es neutro ahí.
