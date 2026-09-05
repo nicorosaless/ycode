@@ -27,14 +27,14 @@ ubuntu-devbox.
 supabase start                      # usa los puertos de supabase/config.toml
 cp .env.example .env                 # y rellena con la salida de `supabase start`
 npm ci
-npm run migrate:latest               # ver "Defecto encontrado" más abajo
+npm run migrate:latest
 npm run build && npm run start -- -p 3202   # o `npm run dev` en 3002
 ```
 
-### Defecto encontrado: `npm run migrate:latest` falla tal cual está documentado
+### Defecto encontrado y corregido: `npm run migrate:latest` fallaba tal cual está documentado
 
-`CONTRIBUTING.md` documenta `npm run migrate:latest` sin más, pero falla en
-este fork:
+`CONTRIBUTING.md` documenta `npm run migrate:latest` sin más, y en este fork
+fallaba por dos razones:
 
 1. `knexfile.ts` importa `lib/credentials.ts`, que hace `import 'server-only'`.
    Ese paquete lanza siempre que se `require`ea fuera de Next.js — el CLI de
@@ -47,26 +47,13 @@ este fork:
    `tsconfig-paths/register` — tampoco está en el script de npm (sí en
    `test` y en `agent:tools`/`agent:smoke`).
 
-Workaround usado en esta investigación (sin tocar el repo):
-
-```bash
-cat > /tmp/server-only-shim.cjs <<'EOF'
-const Module = require('module');
-const orig = Module.prototype.require;
-Module.prototype.require = function (id) {
-  if (id === 'server-only') return {};
-  return orig.call(this, id);
-};
-EOF
-set -a && source .env && set +a
-NODE_OPTIONS="--require /tmp/server-only-shim.cjs --require tsconfig-paths/register" \
-  NODE_NO_WARNINGS=1 npx knex migrate:latest --knexfile knexfile.ts
-```
-
-Con esto: `Batch 1 run: 43 migrations`. No se ha tocado `package.json` — el
-fix real sería añadir el mismo require-shim que ya usan `scripts/*.ts` al
-script `migrate:latest`, o mover la config de Supabase de `knexfile.ts` a un
-módulo sin `server-only`.
+**Corregido en este repo:** los scripts `migrate:*` de `package.json` cargan ya
+`./scripts/server-only-shim.cjs` (el mismo require-patch que instalan
+`scripts/rin5-import.ts`, `scripts/rin5-publish.ts` y `scripts/export.ts`) y
+`tsconfig-paths/register`, así que `npm run migrate:latest` funciona tal cual.
+Salida esperada la primera vez: `Batch 1 run: 43 migrations`. La corrección de
+fondo — sacar la config de Supabase de `knexfile.ts` a un módulo sin
+`server-only` — sigue pendiente.
 
 ### Defecto encontrado: las migraciones no dan GRANT a los roles de Supabase
 
@@ -111,11 +98,72 @@ del repo. Puntos importantes:
   build, solo runtime) el proceso Next usa muchísimo menos, ver
   `docs/investigacion-ws5.md` en el PRD para las cifras medidas.
 
-## 4. Servicios dejados corriendo tras esta investigación
+## 4. El ciclo rin5: import → publish → export
+
+Los tres pasos del round-trip se ejecutan sin abrir el editor. Todos leen `.env`
+y hablan con el Supabase de 573xx.
+
+```bash
+export RIN5_SITE_DIR=/home/nicolas-rosales/src/rin5/clients/7/site
+export TS_NODE_TRANSPILE_ONLY=1 TS_NODE_PROJECT=tsconfig.test.json NODE_NO_WARNINGS=1
+set -a && source .env && set +a
+
+# 1. import — pages + page_layers en BORRADOR, assets a Storage, fuentes
+node --require ts-node/register --require tsconfig-paths/register scripts/rin5-import.ts
+
+# 2. publish — sin esto el export no ve nada
+npm run rin5:publish
+
+# 3. export — a `./out` (destino por defecto del writer local)
+RIN5_EXPORT_ORIGINAL_ASSETS=1 \
+  node --require ts-node/register --require tsconfig-paths/register scripts/export.ts
+
+# 4. medir contra el HTML de entrada
+node scripts/rin5-roundtrip-diff.mjs \
+  --src "$RIN5_SITE_DIR" --out ./out --diff /tmp/roundtrip-diff \
+  --pages index,contacto,permisos,permiso-a,permiso-b
+```
+
+**Por qué existe `npm run rin5:publish`.** `scripts/rin5-import.ts` solo escribe
+filas de borrador y el export estático solo lee `is_published = true`: sin un
+publish en medio, un import recién hecho exporta el sitio *anterior*. El script
+llama directamente al handler `POST` de
+`app/(builder)/ycode/api/publish/route.ts` con un `NextRequest` sintético, en vez
+de reimplementar el orden de publicación, para no desviarse de lo que hace el
+botón "Publish" de la UI. Acepta `-- --pages <id>,<id>` para publicar solo unas
+páginas.
+
+**Línea de error esperada.** El publish por CLI imprime siempre:
+
+```
+❌ [Cache] Invalidation error: Invariant: static generation store missing in revalidateTag route-/…
+```
+
+No es un fallo. La cola de invalidación del handler llama a `next/cache`, que
+necesita el contexto de petición de un servidor Next, y aquí no hay servidor que
+invalidar. El handler lo envuelve en try/catch y el export lee la base de datos
+directamente. Fíate de la línea `✓ Published`, no de la ausencia de ese error.
+
+**`RIN5_EXPORT_ORIGINAL_ASSETS=1`.** Sin esta variable el export sirve cada foto
+por el proxy de imágenes de Ycode (`/a/<hash>/<slug>.jpg?width=…&quality=85` más
+un `srcset` de siete candidatos), lo que hace un bundle imposible de comparar
+con el HTML de entrada. Con ella, todo asset que subió `rin5-import` sale en
+`assets/<filename>` con sus bytes originales, sin query, sin `srcset` y sin
+`sizes`. Solo afecta a las filas con `source = 'rin5-import'`; lo subido desde
+el editor conserva el pipeline responsive. Ver
+`lib/apps/static-export/original-assets.ts`.
+
+**Destino del export.** El writer local escribe en `./out` salvo que se
+configure otra ruta en `app_settings` (`static-export` / `local_path`). Copia el
+bundle a donde lo quieras conservar antes del siguiente ciclo; el import borra y
+reinserta las páginas, así que un export nuevo pisa al anterior.
+
+## 5. Servicios dejados corriendo tras esta investigación
 
 - `supabase start` de este repo (`supabase_*_ycode-spike`, puertos 573xx)
   queda **arriba** porque la siguiente fase de WS5/import puede reutilizarlo.
   Pararlo con `supabase stop` desde `/home/nicolas-rosales/src/ycode-spike`.
-- El proceso `next start -p 3202` levantado a mano y los `python3 -m
-  http.server` usados para servir los bundles comparados se han parado al
-  cerrar esta investigación.
+- El proceso `next start -p 3202` levantado a mano se ha parado al cerrar la
+  investigación. `scripts/rin5-roundtrip-diff.mjs` levanta sus propios
+  servidores HTTP en puertos efímeros y los cierra al terminar: no deja nada
+  escuchando.
