@@ -12,9 +12,12 @@
  * directly with a synthetic `NextRequest` rather than reimplementing the
  * publish order. Reimplementing it would drift from the UI the first time
  * someone adds a step to the route. The cache-invalidation tail of the
- * handler (`next/cache`) is a no-op here — there is no Next.js server in
- * this process to invalidate — and the handler already wraps it in
- * try/catch, so it degrades to a log line instead of failing the publish.
+ * handler (`next/cache`) cannot run here — there is no Next.js server in this
+ * process to invalidate — so it logs
+ * `❌ [Cache] Invalidation error: Invariant: static generation store missing`
+ * and carries on. That line is expected, not a failure: the handler wraps the
+ * whole invalidation step in try/catch, and a static export reads the database
+ * directly. Trust the `✓ Published` line, not the absence of that error.
  *
  * Usage:
  *   npm run rin5:publish
