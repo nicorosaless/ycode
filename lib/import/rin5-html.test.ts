@@ -235,9 +235,29 @@ test('expandBoxShorthand: !important lands on every longhand, not as a fifth sid
   ]);
 });
 
+// `.wrap{max-width:1180px;margin-inline:auto;padding-inline:var(--gutter)}` es
+// el contenedor de todas estas hojas. Con `*{margin:0}` en la cascada, el
+// `margin-inline` del autor y los `margin-left/right` del reset caían en claves
+// distintas: sobrevivían los dos, Tailwind ordenaba el longhand al final y el
+// sitio entero se pegaba al margen izquierdo.
+
+test('expandBoxShorthand: the logical inline/block shorthands expand to two sides', () => {
+  assert.deepEqual(expandBoxShorthand('margin-inline', 'auto'), [
+    ['margin-left', 'auto'],
+    ['margin-right', 'auto'],
+  ]);
+  assert.deepEqual(expandBoxShorthand('padding-block', 'clamp(56px, 9vw, 110px)'), [
+    ['padding-top', 'clamp(56px, 9vw, 110px)'],
+    ['padding-bottom', 'clamp(56px, 9vw, 110px)'],
+  ]);
+  assert.deepEqual(expandBoxShorthand('margin-block', '0 1.5rem'), [
+    ['margin-top', '0'],
+    ['margin-bottom', '1.5rem'],
+  ]);
+});
+
 test('expandBoxShorthand: leaves anything that is not a box shorthand alone', () => {
   assert.equal(expandBoxShorthand('margin-top', '1em'), null);
-  assert.equal(expandBoxShorthand('border', '1px solid red'), null);
   assert.equal(expandBoxShorthand('gap', '1rem 2rem'), null);
 });
 
@@ -262,6 +282,34 @@ test('parseInlineStyle: empty, trailing-semicolon and valueless input', () => {
   assert.deepEqual(parseInlineStyle('color:red;'), [['color', 'red']]);
   assert.deepEqual(parseInlineStyle('color'), []);
   assert.deepEqual(parseInlineStyle('color:'), []);
+});
+
+// ── El atajo `border` compite con `border-color` (P-2609/G9, ronda 6) ──
+//
+// `.btn{border:1.5px solid transparent}` y `.btn--ghost{border-color:var(--line)}`
+// caían en claves distintas del mapa de ganadores, así que sobrevivían las dos
+// y el export sacaba `border-[transparent]` y `border-[rgba(32,38,26,0.14)]` en
+// el mismo `class`. Tailwind decide entonces por orden de generación y el
+// botón fantasma de Natural Equus se quedaba sin borde: una píldora invisible.
+
+test('expandBoxShorthand splits a border shorthand into width, style and colour', () => {
+  assert.deepEqual(expandBoxShorthand('border', '1.5px solid transparent'), [
+    ['border-width', '1.5px'],
+    ['border-style', 'solid'],
+    ['border-color', 'transparent'],
+  ]);
+  assert.deepEqual(expandBoxShorthand('border-top', '1px solid rgba(32, 38, 26, 0.14)'), [
+    ['border-top-width', '1px'],
+    ['border-top-style', 'solid'],
+    ['border-top-color', 'rgba(32, 38, 26, 0.14)'],
+  ]);
+});
+
+test('expandBoxShorthand leaves a border it cannot split confidently alone', () => {
+  // `border: none` no dice anchura ni color; `cssToClasses` ya lo traduce entero.
+  assert.equal(expandBoxShorthand('border', 'none'), null);
+  assert.equal(expandBoxShorthand('border', '0'), null);
+  assert.equal(expandBoxShorthand('border-radius', '999px'), null);
 });
 
 // ── Media-query buckets, for pseudo-element rules too (P-2609/G9) ──
@@ -365,9 +413,12 @@ test('the .nav a.active::after case ends up as an unprefixed block plus a max-md
 // etiqueta, el `h3` y el `p`, y las regiones `section.section-tint` eran las
 // peores del round-trip (hasta 13,3%).
 //
-// Lo que sí hay que seguir descartando es un `*` sin anclar: `*{box-sizing:
-// border-box}` está en todas estas hojas y emitirlo como clase en cada capa
-// es ruido puro (el preflight de Tailwind ya lo aplica).
+// El `*` a secas también entra, desde la ronda 6: `*{margin:0}` es medio reset
+// de Meyer y Natural Equus lo usa. Descartarlo dejaba en pie las semillas del
+// navegador que el importador siembra por tag, así que cada `<h2>`, `<p>` y
+// `<ul>` del export llevaba un margen que el original no tiene y todo el sitio
+// se desplazaba hacia abajo (13,4% de diff ponderado). Lo que sigue fuera es un
+// universal *combinado* sin anclar (`* + *`).
 
 test('isSupportedSelector acepta el búho anclado en una clase', () => {
   assert.equal(isSupportedSelector('.stack > * + *'), true);
@@ -376,14 +427,28 @@ test('isSupportedSelector acepta el búho anclado en una clase', () => {
   assert.equal(isSupportedSelector('[data-x]'), true);
 });
 
-test('isSupportedSelector descarta un universal sin anclar y lo que ya estaba fuera del subset', () => {
-  assert.equal(isSupportedSelector('*'), false);
+test('isSupportedSelector acepta el reset universal a secas', () => {
+  assert.equal(isSupportedSelector('*'), true);
+});
+
+test('isSupportedSelector descarta un universal combinado sin anclar y lo que ya estaba fuera del subset', () => {
   assert.equal(isSupportedSelector('* + *'), false);
   assert.equal(isSupportedSelector('* > *'), false);
   assert.equal(isSupportedSelector(''), false);
   assert.equal(isSupportedSelector('a:focus-visible'), false);
   assert.equal(isSupportedSelector('a:active'), false);
   assert.equal(isSupportedSelector('p::selection'), false);
+});
+
+test('el reset universal gana a la semilla del navegador y pierde contra cualquier regla de autor', () => {
+  const buckets = resolveBuckets([
+    // Semilla UA de <p>, especificidad -1 como la siembra el importador.
+    { bucket: '', spec: -1, order: -1, decls: [['margin-top', '1em'], ['margin-bottom', '1em']] },
+    { bucket: '', spec: 0, order: 1, decls: [['margin-top', '0'], ['margin-bottom', '0']] },
+    { bucket: '', spec: 1, order: 2, decls: [['margin-top', '1rem']] },
+  ]);
+  assert.equal(buckets.get('')?.get('margin-top')?.value, '1rem');
+  assert.equal(buckets.get('')?.get('margin-bottom')?.value, '0');
 });
 
 test('el búho casa contra la tarjeta exacta de la generación 188658f6', () => {

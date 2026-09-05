@@ -139,16 +139,23 @@ const SELECTOR_ANCHOR_RE = /[.#[]|(^|[\s>+~])[a-zA-Z][\w-]*/;
  * its tag, its `h3` and its `p`, and the `section.section-tint` regions were
  * the worst of the whole round-trip (up to 13,3%).
  *
- * `*` is fine for the matcher — `Element.matches()` resolves it like a browser
- * — as long as the rule is anchored to something. What stays out is a bare
- * universal: `* { box-sizing: border-box }` sits in every one of these
- * stylesheets, Tailwind's preflight already applies it, and turning it into a
- * class on every single layer would be noise with no pixel behind it.
+ * `*` is fine for the matcher — `Element.matches()` resolves it like a browser.
+ * A lone `*` is in too, since round 6: `* { margin: 0 }` is half a reset and
+ * dropping it left the UA seeds the importer plants per tag standing, so every
+ * `<h2>`, `<p>` and `<ul>` of the export carried a margin the original does not
+ * have and the whole page drifted downwards (13,4% weighted on the Natural
+ * Equus generation). At specificity 0 it sits exactly where CSS puts it: above
+ * the UA origin, below every author rule. The importer drops its `box-sizing`
+ * on the way in — Tailwind's preflight already applies border-box, so emitting
+ * it on every layer would be noise with no pixel behind it.
+ *
+ * What stays out is a *combined* universal with nothing to anchor it (`* + *`).
  */
 export function isSupportedSelector(sel: string): boolean {
   const s = sel.trim();
   if (!s) return false;
   if (UNSUPPORTED_SELECTOR_RE.test(s)) return false;
+  if (s === '*') return true;
   return SELECTOR_ANCHOR_RE.test(s);
 }
 
@@ -407,9 +414,24 @@ function splitTopLevel(value: string): string[] {
   return parts;
 }
 
+/** `border: <width> <style> <color>`, the only form worth splitting apart. */
+const BORDER_TRIPLE_RE = /^(\S+)\s+(solid|dashed|dotted|double|groove|ridge|inset|outset)\s+(.+)$/;
+
 /**
- * Expand a `margin`/`padding` shorthand into its four longhands, or `null` for
- * anything else.
+ * The two physical sides each logical shorthand writes, in LTR. Every sheet the
+ * rin5 generator produces is LTR; a RTL site would need the pair swapped for
+ * `-inline`.
+ */
+const LOGICAL_SIDES: Readonly<Record<string, readonly [string, string]>> = {
+  'margin-inline': ['margin-left', 'margin-right'],
+  'margin-block': ['margin-top', 'margin-bottom'],
+  'padding-inline': ['padding-left', 'padding-right'],
+  'padding-block': ['padding-top', 'padding-bottom'],
+};
+
+/**
+ * Expand a `margin`/`padding`/`border` shorthand — physical or logical — into
+ * its longhands, or `null` for anything else.
  *
  * The importer resolves the cascade into a map keyed by property name, so a
  * shorthand and a longhand for the same side never compete: `p{margin:0 0 1em}`
@@ -418,12 +440,46 @@ function splitTopLevel(value: string): string[] {
  * Tailwind happens to generate them in, not to specificity. Expanding at parse
  * time puts every box declaration on the same key so the cascade decides.
  *
+ * `border` is the same defect one property family over, and it costs a whole
+ * component: `.btn{border:1.5px solid transparent}` plus
+ * `.btn--ghost{border-color:var(--line)}` emitted `border-[transparent]` *and*
+ * `border-[rgba(32,38,26,0.14)]` into the same `class`, and the ghost buttons of
+ * the Natural Equus generation lost their outline. Only the three-part form is
+ * split: `border: none` or `border: 0` says nothing about colour, and
+ * `cssToClasses` already maps those whole.
+ *
+ * The logical pairs (`margin-inline`, `padding-block`…) are here for the same
+ * reason and it took `*{margin:0}` entering the cascade to expose it:
+ * `.wrap{margin-inline:auto}` and the reset's `margin-left:0` sat on different
+ * keys, both emitted a class, Tailwind sorted the longhand last and every page
+ * of the site stopped being centred.
+ *
  * The split is paren-aware, unlike `parseSpacingShorthand` in
  * `lib/import/css.ts`: that one bails to a single `p-[whole value]` class as
  * soon as it sees a `(`, which is harmless there (Tailwind copies the value
  * through verbatim) but would produce `padding-top: clamp(…) 0 6rem` here.
  */
 export function expandBoxShorthand(prop: string, value: string): Array<[string, string]> | null {
+  const logical = LOGICAL_SIDES[prop];
+  if (logical) {
+    const important = /\s*!important\s*$/i.test(value);
+    const parts = splitTopLevel(value.replace(/\s*!important\s*$/i, ''));
+    if (parts.length === 0 || parts.length > 2) return null;
+    const suffix = important ? ' !important' : '';
+    const [start, end = start] = parts;
+    return [[logical[0], start + suffix], [logical[1], end + suffix]];
+  }
+  if (prop === 'border' || /^border-(top|right|bottom|left)$/.test(prop)) {
+    const important = /\s*!important\s*$/i.test(value);
+    const m = value.replace(/\s*!important\s*$/i, '').trim().match(BORDER_TRIPLE_RE);
+    if (!m) return null;
+    const suffix = important ? ' !important' : '';
+    return [
+      [`${prop}-width`, m[1] + suffix],
+      [`${prop}-style`, m[2] + suffix],
+      [`${prop}-color`, m[3].trim() + suffix],
+    ];
+  }
   if (prop !== 'margin' && prop !== 'padding') return null;
 
   // `!important` rides along on the value string; it belongs on every longhand,

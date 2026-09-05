@@ -226,9 +226,13 @@ function mapDeclaration(prop: string, val: string): string[] {
 
   if (mapped) { out.push(mapped); return out; }
 
-  // Per-side border width (border-top-width → border-t-[…]).
-  const sideBorderWidth = prop.match(/^border-(top|right|bottom|left)-width$/);
-  if (sideBorderWidth) { out.push(`border-${SIDE_ABBR[sideBorderWidth[1]]}-[${arb(val)}]`); return out; }
+  // Per-side border width and colour (border-top-width → border-t-[…]). Both
+  // land on the same utility: Tailwind reads a length as a width and a colour
+  // as a colour. Per-side style has no arbitrary utility, so it is dropped —
+  // `border-solid` is Tailwind's default and the only style these sheets use.
+  const sideBorder = prop.match(/^border-(top|right|bottom|left)-(width|color)$/);
+  if (sideBorder) { out.push(`border-${SIDE_ABBR[sideBorder[1]]}-[${arb(val)}]`); return out; }
+  if (/^border-(top|right|bottom|left)-style$/.test(prop)) return out;
 
   switch (prop) {
     case 'gap': out.push(`gap-[${arb(val)}]`); break;

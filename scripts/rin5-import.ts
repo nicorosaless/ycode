@@ -282,8 +282,14 @@ async function main() {
           if (parsed) counterIncrements.push({ sel, ...parsed });
         }
       });
-      if (decls.length === 0) continue;
-      rules.push({ sel, hover, bucket, spec: specificity(sel), order: order++, decls });
+      // A lone `*` is a reset, and a reset is worth honouring: `*{margin:0}`
+      // cancels the UA seeds this importer plants per tag. `box-sizing` is the
+      // one declaration to leave behind — Tailwind's preflight already sets
+      // border-box on everything, so repeating it on every layer of the site is
+      // noise with no pixel behind it.
+      const selDecls = sel === '*' ? decls.filter(([prop]) => prop !== 'box-sizing') : decls;
+      if (selDecls.length === 0) continue;
+      rules.push({ sel, hover, bucket, spec: specificity(sel), order: order++, decls: selDecls });
     }
   });
   console.log(`Parsed ${rules.length} CSS rule entries`);
