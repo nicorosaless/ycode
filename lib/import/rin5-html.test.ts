@@ -10,6 +10,7 @@ import {
   isInlineCollapsible,
   uaDefaultDecls,
   shorthandsFor,
+  expandBoxShorthand,
 } from '@/lib/import/rin5-html';
 
 test('resolvePseudoContent: literal string content, quotes and escapes stripped', () => {
@@ -179,4 +180,57 @@ test('uaDefaultDecls: form controls do not inherit typography, so the seed resto
   for (const tag of ['input', 'select', 'textarea']) {
     assert.equal(new Map(uaDefaultDecls(tag)).get('line-height'), 'normal', tag);
   }
+});
+
+test('expandBoxShorthand: 1/2/3/4-value forms expand to the four sides', () => {
+  assert.deepEqual(expandBoxShorthand('margin', '0'), [
+    ['margin-top', '0'], ['margin-right', '0'], ['margin-bottom', '0'], ['margin-left', '0'],
+  ]);
+  assert.deepEqual(expandBoxShorthand('margin', '0 auto'), [
+    ['margin-top', '0'], ['margin-right', 'auto'], ['margin-bottom', '0'], ['margin-left', 'auto'],
+  ]);
+  // `p{margin:0 0 1em}` + `p:last-child{margin-bottom:0}` in the reference
+  // client: different map keys, so specificity never got to decide and both
+  // `mb-[1em]` and `mb-[0]` reached the class list. Every section's trailing
+  // paragraph kept a 1em margin it should not have had — 17px of drift at the
+  // top of a section, which the per-section clip turns into a 20–28% diff.
+  assert.deepEqual(expandBoxShorthand('margin', '0 0 1em'), [
+    ['margin-top', '0'], ['margin-right', '0'], ['margin-bottom', '1em'], ['margin-left', '0'],
+  ]);
+  assert.deepEqual(expandBoxShorthand('padding', '1px 2px 3px 4px'), [
+    ['padding-top', '1px'], ['padding-right', '2px'], ['padding-bottom', '3px'], ['padding-left', '4px'],
+  ]);
+});
+
+test('expandBoxShorthand: the split is paren-aware, so a function is one side and not three', () => {
+  assert.deepEqual(expandBoxShorthand('padding', 'clamp(2rem, 4vw, 3rem)'), [
+    ['padding-top', 'clamp(2rem, 4vw, 3rem)'], ['padding-right', 'clamp(2rem, 4vw, 3rem)'],
+    ['padding-bottom', 'clamp(2rem, 4vw, 3rem)'], ['padding-left', 'clamp(2rem, 4vw, 3rem)'],
+  ]);
+  // `.site-footer{padding: clamp(3.5rem,5vw,4.5rem) 0 6rem}` — a function in
+  // one side of a three-value shorthand. Splitting on whitespace would give
+  // `padding-top: clamp(…) 0 6rem`, which is not a value at all.
+  assert.deepEqual(expandBoxShorthand('padding', 'clamp(3.5rem,5vw,4.5rem) 0 6rem'), [
+    ['padding-top', 'clamp(3.5rem,5vw,4.5rem)'], ['padding-right', '0'],
+    ['padding-bottom', '6rem'], ['padding-left', '0'],
+  ]);
+  // `.wrap{width:min(100% - 2.5rem,1220px)}`-style spaces inside the parens
+  // must not create parts either.
+  assert.deepEqual(expandBoxShorthand('margin', 'min(100% - 2.5rem, 1220px) auto'), [
+    ['margin-top', 'min(100% - 2.5rem, 1220px)'], ['margin-right', 'auto'],
+    ['margin-bottom', 'min(100% - 2.5rem, 1220px)'], ['margin-left', 'auto'],
+  ]);
+});
+
+test('expandBoxShorthand: !important lands on every longhand, not as a fifth side', () => {
+  assert.deepEqual(expandBoxShorthand('margin', '0 auto !important'), [
+    ['margin-top', '0 !important'], ['margin-right', 'auto !important'],
+    ['margin-bottom', '0 !important'], ['margin-left', 'auto !important'],
+  ]);
+});
+
+test('expandBoxShorthand: leaves anything that is not a box shorthand alone', () => {
+  assert.equal(expandBoxShorthand('margin-top', '1em'), null);
+  assert.equal(expandBoxShorthand('border', '1px solid red'), null);
+  assert.equal(expandBoxShorthand('gap', '1rem 2rem'), null);
 });

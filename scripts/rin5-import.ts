@@ -105,7 +105,7 @@ async function main() {
   const { cssToClasses } = await import('../lib/import/css');
   const {
     resolvePseudoContent, parseCounterReset, parseCounterIncrement, pseudoHasVisualBox, isInlineCollapsible,
-    uaDefaultDecls, shorthandsFor,
+    uaDefaultDecls, shorthandsFor, expandBoxShorthand,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -222,7 +222,15 @@ async function main() {
       if (!PSEUDO_DROP_PROPS.has(d.prop)) pseudoDecls.push([d.prop, d.value + (d.important ? ' !important' : '')]);
       if (d.prop === 'counter-reset' || d.prop === 'counter-increment') return;
       if (DROP_PROPS.has(d.prop)) return;
-      decls.push([d.prop, d.value + (d.important ? ' !important' : '')]);
+      const value = d.value + (d.important ? ' !important' : '');
+      // Expand `margin`/`padding` into longhands so the cascade can actually
+      // resolve them: the winner map below is keyed by property name, so a
+      // shorthand and a longhand for the same side otherwise sit on different
+      // keys, both survive, and both emit a class — after which the winner is
+      // whichever order Tailwind generated them in, not the more specific rule.
+      const expanded = expandBoxShorthand(d.prop, value);
+      if (expanded) decls.push(...expanded);
+      else decls.push([d.prop, value]);
     });
 
     for (const rawSel of r.selector.split(',')) {

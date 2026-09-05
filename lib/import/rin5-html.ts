@@ -240,3 +240,60 @@ export function shorthandsFor(prop: string): string[] {
   for (let i = 1; i < parts.length; i++) out.push(parts.slice(0, i).join('-'));
   return out;
 }
+
+/**
+ * Split a CSS value into its top-level parts, ignoring whitespace nested in a
+ * function: `clamp(3.5rem, 5vw, 4.5rem) 0 6rem` is three parts, and
+ * `min(100% - 2.5rem, 1220px)` is one.
+ */
+function splitTopLevel(value: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of value.trim()) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth === 0 && /\s/.test(ch)) {
+      if (current) { parts.push(current); current = ''; }
+      continue;
+    }
+    current += ch;
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+/**
+ * Expand a `margin`/`padding` shorthand into its four longhands, or `null` for
+ * anything else.
+ *
+ * The importer resolves the cascade into a map keyed by property name, so a
+ * shorthand and a longhand for the same side never compete: `p{margin:0 0 1em}`
+ * and `p:last-child{margin-bottom:0}` land on different keys, both survive, and
+ * both emit an `mb-…` class — after which which one wins is down to the order
+ * Tailwind happens to generate them in, not to specificity. Expanding at parse
+ * time puts every box declaration on the same key so the cascade decides.
+ *
+ * The split is paren-aware, unlike `parseSpacingShorthand` in
+ * `lib/import/css.ts`: that one bails to a single `p-[whole value]` class as
+ * soon as it sees a `(`, which is harmless there (Tailwind copies the value
+ * through verbatim) but would produce `padding-top: clamp(…) 0 6rem` here.
+ */
+export function expandBoxShorthand(prop: string, value: string): Array<[string, string]> | null {
+  if (prop !== 'margin' && prop !== 'padding') return null;
+
+  // `!important` rides along on the value string; it belongs on every longhand,
+  // not as a fifth side.
+  const important = /\s*!important\s*$/i.test(value);
+  const parts = splitTopLevel(value.replace(/\s*!important\s*$/i, ''));
+  if (parts.length === 0 || parts.length > 4) return null;
+
+  const [top, right = top, bottom = top, left = right] = parts;
+  const suffix = important ? ' !important' : '';
+  return [
+    [`${prop}-top`, top + suffix],
+    [`${prop}-right`, right + suffix],
+    [`${prop}-bottom`, bottom + suffix],
+    [`${prop}-left`, left + suffix],
+  ];
+}
