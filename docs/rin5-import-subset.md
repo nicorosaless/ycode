@@ -6,10 +6,13 @@
 > deforma en el round-trip import → export, con independencia de lo bien
 > escrito que esté el HTML fuente.
 >
-> Estado a 2026-09-05, tras la **ronda 6**: las tres generaciones reales que
-> seguían por encima del gate quedan en **0,25%, 0,37% y 0,19%** de diff
-> ponderado (venían de 3,67%, 2,63% y 13,45%). Tabla completa y advertencia
-> sobre el cambio de medidor al final del documento.
+> Estado a 2026-09-05, tras la **ronda 7**: los dos runs de la cohorte 2 que
+> fallaban el gate —8,36% y 9,19% de diff ponderado— quedan en **0,14% y
+> 0,16%**, por una sola causa (las fuentes que la hoja trae con `@import`), y
+> los cinco controles se mueven dentro del ruido. La ronda 6 había dejado las
+> tres generaciones de la cohorte 1 en 0,25%, 0,37% y 0,19%. Tabla completa,
+> advertencia sobre el cambio de medidor y **la lista PROHIBIDO para el
+> linter** al final del documento.
 
 ## El ciclo, reproducible sin UI
 
@@ -428,3 +431,220 @@ Lo que queda se concentra en dos regiones, las mismas en los tres runs:
 `header.site-header`, que es el artefacto del `scroll-behavior` descrito arriba.
 En Can Nicolau esas dos regiones son las cinco peores de las 274 medidas. No
 queda ninguna causa de cascada identificada.
+
+## Ronda 7: una generación nueva, una sola causa
+
+Un run nuevo de la cohorte 2 —lead 26, Hipiclub Internacional, run
+`a15ba55c-7684-4f0e-95de-1ff24b923a90`, 18 páginas— fallaba el gate con **8,36%
+de diff ponderado**, con las secciones `section--tint` y `section--surface`
+entre el 25% y el 38% en los dos viewports a la vez. El segundo run de la misma
+cohorte (`a6c7fd5e`, Can Nicolau) resultó tener la misma causa y el mismo
+tamaño: 9,19%.
+
+Que *todas* las secciones de *todas* las páginas fallen a la vez, y en los dos
+viewports, no es una propiedad mal mapeada: una propiedad rompe una
+construcción, no un sitio entero. Era la fuente.
+
+**La hoja trae sus familias con `@import`, no con un `<link>`:**
+
+```css
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;…&family=Source+Sans+3:wght@400;500;600;700&display=swap');
+```
+
+El importador solo miraba los `<link>` del `<head>`, no encontraba ninguno y
+caía al set de reserva (Inter/Bricolage Grotesque/Caveat). El export pedía tres
+familias que la hoja no nombra y ninguna de las dos que sí, así que Chromium
+renderizaba todo el sitio con los sustitutos locales de `Fraunces` y
+`Source Sans 3`.
+
+Con otras métricas de glifo se mueve mucho más que el color del texto:
+
+| | entrada | export (antes) |
+|---|---:|---:|
+| `.section-head{max-width:62ch}` computado | 496px | 602,9px |
+| `<h2>Nuestras noticias y eventos</h2>` | dos líneas | una |
+
+El `ch` es el ancho del `0` de la fuente **que se usa de verdad**, no de la que
+pide el CSS. Un `max-width` en `ch` que engorda un 21% cambia dónde parte cada
+título, y con él la altura de la cabecera de sección y la posición vertical de
+todo lo que va debajo. De ahí que las nueve secciones de la portada diffeasen
+juntas.
+
+`lib/import/rin5-html.ts` expone ahora `googleFontsImportHrefs`, que lee las
+tres formas que CSS admite (`url('…')`, `url("…")`, `url(…)` y la cadena
+suelta), y `scripts/rin5-import.ts` sintetiza el `<link>` correspondiente
+cuando el `<head>` no trae ninguno. El set de reserva sigue existiendo, pero ya
+solo para una hoja que de verdad no declara fuentes.
+
+### Los sospechosos que no eran
+
+La hoja de Hipiclub usa 16 `grid-template-columns`, 17 `transform`, 11
+`clamp()`, 6 `position:absolute`, 6 `::after`, 5 `::before`, 3 `object-fit`, 2
+`inset`, 2 `aspect-ratio`, un `position:sticky`, un `backdrop-filter` y 2
+`@media`. Ninguno era la causa, y el remedido lo demuestra región por región:
+tras la corrección, **227 de las 256 regiones dan exactamente 0,00%**, entre
+ellas todas las que contienen esas construcciones:
+
+| Construcción | Dónde vive en esta hoja | Región | Diff |
+|---|---|---|---:|
+| `::before`/`::after` con `content:""`, `position:absolute` e `inset:0` | `.hero::before` / `.hero::after` (dos velos de degradado sobre la foto) | `section.hero` | 0,00%¹ |
+| `::before` decorativo con `position:absolute` y `border-radius:50%` | `.list-check li::before` | `section--dark` | 0,00% |
+| `grid-template-columns:repeat(N,1fr)` y `1.4fr 1fr 1fr` | `.grid-3`, `.contact-grid`, `.footer-cols` | `section--tint`, `footer` | 0,00% |
+| `aspect-ratio` + `object-fit:cover` | `.card-media`, `.gallery img` | `section--tint` | 0,00% |
+| `clamp()` en `padding` y `gap` | `.section`, `.split`, `.hero-inner` | todas | 0,00% |
+| `transform` en `:hover` | `.card:hover`, `.btn:hover` | todas | 0,00% |
+| `@media (max-width:900px)` y `(max-width:720px)` | los dos únicos escalones | todas | 0,00% |
+
+¹ 0,00% una vez descontado el artefacto del medidor que se explica abajo.
+
+Las dos `@media` de esta hoja caen una en `max-lg:` (900px) y otra en `max-md:`
+(720px), y a 1440 y 390 —los dos viewports que mide el gate— coinciden con el
+original. Sigue valiendo la advertencia de la ronda 6: entre 720 y 767, y entre
+900 y 1023, el export aplica lo que el original todavía no.
+
+### El resto es el medidor, y se ha comprobado
+
+Tras la corrección quedan siete regiones por encima del 0,00% que no son
+`header.site-header`, y solo una pasa del 1%. Todas las grandes son la misma
+cosa: la cabecera `position:sticky` con `backdrop-filter`, fotografiada sobre
+una parte distinta del hero en cada lado porque el original vuelve arriba con
+la animación de `html{scroll-behavior:smooth}` y el export salta.
+
+Es el defecto del medidor que la ronda 6 dejó documentado y sin corregir.
+Comprobado aquí de la forma más directa posible: quitando esa única línea del
+`styles.css` de entrada y midiendo contra **el mismo bundle exportado**,
+
+```text
+index                  desktop  0,00%   hipiclub-internacional desktop  0,00%
+index                  mobile   0,00%   hipiclub-internacional mobile   0,00%
+```
+
+No queda ninguna causa de mapeo en este run.
+
+### Antes y después, con los cinco controles
+
+Todo medido con el mismo medidor (el de la ronda 6), schema `cliente_b`,
+viewports 1440 y 390. Los dos primeros son la corrección; los cinco de abajo
+solo tenían que no moverse.
+
+| run | páginas | fuentes por | antes | después |
+|---|---:|---|---:|---:|
+| **lead 26 · Hipiclub · cohorte 2** (`a15ba55c`) | 18 | `@import` | **8,36%** | **0,14%** |
+| **lead 13 · Can Nicolau · cohorte 2** (`a6c7fd5e`) | 18 | `@import` | **9,19%** | **0,16%** |
+| lead 9 · Severino (control) (`188658f6`) | 11 | `<link>` | 0,22% | 0,23% |
+| lead 26 · Hipiclub · cohorte 1 (`bf2fa74c`) | 8 | `<link>` | 0,37% | 0,33% |
+| lead 13 · Can Nicolau · cohorte 1 (`de3387f3`) | 18 | `<link>` | 0,25% | 0,27% |
+| lead 64 · Natural Equus (control) (`34b48e37`) | 18 | `<link>` | 0,19% | 0,14% |
+| `out-v7` (control) | 9 | `<link>` | 1,94% | 1,95% |
+
+Los cinco controles cargan sus familias por `<link>`, así que el cambio no les
+toca nada y las diferencias (±0,05 puntos) son el ruido de captura de siempre.
+`out-v7` sigue con lo que la ronda 4 dejó sin diagnosticar.
+
+Que **dos** generaciones distintas, de dos negocios distintos y con hojas
+distintas, cayeran las dos por la misma causa y se arreglaran las dos con el
+mismo cambio es lo que hace creíble el diagnóstico: no es una hoja rara, es lo
+que escribe hoy el generador.
+
+### Regla nueva para el generador
+
+`html{scroll-behavior:smooth}` **no se importa** (está en `DROP_PROPS` desde el
+principio, junto a `box-sizing`, `counter-reset`, `counter-increment`,
+`content`, `-webkit-font-smoothing`, `text-decoration-thickness` y
+`text-underline-offset`). No cuesta píxeles reales, pero hace ilegible el gate:
+el medidor fotografía el original a medio camino de su scroll de vuelta y toda
+cabecera pegajosa sale con un 50–80% de diff que no existe. Escribir el scroll
+suave en el `site.js`, no en la hoja.
+
+## La lista PROHIBIDO, para el linter del contrato
+
+Todo lo anterior en un solo sitio y en la forma que necesita un linter de CSS:
+un patrón que detectar, por qué se pierde, y **la construcción concreta que sí
+se importa**. Cada fila remite a la sección de arriba donde está la medida.
+
+Tres categorías, y conviene no mezclarlas:
+
+- **Se descarta** — el importador tira la regla entera o la propiedad. El
+  export renderiza otra cosa. Error del linter.
+- **Se deforma** — la regla llega, pero no significa lo mismo. Error del linter
+  salvo que el generador acepte explícitamente el corte.
+- **Se pierde en el modelo de capas** — no hay equivalente en Ycode. Error del
+  linter; la alternativa siempre reestructura el HTML, no solo el CSS.
+
+### Selectores
+
+| # | PROHIBIDO | Qué pasa | En su lugar |
+|---|---|---|---|
+| S1 | `::selection`, `::placeholder`, `::marker`, `::first-line`, `::first-letter` | se descarta la regla | nada equivalente; no estilar esos pseudo-elementos |
+| S2 | `:focus-visible`, `:active` | se descarta la regla | solo `:hover` |
+| S3 | `:hover` en un ancestro (`.card:hover img`, `.card:hover .card-link::after`) | se descarta la regla: solo cuenta el `:hover` en el **sujeto** | poner el `:hover` en el propio elemento que cambia (`.card-link:hover`) |
+| S4 | universal combinado sin anclar: `* + *`, `* > *` | se descarta la regla | anclarlo en una clase: `.stack > * + *` |
+| S5 | un `@` dentro del selector | se descarta la regla (artefacto de parseo) | — |
+
+`*{margin:0}` a secas **sí** entra, con especificidad 0. El búho anclado
+(`.stack > * + *`) también.
+
+### At-rules y breakpoints
+
+| # | PROHIBIDO | Qué pasa | En su lugar |
+|---|---|---|---|
+| M1 | `@media (min-width: …)` | se descarta la regla entera | reescribir en `max-width` (diseño desktop-first) |
+| M2 | `@media (min-width:A) and (max-width:B)`, `orientation`, `hover`, `pointer`, `prefers-reduced-motion` | se descarta la regla entera | un solo `max-width` |
+| M3 | `@media (max-width: N)` con **N > 1200px** | se descarta la regla entera | 1023px |
+| M4 | más de **dos** escalones de breakpoint en toda la hoja | solo hay dos buckets (`max-md:` 767px, `max-lg:` 1023px); tres escalones se funden en dos y gana el último de cada bucket | exactamente dos: `767px` y `1023px` |
+| M5 | cualquier `max-width` que no sea 767px o 1023px | el corte se mueve al del bucket: un `@media(max-width:900px)` ya aplica a 1000px en el export | escribir 767 y 1023 |
+| M6 | `@supports`, `@keyframes`, `@container`, cualquier otro at-rule | se descarta | `transition`, que sí se mapea |
+| M7 | una regla dentro de `@media` **menos específica** que la regla base a la que se enfrenta (`@media{.split{…}}` contra `.split.narrow{…}`) | correcto desde la ronda 6, pero solo si la especificidad es la que quieres: la media query **no** suma especificidad | darle a la variante móvil al menos la misma especificidad que la base |
+
+`@import url('https://fonts.googleapis.com/css2?…')` **sí** entra desde la
+ronda 7, igual que un `<link>` en el `<head>`.
+
+### Pseudo-elementos y contadores
+
+| # | PROHIBIDO | Qué pasa | En su lugar |
+|---|---|---|---|
+| P1 | `content: attr(…)`, `content: url(…)`, `content` con imagen | no genera capa | texto literal, o un `<img>` de verdad |
+| P2 | `content` con varias partes (`content: "Paso " counter(step)`) | solo se lee el primer valor: sale `"Paso "` **o** el número, no los dos | dos pseudo-elementos, o el prefijo en el HTML |
+| P3 | `counters()` multinivel, más de un contador por declaración | no se resuelve | un solo `counter(nombre)` plano |
+| P4 | dos listas independientes con el mismo nombre de contador en una página | el namespace es plano: comparten cuenta | un nombre de contador por lista |
+| P5 | `content: ""` **sin** ninguna propiedad visual | no genera nada (correcto según CSS, pero suele ser un error del generador) | quitar la regla, o darle `background`/`border`/`box-shadow`/`mask` |
+
+`content:""` con `position:absolute`, `inset:0` y un `background` **sí** entra:
+es como están hechos los dos velos del hero de Hipiclub y salen a 0,00%.
+
+### Propiedades
+
+| # | PROHIBIDO | Qué pasa | En su lugar |
+|---|---|---|---|
+| C1 | `background-clip:text` + `-webkit-text-fill-color:transparent` | se descarta a propósito; el texto se queda con su color resuelto (si no, quedaría invisible) | color plano |
+| C2 | `box-sizing`, `scroll-behavior`, `-webkit-font-smoothing`, `text-decoration-thickness`, `text-underline-offset` | se descartan siempre (`DROP_PROPS`) | `box-sizing` ya lo pone el preflight; el scroll suave, al `site.js` (ronda 7) |
+| C3 | `@font-face` con fichero propio auto-hospedado | no se lee; se cae al set de reserva y **todo** el sitio cambia de métricas (8,36% medido) | Google Fonts, por `<link>` en el `<head>` o por `@import` en la hoja |
+| C4 | `<picture>`, `<source>`, `srcset` de autor | solo se lee el `src` | un `<img src>` con `width`/`height` |
+| C5 | `<svg>` inline dimensionado con `height:100%` | el renderer de iconos le inyecta un `aspect-ratio` inline que gana a `h-full`: sale con la altura de su `viewBox` | `aspect-ratio` explícito en el SVG |
+| C6 | listas anidadas (`ul ul`) | el UA pone a cero los márgenes de la lista interior de forma contextual, y el importador siembra por tag: la lista anidada recibe `1em` de más | una sola lista, o `<div>` con clase |
+| C7 | `<button>`/`<input>`/`<select>`/`<textarea>` sin estilar | el cromo nativo (borde gris de 2px, fondo, padding) **no** se siembra | estilar siempre borde, fondo y padding |
+| C8 | tratar una custom property como token editable después del import | `var(--token)` se resuelve al literal al importar; no sobrevive como variable | asumirlo: el CSS exportado lleva valores, no tokens |
+
+`clamp()`, `min()`, `max()`, `calc()`, `rgba()`, `grid-template-columns`,
+`transform`, `position:absolute`/`sticky`, `inset`, `aspect-ratio`,
+`object-fit`, `backdrop-filter` y `padding-top` porcentual **sí** entran, todos
+comprobados a 0,00% en la ronda 7.
+
+### Estado, interactividad y estructura
+
+| # | PROHIBIDO | Qué pasa | En su lugar |
+|---|---|---|---|
+| E1 | un reveal on scroll que además cambie `display`, `height` o `max-height` | solo se resuelven `opacity`, `transform` y `visibility`: el bloque se exporta cerrado y el visitante no lo ve nunca | la pareja `opacity` + `transform`, y nada más |
+| E2 | cualquier otra clase de estado que ponga el JS (`.nav-links.open{display:block}`, acordeones de altura animada) | el export se queda en el estado con que carga la página | `<details>`/`<summary>`, que sí tiene equivalente |
+| E3 | estilar por estado abierto: `details[open] summary::after{content:"–"}` | no hay equivalente; el marcador se queda en `+` | dos capas y un toggle de clase |
+| E4 | un `<a>` con estilo propio dentro de un `<p>`/`<dd>` **sin** atributo `class` | el elemento colapsa a rich-text y el enlace pasa a ser una marca de Tiptap, que no lleva clases: pierde su `border-bottom`/color | darle una clase al `<a>`: con `class` ya no colapsa |
+| E5 | cualquier script que dependa de la forma exacta del DOM (`document.querySelector('.foo > .bar:nth-child(2)')`) | Ycode reestructura el árbol y el selector deja de casar | solo el `site.js` del menú móvil, que se copia verbatim, y selectores por `data-*` |
+
+### Lo que el linter no puede ver, y hay que recordar aparte
+
+- **El id de capa cambia en cada import.** `bundleSha256` de `roundtrip.json`
+  no es reproducible; no sirve para comprobar determinismo.
+- **El gate se mide a 1440 y 390.** Un fallo de M4/M5 no aparece en el número:
+  vive en las anchuras intermedias. El linter es la única defensa.
+- **`html{scroll-behavior:smooth}` no cuesta píxeles pero rompe la medida.**
+  Cualquier cabecera `position:sticky` sale con 50–80% de diff falso.
