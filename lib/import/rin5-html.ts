@@ -187,6 +187,30 @@ const UA_DEFAULTS: Readonly<Record<string, ReadonlyArray<readonly [string, strin
   b: [['font-weight', '700']],
   th: [['font-weight', '700'], ['text-align', 'center']],
   small: [['font-size', 'smaller']],
+  // Form controls are the one place the UA deliberately *blocks* inheritance:
+  // `button{font: 400 13.3333px Arial; line-height: normal; text-align: center}`
+  // and friends. Tailwind preflight replaces that with `font: inherit`, so a
+  // control that the stylesheet only half-styles silently picks up the body's
+  // typography in the export. Only the typography is seeded, not the chrome
+  // (border, background, padding, cursor): a generator that ships an unstyled
+  // native button is outside the subset anyway, and seeding an OS-grey 2px
+  // outset border would be a worse failure than the one it fixes.
+  button: [
+    ['font-family', 'Arial'], ['font-size', '13.3333px'], ['font-weight', '400'],
+    ['font-style', 'normal'], ['line-height', 'normal'], ['text-align', 'center'],
+  ],
+  input: [
+    ['font-family', 'Arial'], ['font-size', '13.3333px'], ['font-weight', '400'],
+    ['font-style', 'normal'], ['line-height', 'normal'], ['text-align', 'start'],
+  ],
+  select: [
+    ['font-family', 'Arial'], ['font-size', '13.3333px'], ['font-weight', '400'],
+    ['font-style', 'normal'], ['line-height', 'normal'],
+  ],
+  textarea: [
+    ['font-family', 'monospace'], ['font-size', '13.3333px'], ['font-weight', '400'],
+    ['font-style', 'normal'], ['line-height', 'normal'], ['text-align', 'start'],
+  ],
   code: [['font-family', 'monospace']],
   kbd: [['font-family', 'monospace']],
   samp: [['font-family', 'monospace']],

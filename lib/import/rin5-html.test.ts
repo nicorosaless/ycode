@@ -163,3 +163,20 @@ test('shorthandsFor: a single-word property has no shorthand above it', () => {
   assert.deepEqual(shorthandsFor('color'), []);
   assert.deepEqual(shorthandsFor('display'), []);
 });
+
+test('uaDefaultDecls: form controls do not inherit typography, so the seed restores the break', () => {
+  // Measured on the mobile header of clients/7 (9.76% on every page): `.btn`
+  // sets family/size/weight but not line-height, so the source button keeps the
+  // UA's `normal` (~18.2px) while Tailwind preflight's `button{font:inherit}`
+  // gave the export body's 1.6 (21.76px). 3px taller button → 3px taller
+  // header → every element inside shifted 2px down.
+  const button = new Map(uaDefaultDecls('button'));
+  assert.equal(button.get('line-height'), 'normal');
+  assert.equal(button.get('font-family'), 'Arial');
+  assert.equal(button.get('font-size'), '13.3333px');
+  assert.equal(button.get('text-align'), 'center');
+
+  for (const tag of ['input', 'select', 'textarea']) {
+    assert.equal(new Map(uaDefaultDecls(tag)).get('line-height'), 'normal', tag);
+  }
+});
