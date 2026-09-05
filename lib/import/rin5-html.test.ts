@@ -8,6 +8,8 @@ import {
   parseCounterIncrement,
   pseudoHasVisualBox,
   isInlineCollapsible,
+  uaDefaultDecls,
+  shorthandsFor,
 } from '@/lib/import/rin5-html';
 
 test('resolvePseudoContent: literal string content, quotes and escapes stripped', () => {
@@ -87,4 +89,77 @@ test('isInlineCollapsible: a classed child still breaks collapse regardless of d
   const el = document.querySelector('.brand__name')!;
   const ctx = { isBlockified: () => false, displayOf: () => undefined };
   assert.equal(isInlineCollapsible(el, INLINE_OK, ctx), false);
+});
+
+test('uaDefaultDecls: <figure> keeps the UA 1em/40px margin box', () => {
+  // The single largest desktop diff left in round 2 (hero, 16.5%): the source
+  // stylesheet has no `*{margin:0}` reset, so the figure was 80px narrower and
+  // 34px shorter than the div Ycode renders under Tailwind preflight.
+  assert.deepEqual(uaDefaultDecls('figure'), [
+    ['margin-top', '1em'],
+    ['margin-right', '40px'],
+    ['margin-bottom', '1em'],
+    ['margin-left', '40px'],
+  ]);
+  assert.deepEqual(uaDefaultDecls('FIGURE'), uaDefaultDecls('figure'));
+});
+
+test('uaDefaultDecls: headings carry both the margin and the type scale', () => {
+  assert.deepEqual(uaDefaultDecls('h1'), [
+    ['margin-top', '.67em'],
+    ['margin-bottom', '.67em'],
+    ['font-size', '2em'],
+    ['font-weight', '700'],
+  ]);
+  assert.deepEqual(uaDefaultDecls('h4'), [
+    ['margin-top', '1.33em'],
+    ['margin-bottom', '1.33em'],
+    ['font-weight', '700'],
+  ]);
+});
+
+test('uaDefaultDecls: list and definition-list indentation', () => {
+  assert.deepEqual(uaDefaultDecls('ul'), [
+    ['margin-top', '1em'],
+    ['margin-bottom', '1em'],
+    ['padding-left', '40px'],
+    ['list-style-type', 'disc'],
+  ]);
+  assert.deepEqual(uaDefaultDecls('dd'), [['margin-left', '40px']]);
+  assert.deepEqual(uaDefaultDecls('dl'), [['margin-top', '1em'], ['margin-bottom', '1em']]);
+});
+
+test('uaDefaultDecls: only longhands, so an author longhand can win per side', () => {
+  for (const tag of ['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'dl', 'dd', 'figure', 'blockquote', 'hr']) {
+    for (const [prop] of uaDefaultDecls(tag)) {
+      assert.notEqual(prop, 'margin', `${tag} must not seed the \`margin\` shorthand`);
+      assert.notEqual(prop, 'padding', `${tag} must not seed the \`padding\` shorthand`);
+      assert.notEqual(prop, 'border', `${tag} must not seed the \`border\` shorthand`);
+    }
+  }
+});
+
+test('uaDefaultDecls: tags with no layout-relevant UA style seed nothing', () => {
+  assert.deepEqual(uaDefaultDecls('div'), []);
+  assert.deepEqual(uaDefaultDecls('span'), []);
+  assert.deepEqual(uaDefaultDecls('section'), []);
+  assert.deepEqual(uaDefaultDecls('a'), []);
+});
+
+test('shorthandsFor: a UA longhand names every shorthand that would override it', () => {
+  // `.site-footer ul{list-style:none;padding:0;margin:0}` in the reference
+  // client competes with the UA's `padding-left`/`margin-top`. Different map
+  // keys, so neither wins by specificity and both classes reach the output —
+  // where Tailwind sorts `pl-[40px]` after `p-[0]` and the footer nav got a
+  // 40px indent it never had. The seed has to stand down instead.
+  assert.deepEqual(shorthandsFor('padding-left'), ['padding']);
+  assert.deepEqual(shorthandsFor('margin-top'), ['margin']);
+  assert.deepEqual(shorthandsFor('list-style-type'), ['list', 'list-style']);
+  assert.deepEqual(shorthandsFor('font-size'), ['font']);
+  assert.deepEqual(shorthandsFor('font-weight'), ['font']);
+});
+
+test('shorthandsFor: a single-word property has no shorthand above it', () => {
+  assert.deepEqual(shorthandsFor('color'), []);
+  assert.deepEqual(shorthandsFor('display'), []);
 });

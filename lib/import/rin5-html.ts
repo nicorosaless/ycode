@@ -134,3 +134,85 @@ export function isInlineCollapsible(
   }
   return true;
 }
+
+/**
+ * Chromium user-agent default declarations, per tag, for the properties that
+ * move pixels.
+ *
+ * Why this exists: the importer resolves the *author* stylesheet only, and the
+ * document Ycode exports is reset by Tailwind's preflight. A hand-written site
+ * that ships no `*{margin:0}` reset of its own — the rin5 reference client is
+ * one — therefore loses every margin, indent and type-scale step it was
+ * silently inheriting from the browser. Measured on `clients/7`: `<figure>`
+ * alone (UA `margin: 1em 40px`) made the home hero 80px wider and 100px taller
+ * in the export than in the source, which was the largest single desktop
+ * region diff left after round 2 (16.5%) — and, before this, was misattributed
+ * to Ycode's image pipeline.
+ *
+ * Seeded into the cascade below every author rule, so anything the stylesheet
+ * declares still wins. Values are kept in the UA's own relative units (`em`,
+ * `smaller`), not resolved pixels, so they scale off the element's own font
+ * size exactly as the browser does.
+ *
+ * Longhands only, deliberately: the importer's winner map is keyed by property
+ * name, so seeding `margin` would sit *alongside* an author `margin-left`
+ * instead of losing to it, and both classes would reach the output.
+ *
+ * Verified against Chromium's computed styles (`getComputedStyle` on a bare
+ * document), not copied from the HTML spec's suggested stylesheet.
+ *
+ * Known gap: the UA also zeroes the margins of a *nested* `ul`/`ol`
+ * (`ul ul {margin: 0}`). That's contextual, not per-tag, so a nested list gets
+ * a spurious `1em` block margin here. No nested lists exist in the reference
+ * client; a list-in-list is on the "avoid" side of the import contract.
+ */
+const UA_DEFAULTS: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  p: [['margin-top', '1em'], ['margin-bottom', '1em']],
+  h1: [['margin-top', '.67em'], ['margin-bottom', '.67em'], ['font-size', '2em'], ['font-weight', '700']],
+  h2: [['margin-top', '.83em'], ['margin-bottom', '.83em'], ['font-size', '1.5em'], ['font-weight', '700']],
+  h3: [['margin-top', '1em'], ['margin-bottom', '1em'], ['font-size', '1.17em'], ['font-weight', '700']],
+  h4: [['margin-top', '1.33em'], ['margin-bottom', '1.33em'], ['font-weight', '700']],
+  h5: [['margin-top', '1.67em'], ['margin-bottom', '1.67em'], ['font-size', '.83em'], ['font-weight', '700']],
+  h6: [['margin-top', '2.33em'], ['margin-bottom', '2.33em'], ['font-size', '.67em'], ['font-weight', '700']],
+  ul: [['margin-top', '1em'], ['margin-bottom', '1em'], ['padding-left', '40px'], ['list-style-type', 'disc']],
+  ol: [['margin-top', '1em'], ['margin-bottom', '1em'], ['padding-left', '40px'], ['list-style-type', 'decimal']],
+  dl: [['margin-top', '1em'], ['margin-bottom', '1em']],
+  dd: [['margin-left', '40px']],
+  figure: [['margin-top', '1em'], ['margin-right', '40px'], ['margin-bottom', '1em'], ['margin-left', '40px']],
+  blockquote: [['margin-top', '1em'], ['margin-right', '40px'], ['margin-bottom', '1em'], ['margin-left', '40px']],
+  pre: [['margin-top', '1em'], ['margin-bottom', '1em'], ['font-family', 'monospace']],
+  hr: [['margin-top', '.5em'], ['margin-bottom', '.5em'], ['margin-left', 'auto'], ['margin-right', 'auto']],
+  address: [['font-style', 'italic']],
+  strong: [['font-weight', '700']],
+  b: [['font-weight', '700']],
+  th: [['font-weight', '700'], ['text-align', 'center']],
+  small: [['font-size', 'smaller']],
+  code: [['font-family', 'monospace']],
+  kbd: [['font-family', 'monospace']],
+  samp: [['font-family', 'monospace']],
+};
+
+/** UA default declarations for `tag`, or an empty list if it has none worth keeping. */
+export function uaDefaultDecls(tag: string): Array<[string, string]> {
+  const decls = UA_DEFAULTS[tag.toLowerCase()];
+  return decls ? decls.map(([prop, value]) => [prop, value]) : [];
+}
+
+/**
+ * Every property name that, declared by the author, would set `prop` as part
+ * of a shorthand — `padding-left` → `padding`, `list-style-type` →
+ * `list-style` (and the nonexistent-but-harmless `list`).
+ *
+ * The importer resolves the cascade into a map keyed by property name, so a
+ * UA-seeded longhand and an author shorthand never meet: they occupy different
+ * keys, both survive, and both become Tailwind classes. Tailwind then sorts the
+ * longhand last and it wins — the opposite of the cascade. Rather than expand
+ * every shorthand (which would need a value parser per property family), the
+ * seed simply withdraws when the author has declared anything above it.
+ */
+export function shorthandsFor(prop: string): string[] {
+  const parts = prop.split('-');
+  const out: string[] = [];
+  for (let i = 1; i < parts.length; i++) out.push(parts.slice(0, i).join('-'));
+  return out;
+}

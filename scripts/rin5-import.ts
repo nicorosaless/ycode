@@ -57,6 +57,14 @@ const DROP_PROPS = new Set([
   '-webkit-font-smoothing', 'text-decoration-thickness', 'text-underline-offset',
 ]);
 
+/**
+ * Cascade weight of a user-agent default. Below every author declaration
+ * (`specificity()` never returns a negative), which is exactly where the UA
+ * origin sits — and recognisable afterwards, so a seed can be withdrawn when
+ * an author shorthand covers it.
+ */
+const UA_SPECIFICITY = -1;
+
 interface CssRule {
   sel: string;
   hover: boolean;
@@ -97,6 +105,7 @@ async function main() {
   const { cssToClasses } = await import('../lib/import/css');
   const {
     resolvePseudoContent, parseCounterReset, parseCounterIncrement, pseudoHasVisualBox, isInlineCollapsible,
+    uaDefaultDecls, shorthandsFor,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -273,6 +282,20 @@ async function main() {
 
   const computeBuckets = (el: El): Record<string, Map<string, Winner>> => {
     const buckets: Record<string, Map<string, Winner>> = {};
+    // Seed the base bucket with the browser's own defaults for this tag before
+    // any author rule. Ycode's output is reset by Tailwind preflight, so a
+    // source stylesheet that ships no reset of its own (the rin5 reference
+    // client is one) would otherwise silently lose every UA margin, indent and
+    // type-scale step — `<figure>`'s `margin: 1em 40px` alone accounted for the
+    // largest desktop region diff left after round 2. `spec`/`order` of -1 puts
+    // them below every author declaration, exactly where the UA origin sits.
+    const uaDecls = uaDefaultDecls(el.tagName);
+    if (uaDecls.length > 0) {
+      const base = (buckets[''] ??= new Map());
+      for (const [prop, value] of uaDecls) {
+        base.set(prop, { value, spec: UA_SPECIFICITY, order: UA_SPECIFICITY });
+      }
+    }
     for (const r of rules) {
       const subject = r.hover ? r.sel.replace(/:hover/g, '') : r.sel;
       if (!matchesSafe(el, subject)) continue;
@@ -282,6 +305,21 @@ async function main() {
         const prev = map.get(prop);
         if (prev && (prev.spec > r.spec || (prev.spec === r.spec && prev.order > r.order))) continue;
         map.set(prop, { value: rawVal, spec: r.spec, order: r.order });
+      }
+    }
+    // Withdraw any UA seed the author has already covered with a shorthand.
+    // Specificity can't do this on its own: `padding-left` (seed) and
+    // `padding` (author) are different keys in this map, so both survive and
+    // both become classes — and Tailwind sorts the longhand last, inverting
+    // the cascade. Measured: `.site-footer ul{list-style:none;padding:0;
+    // margin:0}` vs the UA's `ul{padding-left:40px}` indented the whole footer
+    // nav by 40px.
+    for (const map of Object.values(buckets)) {
+      for (const [prop, winner] of map) {
+        if (winner.spec !== UA_SPECIFICITY) continue;
+        if (shorthandsFor(prop).some((s) => (map.get(s)?.spec ?? UA_SPECIFICITY) !== UA_SPECIFICITY)) {
+          map.delete(prop);
+        }
       }
     }
     return buckets;
