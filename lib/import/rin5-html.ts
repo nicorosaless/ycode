@@ -512,8 +512,10 @@ function splitTopLevel(value: string): string[] {
   return parts;
 }
 
-/** `border: <width> <style> <color>`, the only form worth splitting apart. */
-const BORDER_TRIPLE_RE = /^(\S+)\s+(solid|dashed|dotted|double|groove|ridge|inset|outset)\s+(.+)$/;
+/** The `border-style` keywords, which is what tells a `border` component apart from a width or a colour. */
+const BORDER_STYLES = new Set(['none', 'hidden', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset']);
+/** A `border-width`: a length, or one of the three keywords. */
+const BORDER_WIDTH_RE = /^(0|[\d.]+(px|r?em|ch|vw|vh|pt|%)|thin|medium|thick)$/i;
 
 /**
  * The two physical sides each logical shorthand writes, in LTR. Every sheet the
@@ -568,15 +570,30 @@ export function expandBoxShorthand(prop: string, value: string): Array<[string, 
     return [[logical[0], start + suffix], [logical[1], end + suffix]];
   }
   if (prop === 'border' || /^border-(top|right|bottom|left)$/.test(prop)) {
+    // Any of the three components may be missing — `border: 0 solid` is
+    // Tailwind's own preflight, and it rides inside every export this importer
+    // now reads back. Left whole it sits on the `border` key while an author's
+    // `border-width` sits on another, both survive the cascade and the winner
+    // is whichever utility Tailwind generated last: measured as every bordered
+    // card losing its 1px frame on re-import.
     const important = /\s*!important\s*$/i.test(value);
-    const m = value.replace(/\s*!important\s*$/i, '').trim().match(BORDER_TRIPLE_RE);
-    if (!m) return null;
+    const parts = splitTopLevel(value.replace(/\s*!important\s*$/i, ''));
+    // One component on its own stays whole: `cssToClasses` already has a
+    // utility for `border: none` and `border: 0`, and with nothing else in the
+    // declaration there is no longhand rival to resolve against.
+    if (parts.length < 2 || parts.length > 3) return null;
     const suffix = important ? ' !important' : '';
-    return [
-      [`${prop}-width`, m[1] + suffix],
-      [`${prop}-style`, m[2] + suffix],
-      [`${prop}-color`, m[3].trim() + suffix],
-    ];
+    const out: Array<[string, string]> = [];
+    for (const part of parts) {
+      const side = BORDER_STYLES.has(part.toLowerCase()) ? 'style'
+        : BORDER_WIDTH_RE.test(part) ? 'width'
+          : 'color';
+      if (out.some(([p]) => p === `${prop}-${side}`)) return null;
+      out.push([`${prop}-${side}`, part + suffix]);
+    }
+    // Keep the canonical width/style/colour order regardless of how it was written.
+    const rank = (p: string) => (p.endsWith('-width') ? 0 : p.endsWith('-style') ? 1 : 2);
+    return out.sort((a, b) => rank(a[0]) - rank(b[0]));
   }
   if (prop !== 'margin' && prop !== 'padding') return null;
 

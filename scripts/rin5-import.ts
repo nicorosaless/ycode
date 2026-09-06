@@ -249,10 +249,22 @@ async function main() {
       r.walkDecls((d) => { if (d.prop.startsWith('--')) vars.set(d.prop, d.value); });
     }
   });
-  const resolveVars = (value: string): string => {
+  // `@property` declares the initial value of a custom property, and a compiled
+  // Tailwind sheet leans on it: `box-shadow: var(--tw-inset-shadow), …,
+  // var(--tw-shadow)` is four transparent shadows and the real one. Without the
+  // initial values, every one of those resolves to nothing and the shadow comes
+  // out as `shadow-[,,,,]` — a class with no value behind it.
+  root.walkAtRules('property', (at) => {
+    const name = at.params.trim();
+    if (!name.startsWith('--')) return;
+    at.walkDecls('initial-value', (d) => { vars.set(name, d.value); });
+  });
+
+  const resolveVars = (value: string, local?: Map<string, string>): string => {
     let v = value;
     for (let i = 0; i < 5 && v.includes('var('); i++) {
-      v = v.replace(/var\((--[\w-]+)\s*(?:,\s*([^()]+))?\)/g, (_m, name, fb) => vars.get(name) ?? fb ?? '');
+      v = v.replace(/var\((--[\w-]+)\s*(?:,\s*([^()]+))?\)/g,
+        (_m, name, fb) => local?.get(name) ?? vars.get(name) ?? fb ?? '');
     }
     return v;
   };
@@ -326,7 +338,6 @@ async function main() {
     const decls: Array<[string, string]> = [];
     const pseudoDecls: Array<[string, string]> = [];
     r.decls.forEach((d) => {
-      if (d.prop.startsWith('--')) return;
       if (!PSEUDO_DROP_PROPS.has(d.prop)) pseudoDecls.push([d.prop, d.value + (d.important ? ' !important' : '')]);
       if (d.prop === 'counter-reset' || d.prop === 'counter-increment') return;
       if (DROP_PROPS.has(d.prop)) return;
@@ -505,11 +516,19 @@ async function main() {
 
   // Quotes cannot survive into class attributes (broken HTML) — Tailwind
   // arbitrary values work unquoted with underscores for spaces.
-  const cleanValue = (v: string): string => rewriteUrls(resolveVars(v)).replace(/["']/g, '');
+  const cleanValue = (v: string, local?: Map<string, string>): string =>
+    rewriteUrls(resolveVars(v, local)).replace(/["']/g, '');
 
   const bucketToClasses = (map: Map<string, Winner>): string[] => {
+    // A custom property that a rule sets on the element itself — how Tailwind
+    // carries a shadow, a ring or a font weight — is not a utility of its own:
+    // it is what the declaration next to it reads. It wins its own cascade like
+    // any property, and then resolves the values around it.
+    const local = new Map<string, string>();
+    for (const [prop, winner] of map) if (prop.startsWith('--')) local.set(prop, winner.value);
     const declStr = [...map.entries()]
-      .map(([p, w]) => `${p}: ${cleanValue(w.value)}`)
+      .filter(([prop]) => !prop.startsWith('--'))
+      .map(([p, w]) => `${p}: ${cleanValue(w.value, local)}`)
       .join('; ');
     return cssToClasses(declStr);
   };

@@ -695,3 +695,27 @@ test('resolveNestedSelector compone el anidamiento que emite Tailwind v4', () =>
   assert.equal(resolveNestedSelector('.b', '.a'), '.a .b');
   assert.equal(resolveNestedSelector('&:hover, &:focus', '.a'), '.a:hover, .a:focus');
 });
+
+test('expandBoxShorthand parte un border incompleto, no solo el de tres partes', () => {
+  // `*{border:0 solid}` es el preflight de Tailwind, y viaja dentro de cualquier
+  // export. Sin partirlo compite contra `border-width` desde otra clave del mapa
+  // de ganadores: sobreviven los dos, decide el orden de Tailwind y la tarjeta
+  // sale sin su borde de 1px (2px de ancho de contenido de más en cada una).
+  assert.deepEqual(expandBoxShorthand('border', '0 solid'), [
+    ['border-width', '0'],
+    ['border-style', 'solid'],
+  ]);
+  // Un solo componente sigue entero: `cssToClasses` ya traduce `border: none`
+  // y `border: 0` a una utilidad válida, y no hay longhand rival que resolver.
+  assert.equal(expandBoxShorthand('border', 'none'), null);
+  assert.equal(expandBoxShorthand('border-top', '1px'), null);
+  assert.deepEqual(expandBoxShorthand('border', 'solid #ded3bd'), [
+    ['border-style', 'solid'],
+    ['border-color', '#ded3bd'],
+  ]);
+  assert.deepEqual(expandBoxShorthand('border', '1.5px solid transparent !important'), [
+    ['border-width', '1.5px !important'],
+    ['border-style', 'solid !important'],
+    ['border-color', 'transparent !important'],
+  ]);
+});
