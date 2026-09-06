@@ -781,3 +781,41 @@ export function rewriteInternalHref(href: string): string {
   if (slug === null) return href;
   return slug === '' ? `/${hash}` : `/${slug}${hash}`;
 }
+
+/**
+ * Split a selector list on its top-level commas.
+ *
+ * `String.prototype.split(',')` is wrong for compiled CSS: Tailwind escapes the
+ * commas inside an arbitrary value, so `.pt-\[clamp\(2\.5rem\,6vw\,5rem\)\]`
+ * came apart into three fragments that match nothing. Every `clamp()`, `min()`
+ * and font stack of a re-imported export was lost that way. Commas inside
+ * parentheses — `:is(.a, .b)` — are not separators either.
+ */
+export function splitSelectorList(selector: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let depth = 0;
+  for (let i = 0; i < selector.length; i++) {
+    const ch = selector[i];
+    if (ch === '\\') { current += ch + (selector[i + 1] ?? ''); i++; continue; }
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth--;
+    else if (ch === ',' && depth === 0) { parts.push(current); current = ''; continue; }
+    current += ch;
+  }
+  parts.push(current);
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
+
+/**
+ * The full selector of a rule nested inside another, as CSS nesting resolves it.
+ *
+ * Tailwind v4 compiles a variant into a nested rule (`.hover\:underline {
+ * &:hover { … } }`), so an importer that only reads top-level selectors sees
+ * the utility with no declarations at all.
+ */
+export function resolveNestedSelector(childSelector: string, parentSelector: string): string {
+  return splitSelectorList(childSelector)
+    .map((part) => (part.includes('&') ? part.replace(/&/g, parentSelector) : `${parentSelector} ${part}`))
+    .join(', ');
+}

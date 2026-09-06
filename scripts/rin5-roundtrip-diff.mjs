@@ -89,17 +89,41 @@ function serverPort(server) {
   return server.address().port;
 }
 
-/** rin5 flat bundle: `index.html`, `{slug}.html`. Skips assets/scripts/error pages. */
-function listRin5Pages(srcDir, only) {
-  const files = fs.readdirSync(srcDir).filter((f) => f.endsWith('.html'));
+/**
+ * The pages of a bundle, in either shape it can arrive in.
+ *
+ * `--src` used to be a flat rin5 bundle and nothing else. Since the importer
+ * accepts its own exports (P-2609), a useful measurement is export against
+ * export — same shape on both sides — so the layout is detected instead of
+ * assumed: `{slug}.html` at the root, or `{slug}/index.html` one folder deep.
+ * Error pages are skipped in both.
+ */
+function listBundlePages(srcDir, only) {
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true });
   const skip = new Set(['401.html', '404.html', '500.html']);
-  const slugs = files.filter((f) => !skip.has(f)).map((f) => f.replace(/\.html$/, '')).map((s) => (s === 'index' ? '' : s));
+  const slugs = [];
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (entry.name === 'assets') continue;
+      if (fs.existsSync(path.join(srcDir, entry.name, 'index.html'))) slugs.push(entry.name);
+      continue;
+    }
+    if (!entry.name.endsWith('.html') || skip.has(entry.name)) continue;
+    const base = entry.name.replace(/\.html$/, '');
+    slugs.push(base === 'index' ? '' : base);
+  }
   const picked = only ? slugs.filter((s) => only.includes(s === '' ? 'index' : s)) : slugs;
   return picked.sort();
 }
 
-function urlForSrc(port, slug) {
-  return `http://127.0.0.1:${port}/${slug === '' ? '' : `${slug}.html`}`;
+/** Whether this bundle keeps `{slug}` in a folder (a Ycode export) or as `{slug}.html` (a rin5 bundle). */
+function isNestedBundle(dir) {
+  return !fs.existsSync(path.join(dir, 'styles.css'));
+}
+
+function urlForSrc(port, slug, nested) {
+  if (slug === '') return `http://127.0.0.1:${port}/`;
+  return `http://127.0.0.1:${port}/${nested ? `${slug}/` : `${slug}.html`}`;
 }
 function urlForOut(port, slug) {
   return `http://127.0.0.1:${port}/${slug === '' ? '' : `${slug}/`}`;
@@ -182,7 +206,8 @@ async function main() {
   const srcPort = serverPort(srcServer);
   const outPort = serverPort(outServer);
 
-  const pages = listRin5Pages(args.src, args.pages);
+  const pages = listBundlePages(args.src, args.pages);
+  const srcNested = isNestedBundle(args.src);
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
@@ -191,7 +216,7 @@ async function main() {
     const label = slug === '' ? 'index' : slug;
     for (const vw of args.viewports) {
       const viewportLabel = vw >= 1200 ? 'desktop' : 'mobile';
-      const srcRegions = await screenshotRegions(page, urlForSrc(srcPort, slug), vw);
+      const srcRegions = await screenshotRegions(page, urlForSrc(srcPort, slug, srcNested), vw);
       const outRegions = await screenshotRegions(page, urlForOut(outPort, slug), vw);
       const regionCount = Math.max(srcRegions.length, outRegions.length);
 

@@ -89,6 +89,12 @@ interface PseudoRule extends BucketedRule {
 }
 
 function specificity(sel: string): number {
+  // An escaped character is part of an identifier, never selector syntax: the
+  // `\[`…`\]` of a compiled Tailwind utility is one class, not a class plus an
+  // attribute selector, and `\.` inside `.grid-cols-\[1\.05fr\]` is not a second
+  // class. Counting them as syntax gave arbitrary-value utilities twice the
+  // weight of plain ones and inverted the cascade between them.
+  sel = sel.replace(/\\[\s\S]/g, 'x');
   const ids = (sel.match(/#[\w-]+/g) || []).length;
   const classes = (sel.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+(\([^)]*\))?/g) || []).length;
   const types = (sel.match(/(^|[\s>+~])[a-z][\w-]*/gi) || []).length;
@@ -104,7 +110,8 @@ async function main() {
     uaDefaultDecls, shorthandsFor, expandBoxShorthand, parseInlineStyle,
     bucketForMedia, resolveBuckets, BUCKET_ORDER, isSupportedSelector,
     selectorClassNames, relaxStateClasses, STATE_CLASS_PROPS, isHiddenByCascade,
-    googleFontsImportHrefs,
+    googleFontsImportHrefs, pageSlugForBundleFile, inlineStyleSheets, localStylesheetHrefs,
+    authorInlineScripts, rewriteInternalHref, splitSelectorList, resolveNestedSelector,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -180,13 +187,65 @@ async function main() {
     return assetMap.get(name);
   };
 
-  // ───────────────────────── 2. Parse CSS ─────────────────────────
-  const cssText = fs.readFileSync(path.join(SITE_DIR, 'styles.css'), 'utf8');
+  // ─────────────────── 2. Find the pages and the stylesheet ───────────────────
+  // Two bundle shapes reach this importer. The rin5 generator writes a flat one
+  // (`{slug}.html` + `styles.css` + `site.js`); this editor's own static export
+  // writes `{slug}/index.html` with the whole sheet inlined in a `<style>` and
+  // no loose CSS or JS file at all. Provisioning a paying customer imports the
+  // export — see `docs/rin5-import-subset.md` and `ops/README.md` §5 — so both
+  // have to be readable. Everything past this point is one pipeline.
+  const pageFiles: Array<{ file: string; slug: string }> = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'assets') continue;
+        walk(abs);
+        continue;
+      }
+      const slug = pageSlugForBundleFile(path.relative(SITE_DIR, abs));
+      if (slug !== null) pageFiles.push({ file: path.relative(SITE_DIR, abs), slug });
+    }
+  };
+  walk(SITE_DIR);
+  if (pageFiles.length === 0) throw new Error(`no pages found under ${SITE_DIR}`);
+  const readPage = (file: string) => fs.readFileSync(path.join(SITE_DIR, file), 'utf8');
+
+  // The sheet, from wherever this bundle keeps it. An export inlines the same
+  // site-wide CSS into every page, so the union of the pages' sheets is that
+  // one sheet; sheets are deduplicated by their exact text to keep it that way.
+  // A per-page sheet would need a per-page cascade, which the pipeline below
+  // does not have — and does not need, because every selector Ycode emits is a
+  // class that only the pages carrying it can match.
+  const stylesCssPath = path.join(SITE_DIR, 'styles.css');
+  const sheets: string[] = [];
+  const seenSheets = new Set<string>();
+  const addSheet = (css: string) => {
+    const text = css.trim();
+    if (!text || seenSheets.has(text)) return;
+    seenSheets.add(text);
+    sheets.push(text);
+  };
+  if (fs.existsSync(stylesCssPath)) {
+    addSheet(fs.readFileSync(stylesCssPath, 'utf8'));
+  } else {
+    for (const { file } of pageFiles) {
+      const html = readPage(file);
+      for (const css of inlineStyleSheets(html)) addSheet(css);
+      for (const href of localStylesheetHrefs(html)) {
+        const abs = path.resolve(path.dirname(path.join(SITE_DIR, file)), href.split('?')[0]);
+        if (fs.existsSync(abs)) addSheet(fs.readFileSync(abs, 'utf8'));
+      }
+    }
+    console.log(`No styles.css: read ${sheets.length} inline sheet(s) from the bundle's pages`);
+  }
+  const cssText = sheets.join('\n');
   const root = postcss.parse(cssText);
 
   const vars = new Map<string, string>();
   root.walkRules((r) => {
-    if (r.selector.trim() === ':root') {
+    // `:root, :host` is how Tailwind v4 writes its theme block in an export.
+    if (r.selector.split(',').some((part) => part.trim() === ':root')) {
       r.walkDecls((d) => { if (d.prop.startsWith('--')) vars.set(d.prop, d.value); });
     }
   });
@@ -214,19 +273,59 @@ async function main() {
   const counterResets: Array<{ sel: string; name: string; value: number }> = [];
   const counterIncrements: Array<{ sel: string; name: string; amount: number }> = [];
   let order = 0;
-  root.walkRules((r) => {
-    const parent = r.parent as { type?: string; name?: string; params?: string };
-    let bucket: CssBucket = '';
-    if (parent?.type === 'atrule') {
-      if (parent.name !== 'media') return;
-      if (/prefers-reduced-motion/.test(parent.params || '')) return;
-      const b = bucketForMedia(parent.params || '');
-      if (b === null) return;
-      bucket = b;
+
+  /**
+   * Flatten the sheet into `(selector, media bucket, own declarations)` triples.
+   *
+   * The sheet used to be read as "a rule, maybe inside one `@media`", which is
+   * how a person writes CSS — and how the rin5 generator writes it. A compiled
+   * Tailwind sheet, which is what this editor's own export inlines, nests the
+   * other way round: the rule comes first and the query lives *inside* it
+   * (`.max-lg\:grid-cols-\[1fr\] { @media (width < 64rem) { … } }`), all of it
+   * wrapped in `@layer utilities`, with variants as nested `&:hover` rules.
+   * Read flat, every one of those declarations landed in the base bucket and
+   * the mobile layout overwrote the desktop one on every page.
+   *
+   * `@layer` is transparent (this importer resolves the cascade per element, so
+   * layer ordering has nothing to add); `@supports`, `@container` and any query
+   * `bucketForMedia` doesn't recognise take their declarations out with them,
+   * exactly as before.
+   */
+  interface FlatRule { selector: string; bucket: CssBucket; decls: Array<{ prop: string; value: string; important: boolean }> }
+  const flatRules: FlatRule[] = [];
+  type CssNode = {
+    type?: string; name?: string; params?: string; selector?: string;
+    prop?: string; value?: string; important?: boolean; nodes?: CssNode[];
+  };
+  const flatten = (container: CssNode, selector: string | null, bucket: CssBucket) => {
+    const own: FlatRule['decls'] = [];
+    for (const node of container.nodes ?? []) {
+      if (node.type === 'decl') {
+        own.push({ prop: node.prop!, value: node.value!, important: !!node.important });
+      } else if (node.type === 'rule') {
+        const nested = selector === null
+          ? node.selector!
+          : resolveNestedSelector(node.selector!, selector);
+        flatten(node, nested, bucket);
+      } else if (node.type === 'atrule') {
+        if (node.name === 'layer') { flatten(node, selector, bucket); continue; }
+        if (node.name !== 'media') continue;
+        if (/prefers-reduced-motion/.test(node.params || '')) continue;
+        const b = bucketForMedia(node.params || '');
+        if (b === null) continue;
+        // The narrowest query on the way down decides the bucket.
+        flatten(node, selector, b === '' || bucket === 'max-md:' ? bucket : b);
+      }
     }
+    if (selector !== null && own.length > 0) flatRules.push({ selector, bucket, decls: own });
+  };
+  flatten(root as unknown as CssNode, null, '');
+
+  for (const r of flatRules) {
+    const bucket = r.bucket;
     const decls: Array<[string, string]> = [];
     const pseudoDecls: Array<[string, string]> = [];
-    r.walkDecls((d) => {
+    r.decls.forEach((d) => {
       if (d.prop.startsWith('--')) return;
       if (!PSEUDO_DROP_PROPS.has(d.prop)) pseudoDecls.push([d.prop, d.value + (d.important ? ' !important' : '')]);
       if (d.prop === 'counter-reset' || d.prop === 'counter-increment') return;
@@ -242,9 +341,8 @@ async function main() {
       else decls.push([d.prop, value]);
     });
 
-    for (const rawSel of r.selector.split(',')) {
-      const sel = rawSel.trim();
-      if (!sel || sel === ':root') continue;
+    for (const sel of splitSelectorList(r.selector)) {
+      if (sel === ':root' || sel === ':host') continue;
 
       const pseudoMatch = sel.match(PSEUDO_SUFFIX_RE);
       if (pseudoMatch) {
@@ -275,7 +373,7 @@ async function main() {
       // a `counter()` used by a descendant's `::before` — captured separately so
       // `.step::before{content:counter(step,decimal-leading-zero)}` renders "01..04"
       // instead of being silently skipped along with the rest of `::before`.
-      r.walkDecls((d) => {
+      for (const d of r.decls) {
         if (d.prop === 'counter-reset') {
           const parsed = parseCounterReset(d.value);
           if (parsed) counterResets.push({ sel, ...parsed });
@@ -283,7 +381,7 @@ async function main() {
           const parsed = parseCounterIncrement(d.value);
           if (parsed) counterIncrements.push({ sel, ...parsed });
         }
-      });
+      }
       // A lone `*` is a reset, and a reset is worth honouring: `*{margin:0}`
       // cancels the UA seeds this importer plants per tag. `box-sizing` is the
       // one declaration to leave behind — Tailwind's preflight already sets
@@ -293,7 +391,7 @@ async function main() {
       if (selDecls.length === 0) continue;
       rules.push({ sel, hover, bucket, spec: specificity(sel), order: order++, decls: selDecls });
     }
-  });
+  }
   console.log(`Parsed ${rules.length} CSS rule entries`);
 
   // Reveal-on-scroll. A class the stylesheet tests for but that no element of
@@ -309,8 +407,8 @@ async function main() {
   // them for an element the rest of the cascade leaves invisible — see
   // `isHiddenByCascade`.
   const classesInUse = new Set<string>();
-  for (const file of fs.readdirSync(SITE_DIR).filter((f) => f.endsWith('.html'))) {
-    const html = fs.readFileSync(path.join(SITE_DIR, file), 'utf8');
+  for (const { file } of pageFiles) {
+    const html = readPage(file);
     for (const m of html.matchAll(/\sclass\s*=\s*"([^"]*)"/g)) {
       for (const name of m[1].split(/\s+/)) if (name) classesInUse.add(name);
     }
@@ -439,12 +537,7 @@ async function main() {
   const collapseCtx = { isBlockified: (el: El) => isBlockified(el), displayOf: (el: El) => displayOf(el) };
 
   // ───────────────────────── 4. HTML → layers ─────────────────────────
-  const rewriteHref = (href: string): string => {
-    if (/^(https?:|tel:|mailto:|#|wa\.me)/.test(href)) return href;
-    const m = href.match(/^\/?([\w-]+)\.html(#.*)?$/);
-    if (m) return m[1] === 'index' ? `/${m[2] ?? ''}` : `/${m[1]}${m[2] ?? ''}`;
-    return href;
-  };
+  const rewriteHref = (href: string): string => rewriteInternalHref(href);
 
   // See lib/import/rin5-html.ts: also blockifies a bare inline child that has
   // no `display` rule of its own but sits directly inside a flex/grid parent.
@@ -788,8 +881,7 @@ async function main() {
   };
 
   // ───────────────────────── 5. Build + insert pages ─────────────────────────
-  const htmlFiles = fs.readdirSync(SITE_DIR).filter((f) => f.endsWith('.html'));
-  console.log(`Importing ${htmlFiles.length} pages…`);
+  console.log(`Importing ${pageFiles.length} pages…`);
 
   // Soft-delete previously existing regular pages (draft AND published) so
   // slugs are free. Error pages are kept.
@@ -809,8 +901,7 @@ async function main() {
   // <head> never loaded the fonts the CSS asked for and the browser silently
   // fell back to its default sans/serif, which is a large source of pixel
   // diff on any text-heavy page.
-  const anyHtmlFile = fs.readdirSync(SITE_DIR).find((f) => f.endsWith('.html'));
-  const headSampleHtml = anyHtmlFile ? fs.readFileSync(path.join(SITE_DIR, anyHtmlFile), 'utf8') : '';
+  const headSampleHtml = readPage(pageFiles[0].file);
   const fontLinkTags = [...headSampleHtml.matchAll(
     /<link\b[^>]*href="[^"]*fonts\.g(?:oogleapis|static)\.com[^"]*"[^>]*>/g,
   )].map((m) => m[0]);
@@ -895,20 +986,26 @@ async function main() {
   // component, which does not model this toggle behavior. Element attributes
   // it depends on (`data-nav`, `data-nav-toggle`) are carried over by the
   // generic data-*/aria-* passthrough in `elementToLayerInner` above.
+  //
+  // An export has no `site.js` on disk: the same script is already inlined in
+  // every page's body, which is where it landed on the way out. Those are
+  // carried over per page, minus the runtimes this editor's own export injects
+  // — re-importing those would ship two copies of each on the next export.
   const siteJsPath = path.join(SITE_DIR, 'site.js');
-  const siteJsBody = fs.existsSync(siteJsPath)
+  const sharedSiteJs = fs.existsSync(siteJsPath)
     ? `<script>${fs.readFileSync(siteJsPath, 'utf8')}</script>`
-    : '';
+    : null;
+  const customCodeBodyFor = (html: string): string => sharedSiteJs
+    ?? authorInlineScripts(html).map((js) => `<script>${js}</script>`).join('\n');
 
   let orderIdx = 0;
   const importedPages: Array<{ id: string; slug: string; name: string }> = [];
-  for (const file of htmlFiles.sort()) {
+  for (const { file, slug } of pageFiles) {
     counters.clear();
-    const html = fs.readFileSync(path.join(SITE_DIR, file), 'utf8');
+    const html = readPage(file);
     const { document } = parseHTML(html);
-    const base = file.replace(/\.html$/, '');
-    const isIndex = base === 'index';
-    const slug = isIndex ? '' : base;
+    const isIndex = slug === '';
+    const base = isIndex ? 'index' : slug;
     const title = document.querySelector('title')?.textContent?.trim() || base;
     const name = isIndex ? 'Inicio' : (title.split(/[—|·]/)[0].trim() || base);
     const description = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
@@ -926,7 +1023,7 @@ async function main() {
 
     const settings = {
       seo: { title, description, image: null, noindex },
-      custom_code: { head: fontsHead, body: siteJsBody },
+      custom_code: { head: fontsHead, body: customCodeBodyFor(html) },
     };
     const metaHash = generatePageMetadataHash({
       name, slug, settings, is_index: isIndex, is_dynamic: false, error_page: null,

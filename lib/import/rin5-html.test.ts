@@ -26,6 +26,8 @@ import {
   localStylesheetHrefs,
   authorInlineScripts,
   rewriteInternalHref,
+  splitSelectorList,
+  resolveNestedSelector,
 } from '@/lib/import/rin5-html';
 import { cssToClasses } from '@/lib/import/css';
 
@@ -667,4 +669,29 @@ test('rewriteInternalHref resuelve los enlaces de las dos disposiciones', () => 
   assert.equal(rewriteInternalHref('#contacto'), '#contacto');
   assert.equal(rewriteInternalHref('https://rin5.app'), 'https://rin5.app');
   assert.equal(rewriteInternalHref('tel:653854096'), 'tel:653854096');
+});
+
+test('splitSelectorList no parte una coma escapada de una utilidad de Tailwind', () => {
+  // `.pt-[clamp(2.5rem,6vw,5rem)]` sale del compilador con las comas escapadas:
+  // partir por `,` a secas dejaba tres selectores rotos que no casan con nada, y
+  // con ellos se perdía cada `clamp()`, cada `min()` y cada pila de fuentes del
+  // sitio reimportado.
+  assert.deepEqual(
+    splitSelectorList(String.raw`.pt-\[clamp\(2\.5rem\,6vw\,5rem\)\]`),
+    [String.raw`.pt-\[clamp\(2\.5rem\,6vw\,5rem\)\]`],
+  );
+  assert.deepEqual(splitSelectorList('.a, .b > .c'), ['.a', '.b > .c']);
+  assert.deepEqual(
+    splitSelectorList(String.raw`.min-h-\[min\(82vh\,720px\)\], .x`),
+    [String.raw`.min-h-\[min\(82vh\,720px\)\]`, '.x'],
+  );
+  assert.deepEqual(splitSelectorList(':is(.a, .b) .c'), [':is(.a, .b) .c']);
+  assert.deepEqual(splitSelectorList(''), []);
+});
+
+test('resolveNestedSelector compone el anidamiento que emite Tailwind v4', () => {
+  assert.equal(resolveNestedSelector('&:hover', '.hover\\:underline'), '.hover\\:underline:hover');
+  assert.equal(resolveNestedSelector('&::placeholder', '.x'), '.x::placeholder');
+  assert.equal(resolveNestedSelector('.b', '.a'), '.a .b');
+  assert.equal(resolveNestedSelector('&:hover, &:focus', '.a'), '.a:hover, .a:focus');
 });
