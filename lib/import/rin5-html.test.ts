@@ -21,6 +21,11 @@ import {
   BUCKET_ORDER,
   isSupportedSelector,
   googleFontsImportHrefs,
+  pageSlugForBundleFile,
+  inlineStyleSheets,
+  localStylesheetHrefs,
+  authorInlineScripts,
+  rewriteInternalHref,
 } from '@/lib/import/rin5-html';
 import { cssToClasses } from '@/lib/import/css';
 
@@ -566,4 +571,100 @@ test('googleFontsImportHrefs devuelve las varias hojas de una misma CSS sin repe
     'https://fonts.googleapis.com/css2?family=Fraunces',
     'https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400',
   ]);
+});
+
+// ── Reimportar un export de Ycode ────────────────────────────────────────────
+
+test('pageSlugForBundleFile lee las dos disposiciones de bundle', () => {
+  // Bundle plano del generador de rin5.
+  assert.equal(pageSlugForBundleFile('index.html'), '');
+  assert.equal(pageSlugForBundleFile('contacto.html'), 'contacto');
+  // Export de Ycode: una carpeta por página.
+  assert.equal(pageSlugForBundleFile('contacto/index.html'), 'contacto');
+  assert.equal(pageSlugForBundleFile('a/b/index.html'), 'a/b');
+});
+
+test('pageSlugForBundleFile deja fuera las páginas de error y lo que no es HTML', () => {
+  for (const file of ['401.html', '404.html', '500.html']) {
+    assert.equal(pageSlugForBundleFile(file), null);
+  }
+  assert.equal(pageSlugForBundleFile('assets/foto-01.jpg'), null);
+  assert.equal(pageSlugForBundleFile('styles.css'), null);
+});
+
+test('inlineStyleSheets recoge cada <style> de la página en orden', () => {
+  const html = [
+    '<head><style>a{color:red}</style>',
+    '<style id="rin5-chrome">body{padding-bottom:3rem}</style></head>',
+    '<body><style type="text/css">p{margin:0}</style></body>',
+  ].join('\n');
+  assert.deepEqual(inlineStyleSheets(html), [
+    'a{color:red}',
+    'body{padding-bottom:3rem}',
+    'p{margin:0}',
+  ]);
+});
+
+test('inlineStyleSheets no confunde un <style> vacío ni el texto suelto', () => {
+  assert.deepEqual(inlineStyleSheets('<style></style>'), []);
+  assert.deepEqual(inlineStyleSheets('<p>style</p>'), []);
+});
+
+test('localStylesheetHrefs se queda solo con las hojas del propio bundle', () => {
+  const html = [
+    '<link rel="preconnect" href="https://fonts.googleapis.com">',
+    '<link href="https://fonts.googleapis.com/css2?family=Inter" rel="stylesheet">',
+    '<link rel="stylesheet" href="styles.css">',
+    '<link rel="stylesheet" href="./css/extra.css">',
+    '<link rel="stylesheet" href="//cdn.example.com/x.css">',
+  ].join('\n');
+  assert.deepEqual(localStylesheetHrefs(html), ['styles.css', './css/extra.css']);
+});
+
+test('authorInlineScripts conserva el script del sitio y tira el runtime del export', () => {
+  const html = [
+    '<script type="speculationrules">{"prerender":[]}</script>',
+    '<script src="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.js"></script>',
+    '<script type="application/json" id="ycode-interactions">[]</script>',
+    "<script>(function(){var el=document.getElementById('ycode-interactions');})();</script>",
+    '<script>(function(){var w=el.querySelector(\'.swiper-wrapper\');})();</script>',
+    "<script>document.querySelectorAll('[data-ycode-vis-rule]')</script>",
+    '<script>/* site.js */ document.querySelector(".nav-toggle");</script>',
+  ].join('\n');
+  assert.deepEqual(authorInlineScripts(html), ['/* site.js */ document.querySelector(".nav-toggle");']);
+});
+
+test('authorInlineScripts acepta un type de JavaScript y descarta el JSON-LD', () => {
+  const html = [
+    '<script type="application/ld+json">{"@type":"LocalBusiness"}</script>',
+    '<script type="text/javascript">var a = 1;</script>',
+  ].join('\n');
+  assert.deepEqual(authorInlineScripts(html), ['var a = 1;']);
+});
+
+test('bucketForMedia entiende la sintaxis de rango que emite Tailwind v4', () => {
+  // `max-lg:` y `max-md:` compilados: el export los trae así, no en `max-width`.
+  assert.equal(bucketForMedia('(width < 64rem)'), 'max-lg:');
+  assert.equal(bucketForMedia('(width < 48rem)'), 'max-md:');
+  assert.equal(bucketForMedia('(width < 1024px)'), 'max-lg:');
+  // `min-*` sigue fuera, escrito como sea.
+  assert.equal(bucketForMedia('(width >= 48rem)'), null);
+});
+
+test('bucketForMedia trata (hover: hover) como la hoja base', () => {
+  // Tailwind envuelve toda utilidad `hover:` en esta query; descartarla dejaba
+  // el sitio reimportado sin un solo estado :hover.
+  assert.equal(bucketForMedia('(hover: hover)'), '');
+});
+
+test('rewriteInternalHref resuelve los enlaces de las dos disposiciones', () => {
+  assert.equal(rewriteInternalHref('contacto.html'), '/contacto');
+  assert.equal(rewriteInternalHref('index.html'), '/');
+  assert.equal(rewriteInternalHref('./index.html'), '/');
+  assert.equal(rewriteInternalHref('./contacto/index.html'), '/contacto');
+  assert.equal(rewriteInternalHref('../contacto/index.html'), '/contacto');
+  assert.equal(rewriteInternalHref('./permisos.html#faq'), '/permisos#faq');
+  assert.equal(rewriteInternalHref('#contacto'), '#contacto');
+  assert.equal(rewriteInternalHref('https://rin5.app'), 'https://rin5.app');
+  assert.equal(rewriteInternalHref('tel:653854096'), 'tel:653854096');
 });

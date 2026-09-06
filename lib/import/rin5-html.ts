@@ -27,12 +27,36 @@ export const BUCKET_ORDER: readonly CssBucket[] = ['', 'max-lg:', 'max-md:'];
  * pixel. Documented in `docs/rin5-import-subset.md`.
  */
 export function bucketForMedia(params: string): CssBucket | null {
-  const m = params.match(/max-width:\s*(\d+)px/);
-  if (!m) return null;
-  const px = parseInt(m[1], 10);
+  // `(hover: hover)` is not a width at all: Tailwind wraps every `hover:`
+  // utility in it, so a re-imported export would come back without a single
+  // hover state if this counted as an unsupported query. It restricts *which
+  // pointer*, not which width, so its rules belong in the bucket they were
+  // written in.
+  if (/\(\s*hover\s*:\s*hover\s*\)/.test(params)) return '';
+
+  const px = maxWidthPx(params);
+  if (px === null) return null;
   if (px <= 767) return 'max-md:';
   if (px <= 1200) return 'max-lg:';
   return null;
+}
+
+/**
+ * The upper width bound of a query, in px, or `null` when it doesn't have one.
+ *
+ * Two spellings, because the importer now reads its own exports as well as the
+ * generator's hand-written sheets: `(max-width: 960px)` is what a person
+ * writes, and `(width < 64rem)` is what Tailwind v4 compiles `max-lg:` into.
+ * The range form is an exclusive bound, so it maps to the `max-width` one pixel
+ * below — 64rem becomes 1023px, exactly the cut `max-lg:` already describes.
+ */
+function maxWidthPx(params: string): number | null {
+  const classic = params.match(/max-width:\s*(\d+)px/);
+  if (classic) return parseInt(classic[1], 10);
+  const range = params.match(/width\s*(<=?)\s*([\d.]+)(px|rem)/);
+  if (!range) return null;
+  const value = parseFloat(range[2]) * (range[3] === 'rem' ? 16 : 1);
+  return range[1] === '<' ? Math.ceil(value) - 1 : Math.floor(value);
 }
 
 /** The declaration that won for one property inside one bucket. */
@@ -624,4 +648,136 @@ export function googleFontsImportHrefs(css: string): string[] {
     if (/^https?:\/\/fonts\.g(?:oogleapis|static)\.com\//.test(href)) hrefs.add(href);
   }
   return [...hrefs];
+}
+
+/*
+ * ─────────────── Reading a Ycode export back in ───────────────
+ *
+ * The importer was written against the one bundle shape the rin5 generator
+ * writes: `{slug}.html` + `styles.css` + `site.js` + `assets/`, all flat. But
+ * what rin5 publishes and keeps in Storage is the *export* of this editor —
+ * the CSS inlined in a `<style>` per page, the pages one folder deep, no
+ * `styles.css` and no `site.js` anywhere. Provisioning a paying customer feeds
+ * that export straight back in, which is how production died with
+ * `ENOENT '/site/styles.css'`.
+ *
+ * So the importer has to read its own output. The helpers below are the whole
+ * of the difference between the two shapes; everything downstream — cascade,
+ * layers, assets, fonts — is the same pipeline for both.
+ */
+
+/** Error pages are rows the importer never deletes, so re-reading them as regular pages would duplicate them. */
+const ERROR_PAGE_FILES: ReadonlySet<string> = new Set(['401.html', '404.html', '500.html']);
+
+/**
+ * The page slug a bundle file stands for, or `null` when it isn't a page.
+ *
+ * `''` is the home page, in both shapes: `index.html` at the root of a flat
+ * generator bundle, and the same file at the root of an export. A folder deep
+ * — `contacto/index.html` — is how the export writes every other page.
+ */
+export function pageSlugForBundleFile(relPath: string): string | null {
+  const rel = relPath.replace(/^\.?\//, '');
+  if (!rel.endsWith('.html')) return null;
+  if (ERROR_PAGE_FILES.has(rel)) return null;
+  if (rel === 'index.html') return '';
+  const nested = rel.match(/^(.+)\/index\.html$/);
+  if (nested) return nested[1];
+  return rel.slice(0, -'.html'.length);
+}
+
+const STYLE_TAG_RE = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+
+/**
+ * Every `<style>` sheet of a page, in document order.
+ *
+ * An export carries its whole stylesheet inline — the published Tailwind CSS,
+ * the `@font-face` blocks and whatever chrome rin5 injects — so this is where
+ * the cascade comes from when there is no `styles.css` on disk.
+ */
+export function inlineStyleSheets(html: string): string[] {
+  const sheets: string[] = [];
+  for (const m of html.matchAll(STYLE_TAG_RE)) {
+    const css = m[1].trim();
+    if (css) sheets.push(css);
+  }
+  return sheets;
+}
+
+const LINK_TAG_RE = /<link\b[^>]*>/gi;
+
+/**
+ * The stylesheet `<link>`s that point inside the bundle itself.
+ *
+ * Absolute ones are somebody else's server — Google Fonts above all, which the
+ * font detection already reads — and there is nothing on disk to parse for
+ * them.
+ */
+export function localStylesheetHrefs(html: string): string[] {
+  const hrefs: string[] = [];
+  for (const m of html.matchAll(LINK_TAG_RE)) {
+    const tag = m[0];
+    if (!/\brel\s*=\s*["']?stylesheet\b/i.test(tag)) continue;
+    const href = tag.match(/\bhref\s*=\s*"([^"]*)"|\bhref\s*=\s*'([^']*)'/);
+    const value = (href?.[1] ?? href?.[2] ?? '').trim();
+    if (!value || /^(https?:)?\/\//i.test(value) || value.startsWith('data:')) continue;
+    hrefs.push(value);
+  }
+  return hrefs;
+}
+
+const SCRIPT_TAG_RE = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+const JS_TYPE_RE = /^(text|application)\/(java|ecma)script$/i;
+
+/**
+ * Markers of a script this editor's own export injects.
+ *
+ * Copying those back into `custom_code.body` would ship two copies of the
+ * slider, interactions and visibility runtimes on the next export, one of them
+ * bound to element ids that the re-import has already renamed. The author's
+ * script — the mobile menu and the reveal observer that `rin5-import` itself
+ * duplicated verbatim into every page — has none of them.
+ */
+const EXPORT_RUNTIME_MARKERS: readonly string[] = ['ycode-interactions', 'data-ycode-', 'swiper-wrapper'];
+
+/**
+ * The inline scripts of a page that the site's author wrote.
+ *
+ * External `src` scripts are left out on purpose: there is no file to carry
+ * over, and the only one an export emits is the Swiper CDN bundle, which the
+ * next export re-adds by itself when a slider is present.
+ */
+export function authorInlineScripts(html: string): string[] {
+  const scripts: string[] = [];
+  for (const m of html.matchAll(SCRIPT_TAG_RE)) {
+    const attrs = m[1];
+    if (/\bsrc\s*=/i.test(attrs)) continue;
+    const type = attrs.match(/\btype\s*=\s*"([^"]*)"|\btype\s*=\s*'([^']*)'/);
+    const value = (type?.[1] ?? type?.[2] ?? '').trim();
+    if (value && !JS_TYPE_RE.test(value)) continue;
+    const body = m[2].trim();
+    if (!body) continue;
+    if (EXPORT_RUNTIME_MARKERS.some((marker) => body.includes(marker))) continue;
+    scripts.push(body);
+  }
+  return scripts;
+}
+
+/**
+ * Rewrite a link between pages of the bundle into a Ycode route.
+ *
+ * Both shapes have to resolve: `contacto.html` is what the generator writes,
+ * `./contacto/index.html` is what the export writes, and a page one folder
+ * deep reaches its siblings with `../`. Anything with a scheme, a hash on its
+ * own or an unrecognised shape is left exactly as it came.
+ */
+export function rewriteInternalHref(href: string): string {
+  if (/^(https?:|tel:|mailto:|#|wa\.me)/.test(href)) return href;
+  const bare = href.replace(/^(?:\.\.?\/)+/, '').replace(/^\//, '');
+  const m = bare.match(/^([\w/-]+)\.html(#.*)?$/);
+  if (!m) return href;
+  const hash = m[2] ?? '';
+  const slug = pageSlugForBundleFile(`${m[1]}.html`);
+  if (slug === null) return href;
+  return slug === '' ? `/${hash}` : `/${slug}${hash}`;
 }
