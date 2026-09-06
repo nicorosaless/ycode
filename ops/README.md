@@ -344,7 +344,76 @@ distintos (medido; el HTML no difiere en nada más). Sirve para distinguir el
 bundle de un cliente del de otro y para detectar que un bundle cambió tras una
 edición, no para comprobar determinismo.
 
-### 5.6 El aislamiento, comprobado
+### 5.6 El importador acepta las dos formas de bundle
+
+Hay **dos** formatos de sitio en circulación, y el importador lee los dos:
+
+| | Bundle del generador | Export de Ycode |
+|---|---|---|
+| páginas | `{slug}.html` en plano | `{slug}/index.html`, una carpeta por página |
+| CSS | `styles.css` suelto | inline, en un `<style>` por página |
+| JS | `site.js` suelto | inline, en un `<script>` al final del `<body>` |
+| fuentes | `<link>` en el `<head>` o `@import` en la hoja | `<link>` en el `<head>` |
+| assets | `assets/` | `assets/` |
+
+**El camino en producción usa los dos, en este orden:**
+
+1. **Preview.** El generador escribe el bundle plano y rin5 lo publica en
+   `{slug}.rin5.app`. Es lo que mide el gate de fidelidad de
+   `docs/rin5-import-subset.md`.
+2. **Aprovisionamiento de un cliente pagado.** Lo que rin5 guardó en Storage es
+   el **export de Ycode** de esa preview, no el bundle del generador, y es ese
+   export el que se importa al contenedor del cliente.
+
+El paso 2 fallaba: `scripts/rin5-import.ts` exigía `styles.css` y el
+aprovisionador de Oracle moría con `docker run failed (1): ENOENT
+'/site/styles.css'`. El importador tiene que aceptar sus propios exports, y
+ahora lo hace: si no hay `styles.css`, la hoja son los `<style>` de las páginas
+(deduplicados por texto exacto — el export inlinea el mismo CSS de sitio en cada
+página) más cualquier `<link rel=stylesheet>` local; si no hay `site.js`, el
+`custom_code.body` de cada página son sus `<script>` inline **de autor**. Los
+runtimes que inyecta el propio export (slider de Swiper, `ycode-interactions`,
+visibilidad) se identifican por marcador y se descartan: reimportarlos
+duplicaría cada uno en el siguiente export.
+
+**Idempotencia, medida.** Importar un export, publicar y volver a exportar es un
+round-trip sobre el propio formato, así que el resultado tiene que ser el
+original. Con el export de la generación `f8d1b8f1` (Hipica Natural Equus, la
+que mató a Oracle), 20 páginas, schema `cliente_b`:
+
+```text
+export -> export   0,00% ponderado, las 274 regiones a 0,00%
+```
+
+Los dos controles en formato del generador no se mueven: `f8d1b8f1` 0,647% →
+0,66% y `a15ba55c` 0,14% → 0,14% (ruido de captura).
+
+Llegar ahí destapó cuatro defectos de parseo que **no son del formato**, sino
+del CSS que compila Tailwind v4, y que valen para cualquier hoja:
+
+| # | Defecto | Qué costaba |
+|---|---|---|
+| 1 | El CSS anidado: la `@media` vive *dentro* de la regla y todo va envuelto en `@layer`. Se leía plano, así que cada declaración móvil caía en el bucket base | el layout móvil pisaba al de escritorio en todas las páginas |
+| 2 | El selector se partía por `,` a secas, y una utilidad lleva las comas escapadas (`.pt-\[clamp\(2\.5rem\,6vw\,5rem\)\]`) | se perdía cada `clamp()`, `min()` y pila de fuentes |
+| 3 | `box-shadow: var(--tw-shadow)` con la variable en la propia regla y su valor inicial en un `@property` | la sombra salía como `shadow-[,,,,]` |
+| 4 | `*{border:0 solid}` del preflight no se partía en longhands y ganaba al `border-width` del autor | cada tarjeta perdía su borde de 1px, y con él 2px de ancho de contenido |
+
+Sin ellos el export→export daba **65,90%**; con 1 y 2, 2,13%; con 3 y 4, 0,00%.
+
+**Lo que sí se cuela, y no es del importador.** El export de una preview lleva la
+chapa de rin5: `<div data-rin5-watermark>`, la hoja `<style id="rin5-chrome">` y
+`<meta name="robots" content="noindex">`. El importador es fiel y se los queda
+—de ahí el 0,00%—, así que un cliente **pagado** aprovisionado desde el export de
+su preview abre el editor con la marca de agua y con `noindex` en el SEO de cada
+página. Eso lo tiene que resolver quien produce el artefacto: o rin5 guarda en
+Storage el export limpio, o el aprovisionador lo despoja antes de importar.
+Queda anotado aquí, sin tocar.
+
+`scripts/rin5-roundtrip-diff.mjs` detecta también la disposición de `--src`
+(`{slug}.html` o `{slug}/index.html`), que es lo que permite medir
+export→export con el mismo medidor de siempre.
+
+### 5.7 El aislamiento, comprobado
 
 `clients/7/site` en `cliente_a` y `~/.rin5/bench/7-baseline/site` en
 `cliente_b`, mismo stack, exportados los dos:
@@ -360,7 +429,7 @@ PostgREST            Accept-Profile: cliente_a → solo las 8 slugs de A
 bundles exportados   0 referencias cruzadas a assets o slugs del otro cliente
 ```
 
-### 5.7 Trampa de `docker run --env-file`
+### 5.8 Trampa de `docker run --env-file`
 
 `docker run --env-file` **no** quita las comillas: el `.env` que escribe el
 wizard de setup guarda `SUPABASE_CONNECTION_URL="postgresql://…"` y el
