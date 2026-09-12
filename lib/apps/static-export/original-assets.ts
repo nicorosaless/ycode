@@ -33,7 +33,7 @@ export interface AssetRow {
 export interface OriginalAsset {
   filename: string
   mimeType: string
-  publicUrl: string
+  storagePath: string
   /** Output path in the exported bundle — mirrors the input bundle's `assets/` folder. */
   outputKey: string
 }
@@ -65,7 +65,7 @@ export function buildOriginalAssetMap(assets: readonly AssetRow[]): Map<string, 
     map.set(proxyPath, {
       filename: asset.filename,
       mimeType: asset.mime_type,
-      publicUrl: asset.public_url,
+      storagePath: asset.storage_path,
       outputKey: `assets/${asset.filename}`,
     })
   }

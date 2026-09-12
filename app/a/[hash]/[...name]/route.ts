@@ -50,6 +50,15 @@ function isResizableBitmap(mimeType: string | null | undefined): boolean {
   return true;
 }
 
+function byteRange(range: string | null, length: number): { start: number; end: number } | null {
+  if (!range?.startsWith('bytes=')) return null;
+  const [startRaw, endRaw] = range.slice('bytes='.length).split('-', 2);
+  const start = startRaw === '' ? 0 : Number.parseInt(startRaw, 10);
+  const end = endRaw === '' ? length - 1 : Number.parseInt(endRaw, 10);
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= length) return null;
+  return { start, end: Math.min(end, length - 1) };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ hash: string; name: string[] }> }
@@ -86,33 +95,26 @@ export async function GET(
       return new Response('Service unavailable', { status: 503 });
     }
 
-    const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(asset.storage_path);
-
     const url = new URL(request.url);
     const isImage = isAssetOfType(asset.mime_type, ASSET_CATEGORIES.IMAGES);
 
-    // Forward Range requests for media (video/audio). Safari refuses to play
-    // a video unless the server responds with 206 Partial Content, so we proxy
-    // the client's Range header to Supabase Storage (which supports ranges).
-    const rangeHeader = request.headers.get('range');
-    const upstreamHeaders: Record<string, string> = {};
-    if (rangeHeader && !isImage) {
-      upstreamHeaders.Range = rangeHeader;
-    }
-
-    const response = await fetch(urlData.publicUrl, { headers: upstreamHeaders });
-    if (!response.ok && response.status !== 206) {
+    // The shared rin5 bucket is private. Do not turn a service credential into
+    // a public URL here: the browser only sees bytes after the tenant gate in
+    // proxy.ts has accepted its session.
+    const { data: object, error: downloadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .download(asset.storage_path);
+    if (downloadError || !object) {
       return new Response('Not found', { status: 404 });
     }
+    const original = Buffer.from(await object.arrayBuffer());
 
     const transform = parseTransformParams(url.searchParams);
     // Resize the fetched original in-process with sharp. GIFs are excluded via
     // isResizableBitmap — Sharp flattens animated frames into a single static
     // image, so they fall through and stream as raw bytes below.
     if (transform && isImage && isResizableBitmap(asset.mime_type)) {
-      const buffer = Buffer.from(await response.arrayBuffer());
+      const buffer = original;
 
       // Preserve AVIF on output (already highly compressed); re-encoding to WebP
       // would inflate size and lose quality.
@@ -160,24 +162,25 @@ export async function GET(
       }
     }
 
-    // Mirror the upstream status (206 for partial content) and range headers so
-    // Safari can stream/seek the video. Advertise Accept-Ranges so clients know
-    // range requests are supported even on the initial full response.
     const headers = new Headers({
       'Content-Type': asset.mime_type || 'application/octet-stream',
       'Accept-Ranges': 'bytes',
     });
 
-    const contentRange = response.headers.get('content-range');
-    if (contentRange) headers.set('Content-Range', contentRange);
+    // `download()` keeps the bucket private but returns the complete object.
+    // Reconstruct the one range form browsers issue for audio/video so moving
+    // from a public URL does not regress seeking.
+    const range = !isImage ? byteRange(request.headers.get('range'), original.length) : null;
+    if (range) {
+      const body = original.subarray(range.start, range.end + 1);
+      headers.set('Content-Length', body.length.toString());
+      headers.set('Content-Range', `bytes ${range.start}-${range.end}/${original.length}`);
+      return new Response(new Uint8Array(body), { status: 206, headers });
+    }
 
-    const contentLength = response.headers.get('content-length');
-    if (contentLength) headers.set('Content-Length', contentLength);
+    headers.set('Content-Length', original.length.toString());
 
-    return new Response(response.body, {
-      status: response.status,
-      headers,
-    });
+    return new Response(new Uint8Array(original), { status: 200, headers });
   } catch {
     return new Response('Internal server error', { status: 500 });
   }

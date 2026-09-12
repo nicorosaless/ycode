@@ -5,6 +5,8 @@ import {
   rewriteToOriginalAssets,
   isOriginalAssetsMode,
 } from '@/lib/apps/static-export/original-assets';
+import { fetchAssetByProxyUrl } from '@/lib/apps/static-export/asset-bundler';
+import { uuidToBase62 } from '@/lib/convertion-utils';
 
 const ASSETS = [
   {
@@ -35,6 +37,46 @@ test('buildOriginalAssetMap: keys on the proxy path Ycode renders, values are th
     entries.map(([, a]) => a.filename).sort(),
     ['hero-keys.jpg', 'moto-a1.jpg'],
   );
+});
+
+test('fetchAssetByProxyUrl: descarga desde Storage con la credencial del servidor, no desde public_url', async () => {
+  const id = '5f2c1a44-0000-4000-8000-000000000001';
+  const downloads: string[] = [];
+  const client = {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          eq: () => ({
+            is: () => ({
+              maybeSingle: async () => ({
+                data: {
+                  id,
+                  filename: 'hero-keys.jpg',
+                  mime_type: 'image/jpeg',
+                  public_url: '/a/legacy',
+                  storage_path: 'cliente_a/website/hero.jpg',
+                },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      }),
+    }),
+    storage: {
+      from: () => ({
+        download: async (storagePath: string) => {
+          downloads.push(storagePath);
+          return { data: new Blob(['private asset']), error: null };
+        },
+      }),
+    },
+  };
+
+  const file = await fetchAssetByProxyUrl(client, `/a/${uuidToBase62(id)}/hero-keys.jpg`);
+  assert.equal(Buffer.isBuffer(file?.body), true);
+  assert.equal(file?.body.toString(), 'private asset');
+  assert.deepEqual(downloads, ['cliente_a/website/hero.jpg']);
 });
 
 test('buildOriginalAssetMap: skips assets with no storage_path (inline SVG icons)', () => {

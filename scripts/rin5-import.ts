@@ -115,6 +115,7 @@ async function main() {
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
+  const { getAssetProxyUrl } = await import('../lib/asset-utils');
   const knexMod = await import('knex');
   const sharp = (await import('sharp')).default;
   const { createClient } = await import('@supabase/supabase-js');
@@ -164,13 +165,14 @@ async function main() {
     const { error } = await supabase.storage.from('assets').upload(storagePath, buf, { contentType: mime });
     if (error) throw new Error(`upload ${file}: ${error.message}`);
 
-    const public_url = `${PUBLIC_BASE}/storage/v1/object/public/assets/${storagePath}`;
     const [row] = await db('assets')
       .insert({
         source: 'rin5-import',
         filename: file,
         storage_path: storagePath,
-        public_url,
+        // The bytes are private. The browser receives them only through the
+        // tenant-authenticated `/a/` route after this row is created.
+        public_url: null,
         file_size: buf.length,
         mime_type: mime,
         width,
@@ -178,6 +180,9 @@ async function main() {
         is_published: false,
       })
       .returning('*');
+    const public_url = getAssetProxyUrl(row);
+    if (!public_url) throw new Error(`asset_proxy_url_missing:${row.id}`);
+    await db('assets').where({ id: row.id }).update({ public_url });
     assetMap.set(file, { id: row.id, public_url });
     console.log(`  ✓ ${file}`);
   }

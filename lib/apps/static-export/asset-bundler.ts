@@ -33,19 +33,33 @@ import { mediaContentType, type OutputFile } from './writers/types'
 const ASSET_PROXY_URL_RE = /\/a\/([A-Za-z0-9]{22})\/[^"'\s)<>?&]+/g
 const PROXY_FETCH_CONCURRENCY = 8
 
-interface SupabaseAssetClient {
+export interface SupabaseAssetClient {
   from(table: 'assets'): {
     select(cols: string): {
       eq(col: string, val: unknown): {
         eq(col: string, val: unknown): {
           is(col: string, val: unknown): {
             maybeSingle(): Promise<{
-              data: { id: string; filename: string; mime_type: string; public_url: string | null } | null
+              data: {
+                id: string
+                filename: string
+                mime_type: string
+                public_url: string | null
+                storage_path: string | null
+              } | null
               error: { message: string } | null
             }>
           }
         }
       }
+    }
+  }
+  storage: {
+    from(bucket: string): {
+      download(path: string): Promise<{
+        data: Blob | null
+        error: { message: string } | null
+      }>
     }
   }
 }
@@ -81,7 +95,7 @@ export async function collectSupabaseAssets(htmlOutputs: OutputFile[]): Promise<
   return results
 }
 
-async function fetchAssetByProxyUrl(
+export async function fetchAssetByProxyUrl(
   client: SupabaseAssetClient,
   proxyUrl: string,
 ): Promise<OutputFile | null> {
@@ -97,24 +111,26 @@ async function fetchAssetByProxyUrl(
 
   const { data: asset, error } = await client
     .from('assets')
-    .select('id, filename, mime_type, public_url')
+    .select('id, filename, mime_type, public_url, storage_path')
     .eq('id', assetId)
     .eq('is_published', true)
     .is('deleted_at', null)
     .maybeSingle()
 
-  if (error || !asset?.public_url) {
+  if (error || !asset?.storage_path) {
     console.warn(`[Static Export] Could not look up asset for ${proxyUrl}: ${error?.message ?? 'not found'}`)
     return null
   }
 
   try {
-    const response = await fetch(asset.public_url)
-    if (!response.ok) {
-      console.warn(`[Static Export] HTTP ${response.status} fetching ${asset.filename}`)
+    const { data, error: storageError } = await client.storage
+      .from('assets')
+      .download(asset.storage_path)
+    if (storageError || !data) {
+      console.warn(`[Static Export] Storage download failed for ${asset.filename}: ${storageError?.message ?? 'not found'}`)
       return null
     }
-    const buf = Buffer.from(await response.arrayBuffer())
+    const buf = Buffer.from(await data.arrayBuffer())
     return {
       key: proxyUrl.replace(/^\/+/, ''),
       body: buf,
@@ -174,6 +190,12 @@ export async function collectOriginalAssets(
   }
   if (wanted.size === 0) return []
 
+  const client = (await getSupabaseAdmin()) as SupabaseAssetClient | null
+  if (!client) {
+    console.warn('[Static Export] Could not bundle original assets: Supabase client unavailable')
+    return []
+  }
+
   const queue = Array.from(wanted.values())
   const results: OutputFile[] = []
   let cursor = 0
@@ -181,14 +203,14 @@ export async function collectOriginalAssets(
     while (cursor < queue.length) {
       const asset = queue[cursor++]
       try {
-        const response = await fetch(asset.publicUrl)
-        if (!response.ok) {
-          console.warn(`[Static Export] HTTP ${response.status} fetching ${asset.filename}`)
+        const { data, error } = await client.storage.from('assets').download(asset.storagePath)
+        if (error || !data) {
+          console.warn(`[Static Export] Storage download failed for ${asset.filename}: ${error?.message ?? 'not found'}`)
           continue
         }
         results.push({
           key: asset.outputKey,
-          body: Buffer.from(await response.arrayBuffer()),
+          body: Buffer.from(await data.arrayBuffer()),
           contentType: asset.mimeType || mediaContentType(asset.outputKey),
         })
       } catch (err) {
