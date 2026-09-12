@@ -17,19 +17,20 @@ import knex from 'knex';
 import { getAssetProxyUrl } from '../lib/asset-utils';
 import { resolveDbSchema } from '../lib/tenant';
 
-const schema = resolveDbSchema();
-const expected = Number.parseInt(process.env.RIN5_EXPECTED_ASSET_COUNT ?? '', 10);
-if (schema === 'public') throw new Error('rin5_private_assets_requires_tenant_schema');
-if (!Number.isSafeInteger(expected) || expected < 0) throw new Error('rin5_expected_asset_count_invalid');
-if (!process.env.SUPABASE_CONNECTION_URL) throw new Error('supabase_connection_url_missing');
+async function main(): Promise<void> {
+  const schema = resolveDbSchema();
+  const expected = Number.parseInt(process.env.RIN5_EXPECTED_ASSET_COUNT ?? '', 10);
+  if (schema === 'public') throw new Error('rin5_private_assets_requires_tenant_schema');
+  if (!Number.isSafeInteger(expected) || expected < 0) throw new Error('rin5_expected_asset_count_invalid');
+  if (!process.env.SUPABASE_CONNECTION_URL) throw new Error('supabase_connection_url_missing');
 
-const db = knex({
-  client: 'pg',
-  connection: process.env.SUPABASE_CONNECTION_URL,
-  searchPath: [schema, 'extensions'],
-});
+  const db = knex({
+    client: 'pg',
+    connection: process.env.SUPABASE_CONNECTION_URL,
+    searchPath: [schema, 'extensions'],
+  });
 
-try {
+  try {
   const assets = await db('assets')
     .select('id', 'filename', 'mime_type', 'storage_path', 'public_url')
     .whereNotNull('storage_path')
@@ -46,7 +47,10 @@ try {
       changed += 1;
     }
   }
-  process.stdout.write(JSON.stringify({ schema, expected, changed, total: assets.length }) + '\n');
-} finally {
-  await db.destroy();
+    process.stdout.write(JSON.stringify({ schema, expected, changed, total: assets.length }) + '\n');
+  } finally {
+    await db.destroy();
+  }
 }
+
+void main();
