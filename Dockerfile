@@ -20,28 +20,10 @@ FROM node:22-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Placeholders por defecto para que `next build` no aborte por falta de
-# credenciales — pero OJO: `app/(site)/page.tsx` SÍ hace fetch real contra
-# Supabase durante la generación estática de "/" (fuentes, variables de
-# color, settings de robots/sitemap). Con placeholders puros esa llamada
-# falla (`fetch failed`, host inventado) y aborta el build entero — esto ya
-# ocurre en la rama sin tocar `output: 'standalone'`, no es un efecto de este
-# cambio. Fuera de alcance de P-2609/WS5 arreglar el prerender; documentado
-# en el informe. Para medir la imagen de verdad, sobreescribe estos ARG con
-# credenciales de un Supabase alcanzable en build time (p.ej. `--network
-# host --build-arg SUPABASE_URL=http://127.0.0.1:57321 ...`).
-ARG SUPABASE_PUBLISHABLE_KEY=build-placeholder
-ARG SUPABASE_SECRET_KEY=build-placeholder
-ARG SUPABASE_CONNECTION_URL=postgresql://build:build@localhost:5432/build
-ARG SUPABASE_DB_PASSWORD=build-placeholder
-ARG SUPABASE_URL
-ENV SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY} \
-    SUPABASE_SECRET_KEY=${SUPABASE_SECRET_KEY} \
-    SUPABASE_CONNECTION_URL=${SUPABASE_CONNECTION_URL} \
-    SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD} \
-    SUPABASE_URL=${SUPABASE_URL} \
-    PAGE_AUTH_SECRET=0000000000000000000000000000000000000000000000000000000000000000
-RUN npm run build
+# The build never receives a tenant credential. SKIP_SETUP prevents the
+# static site layout from querying Supabase, so the image is reusable for all
+# clients and the builder stage cannot retain a credential in ENV or history.
+RUN SKIP_SETUP=true npm run build && rm -rf .next/cache
 
 FROM node:22-slim AS runner
 WORKDIR /app
