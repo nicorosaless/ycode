@@ -1,6 +1,6 @@
-import { lookup } from 'dns/promises';
 import { NextRequest } from 'next/server';
 import { noCache } from '@/lib/api-response';
+import { parsePublicHttpUrl, safePublicFetch } from '@/lib/safe-public-fetch';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -38,10 +38,6 @@ export async function GET(request: NextRequest) {
     }
 
     // SSRF guard: only fetch hosts that resolve to public IPs.
-    if (!(await isPublicHost(pageUrl.hostname))) {
-      return noCache({ error: 'That site host is not allowed' }, 400);
-    }
-
     const html = await fetchText(pageUrl.toString());
     const stylesheetUrl = findStylesheetUrl(html);
     if (!stylesheetUrl) {
@@ -77,64 +73,14 @@ function normalizeSiteUrl(input: string): URL | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  let parsed: URL;
   try {
-    parsed = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+    const parsed = parsePublicHttpUrl(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+    parsed.protocol = 'https:';
+    if (parsed.port && parsed.port !== '443') return null;
+    return parsed;
   } catch {
     return null;
   }
-
-  // Always fetch over https and only allow web ports.
-  parsed.protocol = 'https:';
-  if (parsed.port && parsed.port !== '443') return null;
-
-  return parsed;
-}
-
-/**
- * SSRF guard. A host is safe to fetch only if it isn't an internal name and
- * every IP it resolves to is public. We resolve DNS rather than just screening
- * literals so a public domain pointing at a private IP is still rejected.
- *
- * Note: this doesn't fully close DNS-rebinding (the address could change between
- * lookup and fetch) — acceptable for an authenticated, tenant-scoped tool. Pin
- * to the resolved IP at the agent level if that ever matters.
- */
-async function isPublicHost(hostname: string): Promise<boolean> {
-  const host = hostname.toLowerCase();
-  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) {
-    return false;
-  }
-  if (isPrivateIp(host)) return false; // host is itself an IP literal
-
-  try {
-    const addresses = await lookup(host, { all: true });
-    if (addresses.length === 0) return false;
-    return addresses.every((a) => !isPrivateIp(a.address));
-  } catch {
-    return false;
-  }
-}
-
-/** True for loopback, link-local, CGNAT and RFC-1918 private addresses. */
-function isPrivateIp(ip: string): boolean {
-  const v6 = ip.toLowerCase();
-  if (v6 === '::1' || v6 === '::') return true;
-  if (v6.startsWith('fe80') || v6.startsWith('fc') || v6.startsWith('fd')) return true;
-
-  // Unwrap IPv4-mapped IPv6 (e.g. ::ffff:10.0.0.1).
-  const mapped = v6.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  const v4 = mapped ? mapped[1] : ip;
-
-  const m = v4.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (!m) return false;
-  const [a, b] = [Number(m[1]), Number(m[2])];
-  if (a === 0 || a === 10 || a === 127) return true;
-  if (a === 169 && b === 254) return true; // link-local
-  if (a === 172 && b >= 16 && b <= 31) return true; // RFC-1918
-  if (a === 192 && b === 168) return true; // RFC-1918
-  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-  return false;
 }
 
 /**
@@ -161,10 +107,7 @@ async function fetchText(target: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(target, {
-      redirect: 'follow',
-      signal: controller.signal,
-    });
+    const res = await safePublicFetch(target, { signal: controller.signal });
     if (!res.ok) {
       throw new Error(`Upstream returned ${res.status}`);
     }

@@ -8,6 +8,8 @@ import { getComponentsByIds } from '@/lib/repositories/componentRepository';
 import { getDraftLayers, upsertDraftLayers } from '@/lib/repositories/pageLayersRepository';
 import type { Asset, Layer } from '@/types';
 import { collectComponentIds } from '@/lib/component-utils';
+import { getSupabaseAdmin } from '@/lib/supabase-server';
+import { getStorageBucket } from '@/lib/asset-constants';
 
 const LAYOUTS_FILE_PATH = path.join(process.cwd(), 'lib', 'templates', 'layouts.ts');
 const LAYOUT_ASSETS_DIR = path.join(process.cwd(), 'public', 'ycode', 'layouts', 'assets');
@@ -180,13 +182,14 @@ async function downloadAndLocalizeAssets(
 
   for (const assetId of uniqueIds) {
     const asset = assetsMap[assetId];
-    if (!asset?.public_url) continue;
+    if (!asset?.storage_path) continue;
 
     try {
-      const response = await fetch(asset.public_url);
-      if (!response.ok) continue;
-
-      const sourceBuffer = Buffer.from(await response.arrayBuffer());
+      const supabase = await getSupabaseAdmin();
+      if (!supabase) continue;
+      const download = await supabase.storage.from(getStorageBucket()).download(asset.storage_path);
+      if (download.error || !download.data) continue;
+      const sourceBuffer = Buffer.from(await download.data.arrayBuffer());
       const isRasterImage = asset.mime_type?.startsWith('image/') &&
         !asset.mime_type?.includes('svg');
 

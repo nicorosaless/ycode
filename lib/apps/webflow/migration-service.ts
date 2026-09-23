@@ -33,6 +33,7 @@ import {
   getValuesByItemIds,
 } from '@/lib/repositories/collectionItemValueRepository';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
+import { safePublicFetch } from '@/lib/safe-public-fetch';
 
 import {
   listCollectionsWithFields,
@@ -433,7 +434,7 @@ async function uploadWebflowAssets(
     const batch = tasks.slice(i, i + ASSET_CONCURRENCY);
     const settled = await Promise.allSettled(
       batch.map(async ({ asset, index }) => {
-        const res = await fetch(asset.url);
+        const res = await safePublicFetch(asset.url);
         if (!res.ok) return null;
         const buffer = await res.arrayBuffer();
         const contentType = res.headers.get('content-type') || 'application/octet-stream';

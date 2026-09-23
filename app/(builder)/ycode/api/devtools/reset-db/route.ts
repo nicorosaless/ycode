@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getKnexClient } from '@/lib/knex-client';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET } from '@/lib/asset-constants';
+import { getStorageBucket } from '@/lib/asset-constants';
 import { clearAllCache } from '@/lib/services/cacheService';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +42,7 @@ export async function POST() {
 
       try {
         // emptyBucket removes all files recursively (including nested folders)
-        const { error: emptyError } = await supabase.storage.emptyBucket(STORAGE_BUCKET);
+        const { error: emptyError } = await supabase.storage.emptyBucket(getStorageBucket());
 
         if (emptyError) {
           console.log('[POST /ycode/api/devtools/reset-db] Error emptying bucket (may not exist):', emptyError.message);
@@ -50,7 +50,7 @@ export async function POST() {
           console.log('[POST /ycode/api/devtools/reset-db] Assets bucket emptied');
         }
 
-        const { error: deleteBucketError } = await supabase.storage.deleteBucket(STORAGE_BUCKET);
+        const { error: deleteBucketError } = await supabase.storage.deleteBucket(getStorageBucket());
 
         if (deleteBucketError) {
           console.log('[POST /ycode/api/devtools/reset-db] Error deleting bucket (may not exist):', deleteBucketError.message);

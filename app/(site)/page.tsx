@@ -15,8 +15,9 @@ import { getSiteBaseUrl } from '@/lib/url-utils';
 import type { Redirect as RedirectType } from '@/types';
 import type { Metadata } from 'next';
 
-// Static by default for performance, dynamic only when pagination is requested
-export const revalidate = false; // Cache indefinitely until publish invalidates
+// Tenant configuration and content are runtime-only; one image serves every tenant.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
  * Fetch homepage data from database

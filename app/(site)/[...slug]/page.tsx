@@ -3,8 +3,6 @@ import { connection } from 'next/server';
 import { unstable_cache } from 'next/cache';
 import { addCacheTag } from '@vercel/functions';
 import type { Metadata } from 'next';
-import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { buildSlugPath } from '@/lib/page-utils';
 import { generatePageMetadata, fetchGlobalPageSettings } from '@/lib/generate-page-metadata';
 import { fetchPageByPath, fetchPageByPathForMetadata, fetchErrorPage, splitPageData, reassemblePageData, slimPageData } from '@/lib/page-fetcher';
 import PageRenderer from '@/components/PageRenderer';
@@ -13,139 +11,12 @@ import { getSettingByKey } from '@/lib/repositories/settingsRepository';
 import { parseAuthCookie, getPasswordProtection, fetchFoldersForAuth } from '@/lib/page-auth';
 import { getSiteBaseUrl } from '@/lib/url-utils';
 import { matchRedirect } from '@/lib/redirect-utils';
-import type { Page, PageFolder, Translation, Redirect as RedirectType } from '@/types';
+import type { Page, Redirect as RedirectType } from '@/types';
 
-// Static by default for performance, dynamic only when pagination is requested
-export const revalidate = false; // Cache indefinitely until publish invalidates
+// Tenant configuration and content are runtime-only; one image serves every tenant.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const dynamicParams = true;
-
-/**
- * Generate static params for known published pages
- * This tells Next.js which pages to pre-render
- * Includes both default locale paths and translated paths for all locales
- */
-export async function generateStaticParams() {
-  try {
-    const supabase = await getSupabaseAdmin();
-
-    if (!supabase) {
-      return [];
-    }
-
-    // Get all published pages and folders (excluding soft-deleted)
-    const { data: pages } = await supabase
-      .from('pages')
-      .select('*')
-      .eq('is_published', true)
-      .is('deleted_at', null);
-
-    const { data: folders } = await supabase
-      .from('page_folders')
-      .select('*')
-      .eq('is_published', true)
-      .is('deleted_at', null);
-
-    // Get all active locales
-    const { data: locales } = await supabase
-      .from('locales')
-      .select('*')
-      .is('deleted_at', null);
-
-    // Get all published translations
-    const { data: translations } = await supabase
-      .from('translations')
-      .select('*')
-      .eq('is_published', true)
-      .is('deleted_at', null);
-
-    if (!pages || !folders) {
-      return [];
-    }
-
-    const params: { slug: string[] }[] = [];
-
-    // Build translations map for easier lookup
-    const translationsMap: Record<string, Record<string, Translation>> = {};
-    if (translations) {
-      for (const translation of translations) {
-        if (!translationsMap[translation.locale_id]) {
-          translationsMap[translation.locale_id] = {};
-        }
-        const key = `${translation.source_type}:${translation.source_id}:${translation.content_key}`;
-        translationsMap[translation.locale_id][key] = translation;
-      }
-    }
-
-    // Generate localized homepage paths (e.g., /fr/, /es/)
-    if (locales) {
-      for (const locale of locales) {
-        if (locale.is_default) continue; // Skip default locale (/ is handled by app/page.tsx)
-        params.push({ slug: [locale.code] });
-      }
-    }
-
-    // Generate params for each non-dynamic page
-    for (const page of pages) {
-      // Skip dynamic pages - they are handled dynamically at request time
-      if (page.is_dynamic) {
-        continue;
-      }
-
-      // Generate default locale path (no locale prefix)
-      const defaultPath = buildSlugPath(page, folders as PageFolder[], 'page');
-      const defaultSegments = defaultPath.slice(1).split('/').filter(Boolean);
-
-      // Skip empty paths (homepage is handled by app/page.tsx)
-      if (defaultSegments.length > 0) {
-        params.push({ slug: defaultSegments });
-      }
-
-      // Generate translated paths for non-default locales
-      if (locales) {
-        for (const locale of locales) {
-          if (locale.is_default) continue; // Skip default locale
-
-          const localeTranslations = translationsMap[locale.id] || {};
-
-          // Build localized path with translated slugs
-          const slugParts: string[] = [locale.code];
-
-          // Add translated folder path
-          let currentFolderId = page.page_folder_id;
-          const folderSegments: string[] = [];
-          while (currentFolderId) {
-            const folder = folders.find(f => f.id === currentFolderId);
-            if (!folder) break;
-
-            const translationKey = `folder:${folder.id}:slug`;
-            const translatedSlug = localeTranslations[translationKey]?.content_value || folder.slug;
-            folderSegments.unshift(translatedSlug);
-
-            currentFolderId = folder.page_folder_id;
-          }
-          slugParts.push(...folderSegments);
-
-          // Add page's own slug
-          if (!page.is_index && page.slug) {
-            const pageKey = `page:${page.id}:slug`;
-            const translatedSlug = localeTranslations[pageKey]?.content_value || page.slug;
-            slugParts.push(translatedSlug);
-          }
-
-          const localizedSegments = slugParts.filter(Boolean);
-          if (localizedSegments.length > 1) { // Must have at least locale + something
-            params.push({ slug: localizedSegments });
-          }
-        }
-      }
-    }
-
-    return params;
-  } catch (error) {
-    console.error('Failed to generate static params:', error);
-    return [];
-  }
-}
 
 /**
  * Fetch published page and layers data from database

@@ -18,7 +18,7 @@ import { base62ToUuid } from '@/lib/convertion-utils';
 import { getAssetProxyUrl, isAssetOfType, ASSET_CATEGORIES } from '@/lib/asset-utils';
 import { getAssetForProxy } from '@/lib/repositories/assetRepository';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET } from '@/lib/asset-constants';
+import { getStorageBucket } from '@/lib/asset-constants';
 
 // Cache headers set at infrastructure level via next.config.ts headers()
 // to prevent Next.js proxy from overriding them
@@ -86,26 +86,17 @@ export async function GET(
       return new Response('Service unavailable', { status: 503 });
     }
 
-    const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(asset.storage_path);
+    const { data: object, error: objectError } = await supabase.storage
+      .from(getStorageBucket())
+      .download(asset.storage_path);
+    if (objectError || !object) return new Response('Not found', { status: 404 });
 
     const url = new URL(request.url);
     const isImage = isAssetOfType(asset.mime_type, ASSET_CATEGORIES.IMAGES);
 
-    // Forward Range requests for media (video/audio). Safari refuses to play
-    // a video unless the server responds with 206 Partial Content, so we proxy
-    // the client's Range header to Supabase Storage (which supports ranges).
     const rangeHeader = request.headers.get('range');
-    const upstreamHeaders: Record<string, string> = {};
-    if (rangeHeader && !isImage) {
-      upstreamHeaders.Range = rangeHeader;
-    }
 
-    const response = await fetch(urlData.publicUrl, { headers: upstreamHeaders });
-    if (!response.ok && response.status !== 206) {
-      return new Response('Not found', { status: 404 });
-    }
+    const response = new Response(object, { headers: { 'content-type': asset.mime_type || 'application/octet-stream' } });
 
     const transform = parseTransformParams(url.searchParams);
     // Resize the fetched original in-process with sharp. GIFs are excluded via
@@ -160,24 +151,31 @@ export async function GET(
       }
     }
 
-    // Mirror the upstream status (206 for partial content) and range headers so
-    // Safari can stream/seek the video. Advertise Accept-Ranges so clients know
-    // range requests are supported even on the initial full response.
+    const bytes = new Uint8Array(await object.arrayBuffer());
     const headers = new Headers({
       'Content-Type': asset.mime_type || 'application/octet-stream',
       'Accept-Ranges': 'bytes',
+      'Cache-Control': getStorageBucket() === 'assets'
+        ? 'public, max-age=31536000, immutable'
+        : 'private, max-age=3600',
     });
-
-    const contentRange = response.headers.get('content-range');
-    if (contentRange) headers.set('Content-Range', contentRange);
-
-    const contentLength = response.headers.get('content-length');
-    if (contentLength) headers.set('Content-Length', contentLength);
-
-    return new Response(response.body, {
-      status: response.status,
-      headers,
-    });
+    if (rangeHeader && !isImage) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+      if (!match) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${bytes.byteLength}` } });
+      const requestedStart = match[1] ? Number(match[1]) : undefined;
+      const requestedEnd = match[2] ? Number(match[2]) : undefined;
+      const start = requestedStart ?? Math.max(0, bytes.byteLength - (requestedEnd ?? 0));
+      const end = Math.min(requestedEnd ?? bytes.byteLength - 1, bytes.byteLength - 1);
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= bytes.byteLength) {
+        return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${bytes.byteLength}` } });
+      }
+      const partial = bytes.slice(start, end + 1);
+      headers.set('Content-Range', `bytes ${start}-${end}/${bytes.byteLength}`);
+      headers.set('Content-Length', partial.byteLength.toString());
+      return new Response(partial, { status: 206, headers });
+    }
+    headers.set('Content-Length', bytes.byteLength.toString());
+    return new Response(bytes, { status: 200, headers });
   } catch {
     return new Response('Internal server error', { status: 500 });
   }
