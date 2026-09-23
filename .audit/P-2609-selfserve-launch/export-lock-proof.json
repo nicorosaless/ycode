@@ -1,0 +1,5 @@
+{
+  "blockedAdminBackedEditorApiWhileSnapshotLockHeld": true,
+  "completedAfterRelease": true,
+  "minimumObservedWaitMs": 1033
+}

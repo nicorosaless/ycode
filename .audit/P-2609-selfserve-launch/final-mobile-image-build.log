@@ -1,0 +1,77 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon   17.3MB
+Step 1/24 : FROM node:22-slim AS deps
+ ---> 83f487e0a634
+Step 2/24 : WORKDIR /app
+ ---> Using cache
+ ---> b616d74eebc7
+Step 3/24 : COPY package.json package-lock.json ./
+ ---> Using cache
+ ---> 4c812fc4b7e2
+Step 4/24 : RUN npm ci
+ ---> Using cache
+ ---> 7bfc8130b62b
+Step 5/24 : FROM node:22-slim AS builder
+ ---> 83f487e0a634
+Step 6/24 : WORKDIR /app
+ ---> Using cache
+ ---> b616d74eebc7
+Step 7/24 : COPY --from=deps /app/node_modules ./node_modules
+ ---> Using cache
+ ---> 7b345baaf091
+Step 8/24 : COPY . .
+ ---> Using cache
+ ---> 6a94c9041ed9
+Step 9/24 : RUN SKIP_SETUP=true npm run build && rm -rf .next/cache
+ ---> Using cache
+ ---> a8a512ccafad
+Step 10/24 : FROM node:22-slim AS runner
+ ---> 83f487e0a634
+Step 11/24 : WORKDIR /app
+ ---> Using cache
+ ---> b616d74eebc7
+Step 12/24 : ENV NODE_ENV=production
+ ---> Using cache
+ ---> daebc4ab2fee
+Step 13/24 : RUN groupadd -r ycode && useradd -r -g ycode ycode
+ ---> Using cache
+ ---> dba86b42b1e9
+Step 14/24 : COPY --from=builder /app/.next/standalone ./
+ ---> 7e591ded3feb
+Step 15/24 : COPY --from=builder /app/.next/static ./.next/static
+ ---> 68fc4776a933
+Step 16/24 : COPY --from=builder /app/public ./public
+ ---> 03cf9746efe0
+Step 17/24 : COPY --from=builder /app/database ./database
+ ---> 93b0e1f385b6
+Step 18/24 : COPY --from=builder /app/knexfile.ts ./knexfile.ts
+ ---> 98d64e2b9ca7
+Step 19/24 : USER ycode
+ ---> Running in 7ca111a11faf
+ ---> Removed intermediate container 7ca111a11faf
+ ---> 0e02c23ac9ba
+Step 20/24 : EXPOSE 3202
+ ---> Running in fedb04a11fcb
+ ---> Removed intermediate container fedb04a11fcb
+ ---> 91b39c9d901f
+Step 21/24 : ENV PORT=3202
+ ---> Running in 7f0e7cc13d7b
+ ---> Removed intermediate container 7f0e7cc13d7b
+ ---> 0fea22bc0320
+Step 22/24 : CMD ["node", "server.js"]
+ ---> Running in ad93f3d87f57
+ ---> Removed intermediate container ad93f3d87f57
+ ---> 7f816fe9a37f
+Step 23/24 : LABEL rin5.ycode.revision=1b1c4d3-selfserve-working-tree
+ ---> Running in 9d868b5661a2
+ ---> Removed intermediate container 9d868b5661a2
+ ---> 3f9a3c610a7c
+Step 24/24 : LABEL rin5.ycode.task=P-2609-selfserve-launch
+ ---> Running in d4b1f5d97f98
+ ---> Removed intermediate container d4b1f5d97f98
+ ---> 0cc1ab566678
+Successfully built 0cc1ab566678
+Successfully tagged rin5-ycode:selfserve-20260908-mobile

@@ -1,0 +1,5 @@
+{
+  "freshMigration00005Then00008": true,
+  "lockTokenColumns": 1,
+  "temporarySchemaDropped": true
+}

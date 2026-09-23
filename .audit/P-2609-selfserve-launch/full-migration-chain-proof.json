@@ -1,0 +1,9 @@
+{
+  "fullMigrationChain": true,
+  "migrationsApplied": 52,
+  "lockTokenColumns": 1,
+  "registryRows": 1,
+  "transactionRolledBack": true,
+  "schemaTableResidue": 0,
+  "storageRegistryResidue": 0
+}

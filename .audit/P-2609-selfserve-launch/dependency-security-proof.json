@@ -1,0 +1,15 @@
+{
+  "auditProductionVulnerabilities": 0,
+  "versions": {
+    "sharp": "0.35.4",
+    "nodemailer": "10.0.1",
+    "tiptapCore": "3.31.3",
+    "fastUri": "3.1.7",
+    "qs": "6.16.0"
+  },
+  "adapterSmokes": {
+    "nodemailerStreamTransport": true,
+    "sharpSvgToWebp": true
+  },
+  "runtimeImageEditor": true
+}

@@ -1,0 +1,139 @@
+{
+  "capturedAt": "2026-09-09T00:08:35.245Z",
+  "runtimeImage": "1069a2…",
+  "opens": [
+    {
+      "index": 1,
+      "freshContext": true,
+      "collectionPath": "/ycode/collections/630a1922-75d2-4b62-a3fb-80240a01ef0d",
+      "originalImageVisible": true,
+      "filterText": "Images, Icons",
+      "visibleFilenames": [
+        "foto-01.jpg",
+        "foto-02.png",
+        "foto-03.png",
+        "foto-04.jpg",
+        "foto-05.png",
+        "foto-06.jpg",
+        "foto-07.jpg",
+        "foto-08.jpg",
+        "foto-09.jpg",
+        "foto-10.jpg",
+        "foto-11.jpg",
+        "foto-12.jpg"
+      ],
+      "visibleFileCount": 12,
+      "noFilesMessageVisible": false,
+      "assetResponses": [
+        {
+          "status": 200,
+          "path": "/ycode/api/assets?folderId=null&page=1&limit=50",
+          "count": 12,
+          "total": 12,
+          "mimeTypes": [
+            "image/jpeg",
+            "image/png"
+          ]
+        }
+      ],
+      "closedWithoutSelection": true,
+      "contentMutations": [],
+      "readOnlyPosts": [
+        {
+          "method": "POST",
+          "path": "/ycode/api/collections/items/batch"
+        }
+      ],
+      "screenshot": ".audit/P-2609-selfserve-launch/closeout/image-picker/open-1.png"
+    },
+    {
+      "index": 2,
+      "freshContext": true,
+      "collectionPath": "/ycode/collections/630a1922-75d2-4b62-a3fb-80240a01ef0d",
+      "originalImageVisible": true,
+      "filterText": "Images, Icons",
+      "visibleFilenames": [
+        "foto-01.jpg",
+        "foto-02.png",
+        "foto-03.png",
+        "foto-04.jpg",
+        "foto-05.png",
+        "foto-06.jpg",
+        "foto-07.jpg",
+        "foto-08.jpg",
+        "foto-09.jpg",
+        "foto-10.jpg",
+        "foto-11.jpg",
+        "foto-12.jpg"
+      ],
+      "visibleFileCount": 12,
+      "noFilesMessageVisible": false,
+      "assetResponses": [
+        {
+          "status": 200,
+          "path": "/ycode/api/assets?folderId=null&page=1&limit=50",
+          "count": 12,
+          "total": 12,
+          "mimeTypes": [
+            "image/jpeg",
+            "image/png"
+          ]
+        }
+      ],
+      "closedWithoutSelection": true,
+      "contentMutations": [],
+      "readOnlyPosts": [
+        {
+          "method": "POST",
+          "path": "/ycode/api/collections/items/batch"
+        }
+      ],
+      "screenshot": ".audit/P-2609-selfserve-launch/closeout/image-picker/open-2.png"
+    },
+    {
+      "index": 3,
+      "freshContext": true,
+      "collectionPath": "/ycode/collections/630a1922-75d2-4b62-a3fb-80240a01ef0d",
+      "originalImageVisible": true,
+      "filterText": "Images, Icons",
+      "visibleFilenames": [
+        "foto-01.jpg",
+        "foto-02.png",
+        "foto-03.png",
+        "foto-04.jpg",
+        "foto-05.png",
+        "foto-06.jpg",
+        "foto-07.jpg",
+        "foto-08.jpg",
+        "foto-09.jpg",
+        "foto-10.jpg",
+        "foto-11.jpg",
+        "foto-12.jpg"
+      ],
+      "visibleFileCount": 12,
+      "noFilesMessageVisible": false,
+      "assetResponses": [
+        {
+          "status": 200,
+          "path": "/ycode/api/assets?folderId=null&page=1&limit=50",
+          "count": 12,
+          "total": 12,
+          "mimeTypes": [
+            "image/jpeg",
+            "image/png"
+          ]
+        }
+      ],
+      "closedWithoutSelection": true,
+      "contentMutations": [],
+      "readOnlyPosts": [
+        {
+          "method": "POST",
+          "path": "/ycode/api/collections/items/batch"
+        }
+      ],
+      "screenshot": ".audit/P-2609-selfserve-launch/closeout/image-picker/open-3.png"
+    }
+  ],
+  "ok": true
+}

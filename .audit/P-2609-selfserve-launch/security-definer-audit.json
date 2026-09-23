@@ -1,0 +1,38 @@
+{
+  "schema": "cliente_selfserve_f6f6fa38600e4f1aaf6f3728a284f447",
+  "securityDefinerFunctions": [
+    {
+      "arguments": "",
+      "authenticatedExecute": true,
+      "definitionSha256": "de05efb86565ce22ace10194ae9d2ea99e2144941e4c0622a2aaa4e2aa21f659",
+      "fixedSearchPath": true,
+      "name": "is_verified_tenant_member",
+      "owner": "postgres",
+      "schema": "cliente_selfserve_f6f6fa38600e4f1aaf6f3728a284f447",
+      "anonExecute": false,
+      "serviceExecute": true
+    },
+    {
+      "arguments": "",
+      "authenticatedExecute": false,
+      "definitionSha256": "8e5f33d09f64ca5782e80704d92a59c81b1931a29a30005cbae2c75869d10033",
+      "fixedSearchPath": true,
+      "name": "rin5_wait_for_export_lock",
+      "owner": "postgres",
+      "schema": "cliente_selfserve_f6f6fa38600e4f1aaf6f3728a284f447",
+      "anonExecute": false,
+      "serviceExecute": false
+    },
+    {
+      "arguments": "object_bucket text, object_name text",
+      "authenticatedExecute": true,
+      "definitionSha256": "2fc841df80273a6d1e5b4d5951f7bf413eb5580889b66807bbe9a4df425597fb",
+      "fixedSearchPath": true,
+      "name": "rin5_storage_member_for_object",
+      "owner": "postgres",
+      "schema": "public",
+      "anonExecute": false,
+      "serviceExecute": true
+    }
+  ]
+}

@@ -1,0 +1,301 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon   17.3MB
+Step 1/11 : FROM node:22-slim AS deps
+ ---> 83f487e0a634
+Step 2/11 : WORKDIR /app
+ ---> Using cache
+ ---> b616d74eebc7
+Step 3/11 : COPY package.json package-lock.json ./
+ ---> Using cache
+ ---> 4c812fc4b7e2
+Step 4/11 : RUN npm ci
+ ---> Using cache
+ ---> 7bfc8130b62b
+Step 5/11 : FROM node:22-slim AS builder
+ ---> 83f487e0a634
+Step 6/11 : WORKDIR /app
+ ---> Using cache
+ ---> b616d74eebc7
+Step 7/11 : COPY --from=deps /app/node_modules ./node_modules
+ ---> Using cache
+ ---> 7b345baaf091
+Step 8/11 : COPY . .
+ ---> 6a94c9041ed9
+Step 9/11 : RUN SKIP_SETUP=true npm run build && rm -rf .next/cache
+ ---> Running in b0e2c47ed141
+
+> ycode@1.30.3 build
+> next build
+
+▲ Next.js 16.3.0 (Turbopack)
+✓ Running next.config.ts took 25ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+- Experiments (use with caution):
+  · proxyClientMaxBodySize: "500mb"
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 12.4s
+  Running TypeScript ...
+  Finished TypeScript in 20.8s ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/45) ...
+  Generating static pages using 15 workers (11/45) 
+  Generating static pages using 15 workers (22/45) 
+  Generating static pages using 15 workers (33/45) 
+✓ Generating static pages using 15 workers (45/45) in 184ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /.well-known/oauth-authorization-server
+├ ƒ /.well-known/oauth-protected-resource
+├ ƒ /.well-known/oauth-protected-resource/ycode/mcp
+├ ƒ /[...slug]
+├ ƒ /a/[hash]/[...name]
+├ ƒ /api/airtable-webhook
+├ ƒ /api/cron/airtable-webhooks
+├ ƒ /api/page-auth/logout
+├ ƒ /api/page-auth/verify
+├ ƒ /api/templates
+├ ƒ /api/templates/[id]
+├ ƒ /api/templates/[id]/apply
+├ ƒ /api/templates/export
+├ ƒ /api/templates/export-and-upload
+├ ƒ /dynamic
+├ ƒ /dynamic/[...slug]
+├ ○ /icon.svg
+├ ƒ /llms.txt
+├ ○ /robots.txt
+├ ○ /sitemap.xml
+├ ƒ /ycode
+├ ƒ /ycode/accept-invite
+├ ƒ /ycode/api/ai/chat
+├ ƒ /ycode/api/ai/chats
+├ ƒ /ycode/api/ai/chats/[id]
+├ ƒ /ycode/api/api-keys
+├ ƒ /ycode/api/api-keys/[id]
+├ ƒ /ycode/api/apps
+├ ƒ /ycode/api/apps/[appId]/settings
+├ ƒ /ycode/api/apps/airtable/bases
+├ ƒ /ycode/api/apps/airtable/bases/[baseId]/tables
+├ ƒ /ycode/api/apps/airtable/connections
+├ ƒ /ycode/api/apps/airtable/connections/[connectionId]
+├ ƒ /ycode/api/apps/airtable/sync
+├ ƒ /ycode/api/apps/airtable/test
+├ ƒ /ycode/api/apps/airtable/webhook/disable
+├ ƒ /ycode/api/apps/airtable/webhook/refresh
+├ ƒ /ycode/api/apps/airtable/webhook/setup
+├ ƒ /ycode/api/apps/mailerlite/fields
+├ ƒ /ycode/api/apps/mailerlite/groups
+├ ƒ /ycode/api/apps/mailerlite/test
+├ ƒ /ycode/api/apps/static-export/export
+├ ƒ /ycode/api/apps/static-export/settings
+├ ƒ /ycode/api/apps/static-export/status
+├ ƒ /ycode/api/apps/webflow/imports
+├ ƒ /ycode/api/apps/webflow/imports/[importId]
+├ ƒ /ycode/api/apps/webflow/migrate
+├ ƒ /ycode/api/apps/webflow/sites
+├ ƒ /ycode/api/apps/webflow/sites/[siteId]/collections
+├ ƒ /ycode/api/apps/webflow/stylesheet
+├ ƒ /ycode/api/apps/webflow/sync
+├ ƒ /ycode/api/apps/webflow/test
+├ ƒ /ycode/api/asset-folders
+├ ƒ /ycode/api/asset-folders/[id]
+├ ƒ /ycode/api/assets
+├ ƒ /ycode/api/assets/[id]
+├ ƒ /ycode/api/assets/[id]/usage
+├ ƒ /ycode/api/assets/bulk
+├ ƒ /ycode/api/assets/upload
+├ ƒ /ycode/api/auth/callback
+├ ƒ /ycode/api/auth/confirm
+├ ƒ /ycode/api/auth/invite
+├ ƒ /ycode/api/auth/session
+├ ƒ /ycode/api/auth/set-role
+├ ƒ /ycode/api/auth/users
+├ ƒ /ycode/api/cache/clear-all
+├ ƒ /ycode/api/cache/clear-tag
+├ ƒ /ycode/api/cache/warm
+├ ƒ /ycode/api/collections
+├ ƒ /ycode/api/collections/[id]
+├ ƒ /ycode/api/collections/[id]/fields
+├ ƒ /ycode/api/collections/[id]/fields/[field_id]
+├ ƒ /ycode/api/collections/[id]/fields/[field_id]/usage
+├ ƒ /ycode/api/collections/[id]/fields/reorder
+├ ƒ /ycode/api/collections/[id]/import
+├ ƒ /ycode/api/collections/[id]/items
+├ ƒ /ycode/api/collections/[id]/items/[item_id]
+├ ƒ /ycode/api/collections/[id]/items/[item_id]/duplicate
+├ ƒ /ycode/api/collections/[id]/items/[item_id]/status
+├ ƒ /ycode/api/collections/[id]/items/[item_id]/values
+├ ƒ /ycode/api/collections/[id]/items/filter
+├ ƒ /ycode/api/collections/[id]/items/load-more
+├ ƒ /ycode/api/collections/[id]/items/published
+├ ƒ /ycode/api/collections/[id]/items/reorder
+├ ƒ /ycode/api/collections/[id]/items/unpublished
+├ ƒ /ycode/api/collections/[id]/publish
+├ ƒ /ycode/api/collections/[id]/usage
+├ ƒ /ycode/api/collections/fields
+├ ƒ /ycode/api/collections/import/[importId]/status
+├ ƒ /ycode/api/collections/import/process
+├ ƒ /ycode/api/collections/items/batch
+├ ƒ /ycode/api/collections/items/delete
+├ ƒ /ycode/api/collections/items/publish
+├ ƒ /ycode/api/collections/items/slugs
+├ ƒ /ycode/api/collections/reorder
+├ ƒ /ycode/api/collections/sample
+├ ƒ /ycode/api/color-variables
+├ ƒ /ycode/api/color-variables/[id]
+├ ƒ /ycode/api/color-variables/reorder
+├ ƒ /ycode/api/components
+├ ƒ /ycode/api/components/[id]
+├ ƒ /ycode/api/components/[id]/thumbnail
+├ ƒ /ycode/api/components/unpublished
+├ ƒ /ycode/api/css/generate
+├ ƒ /ycode/api/css/generate-pages
+├ ƒ /ycode/api/devtools/reset-db
+├ ƒ /ycode/api/devtools/run-migrations
+├ ƒ /ycode/api/editor/init
+├ ƒ /ycode/api/error-page
+├ ƒ /ycode/api/files/delete
+├ ƒ /ycode/api/files/presign
+├ ƒ /ycode/api/files/register
+├ ƒ /ycode/api/files/upload
+├ ƒ /ycode/api/folders
+├ ƒ /ycode/api/folders/[id]
+├ ƒ /ycode/api/folders/[id]/duplicate
+├ ƒ /ycode/api/fonts
+├ ƒ /ycode/api/fonts/[id]
+├ ƒ /ycode/api/fonts/google
+├ ƒ /ycode/api/form-submissions
+├ ƒ /ycode/api/form-submissions/[id]
+├ ƒ /ycode/api/globals
+├ ƒ /ycode/api/globals/[id]
+├ ƒ /ycode/api/layer-styles
+├ ƒ /ycode/api/layer-styles/[id]
+├ ƒ /ycode/api/layer-styles/bulk
+├ ƒ /ycode/api/layer-styles/unpublished
+├ ƒ /ycode/api/layers
+├ ƒ /ycode/api/layouts
+├ ƒ /ycode/api/layouts/[layoutKey]
+├ ƒ /ycode/api/locales
+├ ƒ /ycode/api/locales/[id]
+├ ƒ /ycode/api/locales/[id]/default
+├ ƒ /ycode/api/maps/geocode
+├ ƒ /ycode/api/mcp-tokens
+├ ƒ /ycode/api/mcp-tokens/[id]
+├ ƒ /ycode/api/oauth/authorize
+├ ƒ /ycode/api/oauth/register
+├ ƒ /ycode/api/oauth/token
+├ ƒ /ycode/api/pages
+├ ƒ /ycode/api/pages/[id]
+├ ƒ /ycode/api/pages/[id]/collection-item
+├ ƒ /ycode/api/pages/[id]/duplicate
+├ ƒ /ycode/api/pages/[id]/status
+├ ƒ /ycode/api/pages/drafts
+├ ƒ /ycode/api/pages/slug/[slug]
+├ ƒ /ycode/api/pages/unpublished
+├ ƒ /ycode/api/profile
+├ ƒ /ycode/api/profile/avatar
+├ ƒ /ycode/api/profile/email
+├ ƒ /ycode/api/profile/name
+├ ƒ /ycode/api/profile/password
+├ ƒ /ycode/api/project/export
+├ ƒ /ycode/api/project/import
+├ ƒ /ycode/api/publish
+├ ƒ /ycode/api/publish/preview
+├ ƒ /ycode/api/revalidate
+├ ƒ /ycode/api/revert
+├ ƒ /ycode/api/rin5/export
+├ ƒ /ycode/api/rin5/handoff
+├ ƒ /ycode/api/rin5/restore
+├ ƒ /ycode/api/settings/[key]
+├ ƒ /ycode/api/settings/agent
+├ ƒ /ycode/api/settings/agent/test
+├ ƒ /ycode/api/settings/batch
+├ ƒ /ycode/api/settings/email/test
+├ ƒ /ycode/api/setup/check-email-confirm
+├ ƒ /ycode/api/setup/connect
+├ ƒ /ycode/api/setup/migrate
+├ ƒ /ycode/api/setup/status
+├ ƒ /ycode/api/supabase/config
+├ ƒ /ycode/api/translations
+├ ƒ /ycode/api/translations/[id]
+├ ƒ /ycode/api/translations/bulk
+├ ƒ /ycode/api/updates/check
+├ ƒ /ycode/api/updates/releases
+├ ƒ /ycode/api/v1/collections
+├ ƒ /ycode/api/v1/collections/[collection_id]
+├ ƒ /ycode/api/v1/collections/[collection_id]/items
+├ ƒ /ycode/api/v1/collections/[collection_id]/items/[item_id]
+├ ƒ /ycode/api/v1/forms
+├ ƒ /ycode/api/v1/forms/[form_id]
+├ ƒ /ycode/api/v1/forms/[form_id]/submissions
+├ ƒ /ycode/api/v1/forms/[form_id]/submissions/[submission_id]
+├ ƒ /ycode/api/versions
+├ ƒ /ycode/api/versions/[id]
+├ ƒ /ycode/api/webhooks
+├ ƒ /ycode/api/webhooks/[id]
+├ ƒ /ycode/api/webhooks/[id]/deliveries
+├ ƒ /ycode/collections
+├ ƒ /ycode/collections/[id]
+├ ƒ /ycode/components/[id]
+├ ƒ /ycode/devtools/reset-db
+├ ƒ /ycode/forms
+├ ○ /ycode/icon-n7x8hb.svg
+├ ƒ /ycode/integrations
+├ ƒ /ycode/integrations/api
+├ ƒ /ycode/integrations/apps
+├ ƒ /ycode/integrations/mcp
+├ ƒ /ycode/integrations/webhooks
+├ ƒ /ycode/layers/[id]
+├ ƒ /ycode/localization
+├ ƒ /ycode/mcp
+├ ƒ /ycode/mcp/[token]
+├ ƒ /ycode/oauth/authorize
+├ ƒ /ycode/pages/[id]
+├ ƒ /ycode/preview
+├ ƒ /ycode/preview/[...slug]
+├ ƒ /ycode/preview/error-pages/[code]
+├ ƒ /ycode/profile
+├ ƒ /ycode/settings
+├ ƒ /ycode/settings/agent
+├ ƒ /ycode/settings/email
+├ ƒ /ycode/settings/general
+├ ƒ /ycode/settings/redirects
+├ ƒ /ycode/settings/security
+├ ƒ /ycode/settings/templates
+├ ƒ /ycode/settings/updates
+├ ƒ /ycode/settings/users
+└ ƒ /ycode/welcome
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+[91mnpm notice
+npm notice New major version of npm available! 10.9.8 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+[0m ---> Removed intermediate container b0e2c47ed141
+ ---> a8a512ccafad
+Step 10/11 : LABEL rin5.ycode.revision=1b1c4d3-selfserve-working-tree
+ ---> Running in 54b1792632f8
+ ---> Removed intermediate container 54b1792632f8
+ ---> 428ffa1895f6
+Step 11/11 : LABEL rin5.ycode.task=P-2609-selfserve-launch
+ ---> Running in bf233e62a4e6
+ ---> Removed intermediate container bf233e62a4e6
+ ---> d9f4e6d2b06d
+Successfully built d9f4e6d2b06d
+Successfully tagged rin5-ycode-tools:selfserve-20260908-final

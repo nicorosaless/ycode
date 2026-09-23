@@ -1,0 +1,10 @@
+✔ restore detects an edit since confirmation (0.93028ms)
+✔ restore refuses a changed set of pages instead of partial recovery (0.17276ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 241.947927

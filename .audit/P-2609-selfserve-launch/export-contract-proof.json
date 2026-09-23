@@ -1,0 +1,13 @@
+{
+  "files": 6,
+  "identityReflected": true,
+  "manifestVerified": true,
+  "paths": [
+    "401.html",
+    "404.html",
+    "500.html",
+    "assets/editor-proof.svg",
+    "index.html",
+    "nosotros/index.html"
+  ]
+}

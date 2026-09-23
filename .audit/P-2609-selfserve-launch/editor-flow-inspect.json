@@ -1,0 +1,14 @@
+{
+  "finalPath": "/ycode/layers/4436b97a-01a5-4776-9930-347dfa45dc0f",
+  "textPersistedAcrossContext": true,
+  "textRestored": true,
+  "exportedHtmlPages": [
+    "401.html",
+    "404.html",
+    "500.html",
+    "index.html",
+    "nosotros/index.html"
+  ],
+  "exportedImagePath": "assets/editor-proof.svg",
+  "exportedImageSha256": "3ec412a50b6fc13bb985df36881509cb05fa499613540bee69366cb3195a27d3"
+}

@@ -84,14 +84,11 @@ haga.
 `Dockerfile` (multi-stage, Node 22) y `compose.yml` de referencia en la raíz
 del repo. Puntos importantes:
 
-- `next.config.ts` **no** declara `output: 'standalone'`, así que la imagen
-  copia `node_modules` completo en el stage de runtime — no el bundle
-  reducido que produce Next con standalone. Activar `output: 'standalone'`
-  reduciría el tamaño de imagen de forma notable, pero es un cambio de
-  comportamiento de build fuera del alcance de este diagnóstico.
-- El build (`next build`) necesita variables de Supabase con forma válida
-  (aunque no se conecte a nada durante el build) — el Dockerfile las pasa
-  como placeholders en el stage `builder`.
+- `next.config.ts` genera `.next/standalone`; el runtime copia ese bundle
+  reducido y los estáticos necesarios.
+- El build no recibe variables de Supabase. Las páginas resuelven el tenant y
+  sus datos en runtime, y `.dockerignore` excluye entornos, credenciales,
+  bases locales, evidencias y outputs.
 - El contenedor de Supabase CLI local corre en la red default de Docker, no
   en la red del `compose.yml` de la app; por eso `compose.yml` usa
   `host.docker.internal` + `extra_hosts: host-gateway` en vez de nombres de

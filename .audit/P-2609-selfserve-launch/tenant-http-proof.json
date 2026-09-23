@@ -1,0 +1,31 @@
+{
+  "schema": "cliente_selfserve_f6f6fa38600e4f1aaf6f3728a284f447",
+  "prefix": "cliente_selfserve_f6f6fa38600e4f1aaf6f3728a284f447",
+  "ownerPages": {
+    "status": 200,
+    "rows": 10,
+    "error": null
+  },
+  "otherPages": {
+    "status": 200,
+    "rows": 0,
+    "error": null
+  },
+  "storage": {
+    "publicStatus": 400,
+    "ownerAllowed": true,
+    "otherDenied": true,
+    "assetProxy": {
+      "anonymousCacheControl": "private, no-store",
+      "anonymousStatus": 401,
+      "foreignStatus": 403,
+      "ownerCacheControl": "private, no-store",
+      "ownerStatus": 200
+    }
+  },
+  "metadata": {
+    "authenticatedMembershipsStatus": 403,
+    "authenticatedMigrationsStatus": 403,
+    "serviceMigrationsStatus": 200
+  }
+}

@@ -1,0 +1,13 @@
+✔ restore detects an edit since confirmation (0.939961ms)
+✔ restore refuses a changed set of pages instead of partial recovery (0.17761ms)
+✔ builds the Basic customer navigation from runtime-only rin5 configuration (1.188931ms)
+✔ does not expose navigation for incomplete or unsafe configuration (0.21507ms)
+✔ allows plain HTTP only for local development hosts (0.13861ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 251.428805

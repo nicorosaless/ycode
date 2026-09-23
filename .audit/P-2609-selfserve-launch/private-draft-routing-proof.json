@@ -1,0 +1,22 @@
+{
+  "afterExportAnonymous": {
+    "/": 401,
+    "/nosotros": 401,
+    "/dynamic": 401
+  },
+  "beforeExportAnonymous": {
+    "/": 401,
+    "/nosotros": 401,
+    "/dynamic": 401
+  },
+  "owner": {
+    "/": 200,
+    "/nosotros": 200,
+    "/dynamic": 200
+  },
+  "tenantApis": {
+    "collection": 401,
+    "configBootstrap": 200,
+    "form": 401
+  }
+}

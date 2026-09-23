@@ -31,7 +31,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "type-check": "tsc --noEmit",
-    "test": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_PROJECT=tsconfig.test.json node --test --require ts-node/register --require tsconfig-paths/register lib/api-authz.test.ts lib/rin5-internal-auth.test.ts lib/tenant.test.ts lib/form-submission-security.test.ts lib/layer-style-resolve.test.ts lib/import/adapters/webflow/global-styles.test.ts lib/import/rin5-html.test.ts lib/import/css.test.ts lib/apps/static-export/original-assets.test.ts lib/current-page-filter.test.ts lib/apps/airtable/markdown-to-tiptap.test.ts lib/agent/tools/to-anthropic.test.ts lib/agent/tools/compact-result.test.ts lib/agent/tools/deferred.test.ts",
+    "test": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_PROJECT=tsconfig.test.json node --test --require ts-node/register --require tsconfig-paths/register proxy.test.ts lib/rin5-customer-reorder.test.ts lib/api-authz.test.ts lib/rin5-internal-auth.test.ts lib/rin5-navigation.test.ts lib/rin5-customer-settings.test.ts lib/rin5-customer-cms.test.ts lib/locale-input.test.ts lib/supabase-server-fetch.test.ts lib/tenant.test.ts lib/form-submission-security.test.ts lib/layer-style-resolve.test.ts lib/import/adapters/webflow/global-styles.test.ts lib/import/rin5-html.test.ts lib/import/css.test.ts lib/apps/static-export/original-assets.test.ts lib/apps/static-export/path-rewriter.test.ts lib/apps/static-export/resolver.test.ts lib/current-page-filter.test.ts lib/apps/airtable/markdown-to-tiptap.test.ts lib/agent/tools/to-anthropic.test.ts lib/agent/tools/compact-result.test.ts lib/agent/tools/deferred.test.ts 'app/(builder)/ycode/components/RightPanel.test.tsx' 'app/(builder)/ycode/components/CustomerWorkspaceAccess.test.tsx' 'app/(builder)/ycode/components/file-manager-load.test.ts'",
     "migrate:make": "NODE_NO_WARNINGS=1 NODE_OPTIONS=\"--require ./scripts/server-only-shim.cjs --require tsconfig-paths/register\" knex migrate:make --knexfile knexfile.ts -x ts",
     "migrate:latest": "NODE_NO_WARNINGS=1 NODE_OPTIONS=\"--require ./scripts/server-only-shim.cjs --require tsconfig-paths/register\" knex migrate:latest --knexfile knexfile.ts",
     "migrate:rollback": "NODE_NO_WARNINGS=1 NODE_OPTIONS=\"--require ./scripts/server-only-shim.cjs --require tsconfig-paths/register\" knex migrate:rollback --knexfile knexfile.ts",
@@ -73,7 +73,7 @@
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.76.1",
     "@tanstack/react-virtual": "^3.13.22",
-    "@tiptap/core": "^3.10.5",
+    "@tiptap/core": "^3.30.4",
     "@tiptap/extension-heading": "^3.10.7",
     "@tiptap/extension-history": "^3.20.0",
     "@tiptap/extension-image": "^3.20.1",
@@ -101,7 +101,7 @@
     "marked": "^17.0.1",
     "next": "^16.1.6",
     "next-themes": "^0.4.6",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^10.0.1",
     "openai": "^6.45.0",
     "pg": "^8.16.3",
     "prismjs": "^1.30.0",
@@ -113,7 +113,7 @@
     "react-hook-form": "^7.66.0",
     "react-simple-code-editor": "^0.14.1",
     "server-only": "^0.0.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "sonner": "^2.0.7",
     "swiper": "^12.1.2",
     "tailwind-merge": "^3.3.1",
@@ -159,7 +159,9 @@
     "whatwg-url": "^14.2.0",
     "tr46": "^5.1.0",
     "diff": ">=8.0.3",
-    "glob": ">=10.4.6"
+    "fast-uri": "^3.1.6",
+    "glob": ">=10.4.6",
+    "qs": "^6.16.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
