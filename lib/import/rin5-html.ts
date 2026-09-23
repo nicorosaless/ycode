@@ -780,6 +780,13 @@ export function authorInlineScripts(html: string): string[] {
   return scripts;
 }
 
+/** Active author code crosses the import boundary only after an explicit tenant opt-in. */
+export function authorScriptsForImport(html: string, sharedSiteJs: string | null, allowTrustedScripts: boolean): string {
+  if (!allowTrustedScripts) return '';
+  if (sharedSiteJs !== null) return `<script>${sharedSiteJs}</script>`;
+  return authorInlineScripts(html).map((js) => `<script>${js}</script>`).join('\n');
+}
+
 /**
  * Rewrite a link between pages of the bundle into a Ycode route.
  *

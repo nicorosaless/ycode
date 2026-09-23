@@ -25,6 +25,7 @@ import {
   inlineStyleSheets,
   localStylesheetHrefs,
   authorInlineScripts,
+  authorScriptsForImport,
   rewriteInternalHref,
   splitSelectorList,
   resolveNestedSelector,
@@ -669,6 +670,13 @@ test('rewriteInternalHref resuelve los enlaces de las dos disposiciones', () => 
   assert.equal(rewriteInternalHref('#contacto'), '#contacto');
   assert.equal(rewriteInternalHref('https://rin5.app'), 'https://rin5.app');
   assert.equal(rewriteInternalHref('tel:653854096'), 'tel:653854096');
+});
+
+test('authorScriptsForImport strips active code unless the tenant explicitly trusts it', () => {
+  const html = '<script>window.authorCode = true</script><script src="https://example.test/x.js"></script>';
+  assert.equal(authorScriptsForImport(html, 'window.shared = true', false), '');
+  assert.equal(authorScriptsForImport(html, 'window.shared = true', true), '<script>window.shared = true</script>');
+  assert.equal(authorScriptsForImport(html, null, true), '<script>window.authorCode = true</script>');
 });
 
 test('splitSelectorList no parte una coma escapada de una utilidad de Tailwind', () => {

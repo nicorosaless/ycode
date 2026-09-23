@@ -34,6 +34,7 @@ moduleProto.require = function patchedRequire(this: unknown, id: string): unknow
   return originalRequire.call(this, id)
 }
 
+import { resolveStorageBucket } from '../lib/tenant'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -157,9 +158,9 @@ async function main(): Promise<void> {
   await admin.raw(`DROP SCHEMA IF EXISTS "${schema}" CASCADE; CREATE SCHEMA "${schema}"`)
   await admin.destroy()
 
-  const stale = await listStorageObjects(supabase.storage.from('assets'), storagePrefix)
+  const stale = await listStorageObjects(supabase.storage.from(resolveStorageBucket()), storagePrefix)
   if (stale.length > 0) {
-    const { error } = await supabase.storage.from('assets').remove(stale)
+    const { error } = await supabase.storage.from(resolveStorageBucket()).remove(stale)
     if (error) throw new Error(`storage cleanup: ${error.message}`)
   }
   console.log(`✓ Cleaned — schema dropped, ${stale.length} stale object(s) removed`)

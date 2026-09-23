@@ -111,7 +111,7 @@ async function main() {
     bucketForMedia, resolveBuckets, BUCKET_ORDER, isSupportedSelector,
     selectorClassNames, relaxStateClasses, STATE_CLASS_PROPS, isHiddenByCascade,
     googleFontsImportHrefs, pageSlugForBundleFile, inlineStyleSheets, localStylesheetHrefs,
-    authorInlineScripts, rewriteInternalHref, splitSelectorList, resolveNestedSelector,
+    authorScriptsForImport, rewriteInternalHref, splitSelectorList, resolveNestedSelector,
   } = await import('../lib/import/rin5-html');
   const { generatePageMetadataHash, generatePageLayersHash } = await import('../lib/hash-utils');
   const { generateId } = await import('../lib/utils');
@@ -119,11 +119,12 @@ async function main() {
   const sharp = (await import('sharp')).default;
   const { createClient } = await import('@supabase/supabase-js');
   const { generateCSSForPage, generateAndSaveDraftCSS } = await import('../lib/server/cssGenerator');
-  const { dbSchemaForClient, resolveDbSchema, tenantStoragePath } = await import('../lib/tenant');
+  const { dbSchemaForClient, resolveDbSchema, resolveStorageBucket, tenantStoragePath } = await import('../lib/tenant');
+  const { getAssetProxyUrl } = await import('../lib/asset-utils');
+  const { resolveBundlePath } = await import('../lib/import/bundle-files');
 
   const SUPABASE_URL = process.env.SUPABASE_URL!;
   const SECRET = process.env.SUPABASE_SECRET_KEY!;
-  const PUBLIC_BASE = (process.env.ASSET_PUBLIC_BASE || SUPABASE_URL).replace(/\/$/, '');
   // This script writes straight to the tenant's schema and to its own folder
   // inside the shared `assets` bucket — see lib/tenant.ts.
   const db = knexMod.default({
@@ -138,7 +139,10 @@ async function main() {
 
   // ───────────────────────── 1. Upload assets ─────────────────────────
   const assetMap = new Map<string, { id: string; public_url: string }>();
-  const files = fs.readdirSync(ASSET_DIR).filter((f) => MIME[path.extname(f).toLowerCase()]);
+  const files = fs.readdirSync(ASSET_DIR, { withFileTypes: true }).map((entry) => {
+    if (entry.isSymbolicLink()) throw new Error(`rin5_bundle_symlink_rejected:${entry.name}`);
+    return entry;
+  }).filter((entry) => entry.isFile() && MIME[path.extname(entry.name).toLowerCase()]).map((entry) => entry.name);
   console.log(`Uploading ${files.length} assets…`);
 
   // Reuse previously imported assets (idempotent re-runs)
@@ -149,7 +153,9 @@ async function main() {
 
   for (const file of files) {
     if (assetMap.has(file)) continue;
-    const buf = fs.readFileSync(path.join(ASSET_DIR, file));
+    const assetPath = resolveBundlePath(ASSET_DIR, file);
+    if (fs.statSync(assetPath).size > 50 * 1024 * 1024) throw new Error(`rin5_bundle_asset_too_large:${file}`);
+    const buf = fs.readFileSync(assetPath);
     const mime = MIME[path.extname(file).toLowerCase()];
     let width: number | null = null;
     let height: number | null = null;
@@ -161,16 +167,15 @@ async function main() {
 
     const ext = path.extname(file).slice(1);
     const storagePath = tenantStoragePath(`website/${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${ext}`);
-    const { error } = await supabase.storage.from('assets').upload(storagePath, buf, { contentType: mime });
+    const { error } = await supabase.storage.from(resolveStorageBucket()).upload(storagePath, buf, { contentType: mime });
     if (error) throw new Error(`upload ${file}: ${error.message}`);
 
-    const public_url = `${PUBLIC_BASE}/storage/v1/object/public/assets/${storagePath}`;
     const [row] = await db('assets')
       .insert({
         source: 'rin5-import',
         filename: file,
         storage_path: storagePath,
-        public_url,
+        public_url: null,
         file_size: buf.length,
         mime_type: mime,
         width,
@@ -178,6 +183,9 @@ async function main() {
         is_published: false,
       })
       .returning('*');
+    const public_url = getAssetProxyUrl(row);
+    if (!public_url) throw new Error(`proxy URL unavailable for ${file}`);
+    await db('assets').where({ id: row.id, is_published: false }).update({ public_url });
     assetMap.set(file, { id: row.id, public_url });
     console.log(`  ✓ ${file}`);
   }
@@ -198,6 +206,7 @@ async function main() {
   const walk = (dir: string) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const abs = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) throw new Error(`rin5_bundle_symlink_rejected:${path.relative(SITE_DIR, abs)}`);
       if (entry.isDirectory()) {
         if (entry.name === 'assets') continue;
         walk(abs);
@@ -209,7 +218,11 @@ async function main() {
   };
   walk(SITE_DIR);
   if (pageFiles.length === 0) throw new Error(`no pages found under ${SITE_DIR}`);
-  const readPage = (file: string) => fs.readFileSync(path.join(SITE_DIR, file), 'utf8');
+  const readPage = (file: string) => {
+    const absolute = resolveBundlePath(SITE_DIR, file);
+    if (fs.statSync(absolute).size > 5 * 1024 * 1024) throw new Error(`rin5_bundle_page_too_large:${file}`);
+    return fs.readFileSync(absolute, 'utf8');
+  };
 
   // The sheet, from wherever this bundle keeps it. An export inlines the same
   // site-wide CSS into every page, so the union of the pages' sheets is that
@@ -227,14 +240,21 @@ async function main() {
     sheets.push(text);
   };
   if (fs.existsSync(stylesCssPath)) {
+    if (fs.lstatSync(stylesCssPath).isSymbolicLink()) throw new Error('rin5_bundle_symlink_rejected:styles.css');
+    if (fs.statSync(stylesCssPath).size > 5 * 1024 * 1024) throw new Error('rin5_bundle_stylesheet_too_large:styles.css');
     addSheet(fs.readFileSync(stylesCssPath, 'utf8'));
   } else {
     for (const { file } of pageFiles) {
       const html = readPage(file);
       for (const css of inlineStyleSheets(html)) addSheet(css);
       for (const href of localStylesheetHrefs(html)) {
-        const abs = path.resolve(path.dirname(path.join(SITE_DIR, file)), href.split('?')[0]);
-        if (fs.existsSync(abs)) addSheet(fs.readFileSync(abs, 'utf8'));
+        const relativeCss = path.join(path.dirname(file), href.split('?')[0]);
+        const abs = resolveBundlePath(SITE_DIR, relativeCss);
+        if (fs.existsSync(abs)) {
+          if (fs.lstatSync(abs).isSymbolicLink()) throw new Error(`rin5_bundle_symlink_rejected:${relativeCss}`);
+          if (fs.statSync(abs).size > 5 * 1024 * 1024) throw new Error(`rin5_bundle_stylesheet_too_large:${relativeCss}`);
+          addSheet(fs.readFileSync(abs, 'utf8'));
+        }
       }
     }
     console.log(`No styles.css: read ${sheets.length} inline sheet(s) from the bundle's pages`);
@@ -1011,11 +1031,11 @@ async function main() {
   // carried over per page, minus the runtimes this editor's own export injects
   // — re-importing those would ship two copies of each on the next export.
   const siteJsPath = path.join(SITE_DIR, 'site.js');
-  const sharedSiteJs = fs.existsSync(siteJsPath)
-    ? `<script>${fs.readFileSync(siteJsPath, 'utf8')}</script>`
-    : null;
-  const customCodeBodyFor = (html: string): string => sharedSiteJs
-    ?? authorInlineScripts(html).map((js) => `<script>${js}</script>`).join('\n');
+  if (fs.existsSync(siteJsPath) && fs.lstatSync(siteJsPath).isSymbolicLink()) throw new Error('rin5_bundle_symlink_rejected:site.js');
+  if (fs.existsSync(siteJsPath) && fs.statSync(siteJsPath).size > 1024 * 1024) throw new Error('rin5_bundle_script_too_large:site.js');
+  const sharedSiteJs = fs.existsSync(siteJsPath) ? fs.readFileSync(siteJsPath, 'utf8') : null;
+  const allowTrustedScripts = process.env.RIN5_ALLOW_TRUSTED_SCRIPTS === 'true';
+  const customCodeBodyFor = (html: string): string => authorScriptsForImport(html, sharedSiteJs, allowTrustedScripts);
 
   let orderIdx = 0;
   const importedPages: Array<{ id: string; slug: string; name: string }> = [];
