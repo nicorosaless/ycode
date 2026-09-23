@@ -10,6 +10,10 @@ import { findStatusFieldId, isAssetFieldType, isMultipleAssetField } from '@/lib
 import type { StatusAction } from '@/lib/collection-field-utils';
 import { noCache } from '@/lib/api-response';
 import type { CollectionItemWithValues, CollectionField } from '@/types';
+import { getAuthUser } from '@/lib/supabase-auth';
+import { resolveRole } from '@/lib/roles';
+import { resolveAllowedEmails } from '@/lib/tenant';
+import { canDirectlyPublishCms } from '@/lib/rin5-customer-cms';
 
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
@@ -210,6 +214,13 @@ export async function POST(
 
     // Extract item data, values, and optional status action
     const { values, status_action, ...itemData } = body;
+    const action = status_action as StatusAction | undefined;
+    if (action === 'publish' && resolveAllowedEmails() !== null) {
+      const auth = await getAuthUser();
+      if (!auth || !canDirectlyPublishCms(resolveRole(auth.user.app_metadata?.role), true)) {
+        return noCache({ error: 'rin5_customer_publish_via_dashboard' }, 403);
+      }
+    }
 
     // Create the item (draft)
     const item = await createItem({
@@ -260,7 +271,6 @@ export async function POST(
     }
 
     // Apply status action if provided
-    const action = status_action as StatusAction | undefined;
     if (action === 'draft') {
       await unpublishSingleItem(item.id);
       await clearAllCache();

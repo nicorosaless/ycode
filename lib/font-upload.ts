@@ -6,7 +6,7 @@
 
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { createFont } from '@/lib/repositories/fontRepository';
-import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { getStorageBucket, STORAGE_FOLDERS } from '@/lib/asset-constants';
 import { tenantStoragePath } from '@/lib/tenant';
 import { mapExtensionToFontFormat } from '@/lib/font-utils';
 import type { Font } from '@/types';
@@ -46,7 +46,7 @@ export async function uploadFontFile(
     const buffer = Buffer.from(arrayBuffer);
 
     const { data, error } = await supabase.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .upload(storagePath, buffer, {
         cacheControl: '31536000', // Cache for 1 year (fonts don't change)
         upsert: false,
@@ -59,7 +59,7 @@ export async function uploadFontFile(
     }
 
     const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .getPublicUrl(data.path);
 
     // Derive font name from filename if not provided

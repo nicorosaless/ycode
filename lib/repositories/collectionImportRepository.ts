@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET } from '@/lib/asset-constants';
+import { getStorageBucket } from '@/lib/asset-constants';
 import type { CollectionImport, CollectionImportStatus } from '@/types';
 
 /**
@@ -268,7 +268,7 @@ export async function cleanupStaleImports(): Promise<void> {
   // Remove CSV files from storage
   if (storagePaths.length > 0) {
     try {
-      await client.storage.from(STORAGE_BUCKET).remove(storagePaths);
+      await client.storage.from(getStorageBucket()).remove(storagePaths);
     } catch { /* best-effort */ }
   }
 

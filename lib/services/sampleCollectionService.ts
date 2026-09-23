@@ -9,7 +9,7 @@ import { insertValuesBulk } from '@/lib/repositories/collectionItemValueReposito
 import { findStatusFieldId } from '@/lib/collection-field-utils';
 import { createAsset } from '@/lib/repositories/assetRepository';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { getStorageBucket, STORAGE_FOLDERS } from '@/lib/asset-constants';
 import { tenantStoragePath } from '@/lib/tenant';
 import { getSampleCollectionById } from '@/lib/sample-collections';
 import type { SampleCollectionDefinition, SampleFieldDefinition, SampleItemDefinition } from '@/lib/sample-collections';
@@ -189,7 +189,7 @@ async function getOrUploadSampleImage(filename: string): Promise<Asset> {
   const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.WEBSITE}/${timestamp}-${random}.${ext}`);
 
   const { data, error } = await supabase.storage
-    .from(STORAGE_BUCKET)
+    .from(getStorageBucket())
     .upload(storagePath, buffer, {
       cacheControl: '3600',
       upsert: false,
@@ -201,7 +201,7 @@ async function getOrUploadSampleImage(filename: string): Promise<Asset> {
   }
 
   const { data: urlData } = supabase.storage
-    .from(STORAGE_BUCKET)
+    .from(getStorageBucket())
     .getPublicUrl(data.path);
 
   return createAsset({

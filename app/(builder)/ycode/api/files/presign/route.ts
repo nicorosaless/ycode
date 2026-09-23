@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { validateCategoryMimeType } from '@/lib/asset-utils';
-import { STORAGE_BUCKET, MAX_UPLOAD_FILE_SIZE, generateStoragePath } from '@/lib/asset-constants';
+import { getStorageBucket, MAX_UPLOAD_FILE_SIZE, generateStoragePath } from '@/lib/asset-constants';
 
 export const runtime = 'nodejs';
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const storagePath = generateStoragePath(filename);
 
     const { data, error } = await supabase.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .createSignedUploadUrl(storagePath);
 
     if (error) {

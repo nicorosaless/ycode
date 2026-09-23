@@ -6,7 +6,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { createAsset } from '@/lib/repositories/assetRepository';
 import { isAssetOfType } from './asset-utils';
-import { ASSET_CATEGORIES, STORAGE_BUCKET, generateStoragePath, getDisplayName } from '@/lib/asset-constants';
+import { ASSET_CATEGORIES, getStorageBucket, generateStoragePath, getDisplayName } from '@/lib/asset-constants';
 import sharp from 'sharp';
 import type { Asset } from '@/types';
 
@@ -264,7 +264,7 @@ export async function uploadFile(
     const storagePath = generateStoragePath(effectiveFilename);
 
     const { data, error } = await supabase.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .upload(storagePath, fileToUpload, {
         cacheControl: '3600',
         upsert: false,
@@ -277,7 +277,7 @@ export async function uploadFile(
     }
 
     const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .getPublicUrl(data.path);
 
     const asset = await createAsset({
@@ -327,7 +327,7 @@ export async function deleteAsset(assetId: string): Promise<boolean> {
     }
 
     const { error: storageError } = await supabase.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .remove([asset.storage_path]);
 
     if (storageError) {

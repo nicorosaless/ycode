@@ -5,6 +5,7 @@ import { getItemsByCollectionId } from '@/lib/repositories/collectionItemReposit
 import { clearValuesForField, renameValuesForField } from '@/lib/repositories/collectionItemValueRepository';
 import { deleteTranslationsInBulk } from '@/lib/repositories/translationRepository';
 import { noCache } from '@/lib/api-response';
+import { customerFieldUpdate } from '@/lib/rin5-customer-cms';
 
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
@@ -129,7 +130,7 @@ export async function PUT(
       }
     }
 
-    const field = await updateField(fieldId, body);
+    const field = await updateField(fieldId, customerFieldUpdate(body));
 
     if (optionRenames.length > 0) {
       await Promise.all(

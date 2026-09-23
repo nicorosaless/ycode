@@ -3,14 +3,23 @@
  * Shared constants for asset categorization and storage (no dependencies to avoid circular imports)
  */
 
-import { tenantStoragePath } from '@/lib/tenant';
+import { DEFAULT_STORAGE_BUCKET, RIN5_STORAGE_BUCKET, resolveStorageBucket, tenantStoragePath } from '@/lib/tenant';
 import type { AssetCategory } from '@/types';
 
 /**
  * Supabase Storage bucket and folder prefix constants.
  * All uploads go to a single 'assets' bucket, organized by folder.
  */
-export const STORAGE_BUCKET = 'assets';
+let browserStorageBucket = DEFAULT_STORAGE_BUCKET;
+
+export function configureBrowserStorageBucket(bucket: string): void {
+  if (bucket !== DEFAULT_STORAGE_BUCKET && bucket !== RIN5_STORAGE_BUCKET) throw new Error('storage_bucket_invalid');
+  browserStorageBucket = bucket;
+}
+
+export function getStorageBucket(): string {
+  return typeof window === 'undefined' ? resolveStorageBucket() : browserStorageBucket;
+}
 export const STORAGE_FOLDERS = {
   WEBSITE: 'website',
   AVATARS: 'avatars',

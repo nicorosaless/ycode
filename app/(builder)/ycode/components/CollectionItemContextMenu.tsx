@@ -13,6 +13,7 @@ interface CollectionItemContextMenuProps {
   onSetAsDraft: () => void;
   onStageForPublish: () => void;
   onSetAsPublished: () => void;
+  allowDirectPublish?: boolean;
   onDuplicate: () => void;
   onDelete: () => void;
   disabled?: boolean;
@@ -28,6 +29,7 @@ export default function CollectionItemContextMenu({
   onSetAsDraft,
   onStageForPublish,
   onSetAsPublished,
+  allowDirectPublish = true,
   onDuplicate,
   onDelete,
   disabled = false,
@@ -58,12 +60,14 @@ export default function CollectionItemContextMenu({
         >
           Stage for publish
         </ContextMenuItem>
-        <ContextMenuItem
-          disabled={!isCollectionPublished || (hasPublishedVersion && isPublishable && !isModified)}
-          onClick={onSetAsPublished}
-        >
-          Set as published
-        </ContextMenuItem>
+        {allowDirectPublish && (
+          <ContextMenuItem
+            disabled={!isCollectionPublished || (hasPublishedVersion && isPublishable && !isModified)}
+            onClick={onSetAsPublished}
+          >
+            Set as published
+          </ContextMenuItem>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem onClick={onDuplicate}>
           Duplicate

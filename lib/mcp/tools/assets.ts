@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { uploadFile } from '@/lib/file-upload';
 import { getAllAssets, getAssetById, updateAsset, deleteAsset } from '@/lib/repositories/assetRepository';
+import { safePublicFetch } from '@/lib/safe-public-fetch';
 
 export function registerAssetTools(server: McpServer) {
   server.tool(
@@ -56,7 +57,7 @@ Use base64_data for images generated locally (e.g. AI-generated images in a sand
           const blob = new Blob([buffer], { type: contentType });
           file = new File([blob], derivedFilename, { type: contentType });
         } else {
-          const res = await fetch(url!);
+          const res = await safePublicFetch(url!);
           if (!res.ok) {
             return {
               content: [{ type: 'text' as const, text: `Error: Failed to download image from ${url}: ${res.status}` }],

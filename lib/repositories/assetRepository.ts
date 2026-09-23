@@ -1,10 +1,11 @@
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { SUPABASE_IN_FILTER_CHUNK_SIZE, SUPABASE_QUERY_LIMIT, SUPABASE_WRITE_BATCH_SIZE } from '@/lib/supabase-constants';
-import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { getStorageBucket, STORAGE_FOLDERS } from '@/lib/asset-constants';
 import { tenantStoragePath } from '@/lib/tenant';
 import { cleanupOrphanedStorageFiles } from '@/lib/storage-utils';
 import { chunk } from '@/lib/utils';
 import { generateAssetContentHash } from '../hash-utils';
+import { getAssetProxyUrl } from '@/lib/asset-utils';
 import type { Asset } from '../../types';
 
 export interface CreateAssetData {
@@ -330,10 +331,12 @@ export async function createAsset(assetData: CreateAssetData): Promise<Asset> {
   }
 
   const now = new Date().toISOString();
+  const privateStorage = getStorageBucket() === 'rin5-assets' && Boolean(assetData.storage_path);
+  const initialData = privateStorage ? { ...assetData, public_url: null } : assetData;
   const content_hash = generateAssetContentHash({
-    filename: assetData.filename,
-    storage_path: assetData.storage_path ?? null,
-    public_url: assetData.public_url ?? null,
+    filename: initialData.filename,
+    storage_path: initialData.storage_path ?? null,
+    public_url: initialData.public_url ?? null,
     file_size: assetData.file_size,
     mime_type: assetData.mime_type,
     width: assetData.width ?? null,
@@ -346,7 +349,7 @@ export async function createAsset(assetData: CreateAssetData): Promise<Asset> {
   const { data, error } = await client
     .from('assets')
     .insert({
-      ...assetData,
+      ...initialData,
       content_hash,
       is_published: false,
       updated_at: now,
@@ -358,7 +361,31 @@ export async function createAsset(assetData: CreateAssetData): Promise<Asset> {
     throw new Error(`Failed to create asset: ${error.message}`);
   }
 
-  return data;
+  if (!privateStorage) return data;
+
+  const proxyUrl = getAssetProxyUrl(data);
+  if (!proxyUrl) return data;
+  const proxyHash = generateAssetContentHash({
+    filename: data.filename,
+    storage_path: data.storage_path,
+    public_url: proxyUrl,
+    file_size: data.file_size,
+    mime_type: data.mime_type,
+    width: data.width,
+    height: data.height,
+    asset_folder_id: data.asset_folder_id,
+    content: data.content,
+    source: data.source,
+  });
+  const { data: proxied, error: proxyError } = await client
+    .from('assets')
+    .update({ public_url: proxyUrl, content_hash: proxyHash })
+    .eq('id', data.id)
+    .eq('is_published', false)
+    .select()
+    .single();
+  if (proxyError) throw new Error(`Failed to secure asset URL: ${proxyError.message}`);
+  return proxied;
 }
 
 /**
@@ -447,7 +474,7 @@ export async function deleteAsset(id: string): Promise<void> {
   // If never published, delete the physical file immediately
   if (!publishedAsset && draftAsset.storage_path) {
     const { error: storageError } = await client.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .remove([draftAsset.storage_path]);
 
     if (storageError) {
@@ -532,7 +559,7 @@ export async function bulkDeleteAssets(ids: string[]): Promise<{ success: string
     for (let i = 0; i < storagePaths.length; i += SUPABASE_WRITE_BATCH_SIZE) {
       const batch = storagePaths.slice(i, i + SUPABASE_WRITE_BATCH_SIZE);
       const { error: storageError } = await client.storage
-        .from(STORAGE_BUCKET)
+        .from(getStorageBucket())
         .remove(batch);
 
       if (storageError) {
@@ -669,7 +696,7 @@ export async function uploadFile(file: File): Promise<{ path: string; url: strin
   const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.WEBSITE}/${Date.now()}-${sanitizedName}`);
 
   const { data, error } = await client.storage
-    .from(STORAGE_BUCKET)
+    .from(getStorageBucket())
     .upload(storagePath, file, {
       cacheControl: '3600',
       upsert: false,
@@ -680,7 +707,7 @@ export async function uploadFile(file: File): Promise<{ path: string; url: strin
   }
 
   const { data: urlData } = client.storage
-    .from(STORAGE_BUCKET)
+    .from(getStorageBucket())
     .getPublicUrl(data.path);
 
   return {

@@ -9,7 +9,7 @@ import { gzipSync, gunzipSync } from 'zlib';
 import type { Knex } from 'knex';
 import { getKnexClient, closeKnexClient, testKnexConnection } from '../knex-client';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { getStorageBucket, STORAGE_FOLDERS } from '@/lib/asset-constants';
 import { tenantStoragePath } from '@/lib/tenant';
 import { migrations } from '../migrations-loader';
 import { guardKnexForMigrationReplay } from '@/lib/migration-replay-guard';
@@ -624,7 +624,7 @@ export async function collectAssetFiles(
   return processInParallel(uniquePaths, async (storagePath): Promise<ExportFile | null> => {
     try {
       const { data, error } = await client.storage
-        .from(STORAGE_BUCKET)
+        .from(getStorageBucket())
         .download(storagePath);
 
       if (error || !data) {
@@ -659,7 +659,7 @@ export async function restoreAssetFiles(
       const newPath = generateStoragePath(file.storagePath);
 
       const { data, error } = await client.storage
-        .from(STORAGE_BUCKET)
+        .from(getStorageBucket())
         .upload(newPath, buffer, {
           contentType: file.mimeType,
           cacheControl: '3600',
@@ -672,7 +672,7 @@ export async function restoreAssetFiles(
       }
 
       const { data: urlData } = client.storage
-        .from(STORAGE_BUCKET)
+        .from(getStorageBucket())
         .getPublicUrl(data.path);
 
       return { oldPath: file.storagePath, newPath: data.path, publicUrl: urlData.publicUrl };

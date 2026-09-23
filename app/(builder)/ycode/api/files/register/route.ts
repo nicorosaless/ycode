@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { createAsset } from '@/lib/repositories/assetRepository';
-import { STORAGE_BUCKET, getDisplayName } from '@/lib/asset-constants';
+import { getStorageBucket, getDisplayName } from '@/lib/asset-constants';
+import { isStoragePathOwnedByTenant } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +31,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!isStoragePathOwnedByTenant(storagePath)) {
+      return NextResponse.json({ error: 'Invalid storagePath' }, { status: 400 });
+    }
+
     const supabase = await getSupabaseAdmin();
 
     if (!supabase) {
@@ -37,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .getPublicUrl(storagePath);
 
     const asset = await createAsset({

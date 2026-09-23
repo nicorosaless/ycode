@@ -6,7 +6,7 @@
 
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { SUPABASE_QUERY_LIMIT, SUPABASE_WRITE_BATCH_SIZE } from '@/lib/supabase-constants';
-import { STORAGE_BUCKET } from '@/lib/asset-constants';
+import { getStorageBucket } from '@/lib/asset-constants';
 
 /**
  * Delete files from Supabase Storage in batches.
@@ -21,7 +21,7 @@ export async function deleteStorageFiles(paths: string[]): Promise<number> {
   let deletedCount = 0;
   for (let i = 0; i < paths.length; i += SUPABASE_WRITE_BATCH_SIZE) {
     const batch = paths.slice(i, i + SUPABASE_WRITE_BATCH_SIZE);
-    const { error } = await client.storage.from(STORAGE_BUCKET).remove(batch);
+    const { error } = await client.storage.from(getStorageBucket()).remove(batch);
 
     if (error) {
       console.error(`Failed to delete ${batch.length} files from storage:`, error.message);

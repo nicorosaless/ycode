@@ -80,6 +80,7 @@ interface CollectionItemSheetProps {
   collectionId: string;
   itemId?: string | null; // null = create new, string = edit existing
   onSuccess?: () => void;
+  allowDirectPublish?: boolean;
 }
 
 export default function CollectionItemSheet({
@@ -88,6 +89,7 @@ export default function CollectionItemSheet({
   collectionId,
   itemId,
   onSuccess,
+  allowDirectPublish = true,
 }: CollectionItemSheetProps) {
   const { collections, fields, items, updateItem, createItem, setItemStatus } = useCollectionsStore();
   const { updateItemInLayerData, invalidateLayerData, refetchLayersForCollection } = useCollectionLayerStore();
@@ -726,15 +728,17 @@ export default function CollectionItemSheet({
                     >
                       {isNewItem ? 'Create' : 'Save'} as draft
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={!collection?.has_published_version}
-                      onClick={() => {
-                        pendingStatusActionRef.current = 'publish';
-                        form.handleSubmit(handleSubmit)();
-                      }}
-                    >
-                      {isNewItem ? 'Create' : 'Save'} and publish
-                    </DropdownMenuItem>
+                    {allowDirectPublish && (
+                      <DropdownMenuItem
+                        disabled={!collection?.has_published_version}
+                        onClick={() => {
+                          pendingStatusActionRef.current = 'publish';
+                          form.handleSubmit(handleSubmit)();
+                        }}
+                      >
+                        {isNewItem ? 'Create' : 'Save'} and publish
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

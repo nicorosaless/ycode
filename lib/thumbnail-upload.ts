@@ -4,7 +4,7 @@
  */
 
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { getStorageBucket, STORAGE_FOLDERS } from '@/lib/asset-constants';
 import { tenantStoragePath } from '@/lib/tenant';
 import sharp from 'sharp';
 
@@ -38,7 +38,7 @@ export async function uploadThumbnail(componentId: string, imageBuffer: Buffer):
   const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.COMPONENTS}/${componentId}.webp`);
 
   const { data, error } = await client.storage
-    .from(STORAGE_BUCKET)
+    .from(getStorageBucket())
     .upload(storagePath, webpBuffer, {
       cacheControl: '3600',
       upsert: true,
@@ -50,7 +50,7 @@ export async function uploadThumbnail(componentId: string, imageBuffer: Buffer):
   }
 
   const { data: urlData } = client.storage
-    .from(STORAGE_BUCKET)
+    .from(getStorageBucket())
     .getPublicUrl(data.path);
 
   return urlData.publicUrl;
@@ -70,7 +70,7 @@ export async function deleteThumbnail(componentId: string): Promise<void> {
   const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.COMPONENTS}/${componentId}.webp`);
 
   const { error } = await client.storage
-    .from(STORAGE_BUCKET)
+    .from(getStorageBucket())
     .remove([storagePath]);
 
   if (error) {

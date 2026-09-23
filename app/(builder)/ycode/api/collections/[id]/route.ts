@@ -3,6 +3,7 @@ import { getCollectionById, updateCollection, deleteCollection } from '@/lib/rep
 import { getItemsByCollectionId } from '@/lib/repositories/collectionItemRepository';
 import { deleteTranslationsInBulk } from '@/lib/repositories/translationRepository';
 import { noCache } from '@/lib/api-response';
+import { customerCollectionUpdate } from '@/lib/rin5-customer-cms';
 
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,7 @@ export async function PUT(
     const body = await request.json();
 
     // Always update draft version in the builder
-    const collection = await updateCollection(id, body, false);
+    const collection = await updateCollection(id, customerCollectionUpdate(body), false);
 
     return noCache({ data: collection });
   } catch (error) {

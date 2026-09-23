@@ -3,6 +3,7 @@ import { getItemWithValues, updateItem, deleteItem, enrichSingleItemWithStatus }
 import { setValuesByFieldName } from '@/lib/repositories/collectionItemValueRepository';
 import { deleteTranslationsInBulk } from '@/lib/repositories/translationRepository';
 import { noCache } from '@/lib/api-response';
+import { customerItemUpdate } from '@/lib/rin5-customer-cms';
 
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
@@ -61,7 +62,7 @@ export async function PUT(
     const { values, is_publishable, ...itemData } = body;
 
     // Build update payload (only include is_publishable if explicitly provided)
-    const updatePayload: Record<string, any> = { ...itemData };
+    const updatePayload: Record<string, any> = customerItemUpdate(itemData);
     if (typeof is_publishable === 'boolean') {
       updatePayload.is_publishable = is_publishable;
     }

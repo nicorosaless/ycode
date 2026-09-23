@@ -1,10 +1,11 @@
 import { getKnexClient, closeKnexClient, testKnexConnection } from '../knex-client';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { getStorageBucket, STORAGE_FOLDERS } from '@/lib/asset-constants';
 import { tenantStoragePath } from '@/lib/tenant';
 import { migrations } from '../migrations-loader';
 import { guardKnexForMigrationReplay } from '@/lib/migration-replay-guard';
 import { YCODE_EXTERNAL_API_URL } from '@/lib/config';
+import { safePublicFetch } from '@/lib/safe-public-fetch';
 
 /**
  * Tables to truncate when applying a template.
@@ -151,7 +152,7 @@ async function copyTemplateAssetsToUserStorage(knex: ReturnType<typeof getKnexCl
 
       let response: Response;
       try {
-        response = await fetch(asset.public_url, { signal: controller.signal });
+        response = await safePublicFetch(asset.public_url, { signal: controller.signal });
       } catch (fetchErr) {
         clearTimeout(timeout);
         console.warn(`[copyTemplateAssets] Failed to fetch ${asset.filename}:`, fetchErr);
@@ -175,7 +176,7 @@ async function copyTemplateAssetsToUserStorage(knex: ReturnType<typeof getKnexCl
 
       // Upload to user's storage
       const { data, error } = await supabase.storage
-        .from(STORAGE_BUCKET)
+        .from(getStorageBucket())
         .upload(storagePath, buffer, {
           contentType: asset.mime_type || 'application/octet-stream',
           cacheControl: '3600',
@@ -189,7 +190,7 @@ async function copyTemplateAssetsToUserStorage(knex: ReturnType<typeof getKnexCl
 
       // Get new public URL
       const { data: urlData } = supabase.storage
-        .from(STORAGE_BUCKET)
+        .from(getStorageBucket())
         .getPublicUrl(data.path);
 
       // Update asset record with new storage path and URL
@@ -219,7 +220,7 @@ async function copyTemplateAssetsToUserStorage(knex: ReturnType<typeof getKnexCl
 
         let response: Response;
         try {
-          response = await fetch(font.url, { signal: controller.signal });
+          response = await safePublicFetch(font.url, { signal: controller.signal });
         } catch (fetchErr) {
           clearTimeout(timeout);
           console.warn(`[copyTemplateAssets] Failed to fetch font ${font.name}:`, fetchErr);
@@ -241,7 +242,7 @@ async function copyTemplateAssetsToUserStorage(knex: ReturnType<typeof getKnexCl
         const storagePath = tenantStoragePath(`${STORAGE_FOLDERS.WEBSITE}/fonts/${timestamp}-${random}.${extension}`);
 
         const { data, error } = await supabase.storage
-          .from(STORAGE_BUCKET)
+          .from(getStorageBucket())
           .upload(storagePath, buffer, {
             contentType: extension === 'woff2' ? 'font/woff2' : 'font/ttf',
             cacheControl: '31536000',
@@ -254,7 +255,7 @@ async function copyTemplateAssetsToUserStorage(knex: ReturnType<typeof getKnexCl
         }
 
         const { data: urlData } = supabase.storage
-          .from(STORAGE_BUCKET)
+          .from(getStorageBucket())
           .getPublicUrl(data.path);
 
         await knex('fonts')

@@ -10,6 +10,10 @@ import { getCollectionById } from '@/lib/repositories/collectionRepository';
 import type { StatusAction } from '@/lib/collection-field-utils';
 import { clearAllCache } from '@/lib/services/cacheService';
 import { noCache } from '@/lib/api-response';
+import { getAuthUser } from '@/lib/supabase-auth';
+import { resolveRole } from '@/lib/roles';
+import { resolveAllowedEmails } from '@/lib/tenant';
+import { canDirectlyPublishCms } from '@/lib/rin5-customer-cms';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -32,6 +36,13 @@ export async function PUT(
 
     if (!['draft', 'stage', 'publish'].includes(action)) {
       return noCache({ error: 'Invalid action. Must be draft, stage, or publish' }, 400);
+    }
+
+    if (action === 'publish' && resolveAllowedEmails() !== null) {
+      const auth = await getAuthUser();
+      if (!auth || !canDirectlyPublishCms(resolveRole(auth.user.app_metadata?.role), true)) {
+        return noCache({ error: 'rin5_customer_publish_via_dashboard' }, 403);
+      }
     }
 
     // Block publishing items when the collection itself hasn't been published

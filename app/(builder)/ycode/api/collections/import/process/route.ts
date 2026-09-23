@@ -25,7 +25,7 @@ import { findAssetsByFilenames } from '@/lib/repositories/assetRepository';
 import { generateCollectionItemContentHash } from '@/lib/hash-utils';
 import { noCache } from '@/lib/api-response';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET } from '@/lib/asset-constants';
+import { getStorageBucket } from '@/lib/asset-constants';
 import { randomUUID } from 'crypto';
 import type { CollectionField } from '@/types';
 
@@ -240,7 +240,7 @@ async function loadBatchFromStorage(
   }
 
   const { data: fileBlob, error: downloadError } = await supabase.storage
-    .from(STORAGE_BUCKET)
+    .from(getStorageBucket())
     .download(batchPath);
 
   if (downloadError || !fileBlob) {
@@ -253,7 +253,7 @@ async function loadBatchFromStorage(
   const rows = JSON.parse(text) as Record<string, string>[];
 
   try {
-    await supabase.storage.from(STORAGE_BUCKET).remove([batchPath]);
+    await supabase.storage.from(getStorageBucket()).remove([batchPath]);
   } catch { /* best-effort cleanup */ }
 
   return { rows, supabase };
@@ -604,7 +604,7 @@ export async function POST(request: NextRequest) {
         try {
           const supabase = supabaseForCleanup || await getSupabaseAdmin();
           if (supabase) {
-            await supabase.storage.from(STORAGE_BUCKET).remove([csvMeta.storage_path]);
+            await supabase.storage.from(getStorageBucket()).remove([csvMeta.storage_path]);
           }
         } catch { /* best-effort cleanup */ }
       }

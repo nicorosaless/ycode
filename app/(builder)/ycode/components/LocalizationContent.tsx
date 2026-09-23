@@ -28,9 +28,9 @@ import { buildFolderPath, getPageIcon } from '@/lib/page-utils';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
 import type { Locale, LocaleOption } from '@/types';
-
 interface LocalizationContentProps {
   children: React.ReactNode;
+  canManageLocales?: boolean;
 }
 
 // Minimum number of characters before a search query is applied.
@@ -60,7 +60,7 @@ const initialModalState: ModalState = {
   localeSearch: '',
 };
 
-export default function LocalizationContent({ children }: LocalizationContentProps) {
+export default function LocalizationContent({ children, canManageLocales = false }: LocalizationContentProps) {
   // Store (locales are already sorted)
   const locales = useLocalisationStore((state) => state.locales);
   const selectedLocaleId = useLocalisationStore((state) => state.selectedLocaleId);
@@ -601,19 +601,21 @@ export default function LocalizationContent({ children }: LocalizationContentPro
       <div className="w-64 border-r flex flex-col px-4">
         <header className="py-5 flex justify-between items-center">
           <span className="font-medium">Localization</span>
-          <Button
-            size="xs"
-            variant="secondary"
-            onClick={() => {
-              clearError();
-              setModalState({
-                ...initialModalState,
-                isOpen: true,
-              });
-            }}
-          >
-            <Icon name="plus" className="size-3" />
-          </Button>
+          {canManageLocales && (
+            <Button
+              size="xs"
+              variant="secondary"
+              onClick={() => {
+                clearError();
+                setModalState({
+                  ...initialModalState,
+                  isOpen: true,
+                });
+              }}
+            >
+              <Icon name="plus" className="size-3" />
+            </Button>
+          )}
         </header>
 
         <div className="flex-1 overflow-y-auto">
@@ -640,17 +642,19 @@ export default function LocalizationContent({ children }: LocalizationContentPro
                     {locale.is_default && <Badge variant="secondary" className="shrink-0 ml-auto text-[10px]">Default</Badge>}
                   </div>
 
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    className="hidden group-hover:flex"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenEditDialog(locale);
-                    }}
-                  >
-                    <Icon name="more" className="size-3" />
-                  </Button>
+                  {canManageLocales && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      className="hidden group-hover:flex"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditDialog(locale);
+                      }}
+                    >
+                      <Icon name="more" className="size-3" />
+                    </Button>
+                  )}
                 </div>
               );
             })}

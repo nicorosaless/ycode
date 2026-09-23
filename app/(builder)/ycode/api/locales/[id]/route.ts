@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLocaleById, updateLocale, deleteLocale } from '@/lib/repositories/localeRepository';
+import { parseUpdateLocale } from '@/lib/locale-input';
 
 /**
  * GET /ycode/api/locales/[id]
@@ -37,18 +38,14 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { code, label, is_default } = body;
-    
-    const updates: any = {};
-    if (code !== undefined) updates.code = code;
-    if (label !== undefined) updates.label = label;
-    if (is_default !== undefined) updates.is_default = is_default;
-    
+    const updates = parseUpdateLocale(await request.json());
     const { locale, locales } = await updateLocale(id, updates);
     
     return NextResponse.json({ data: { locale, locales } });
   } catch (error) {
+    if (error instanceof SyntaxError || (error instanceof Error && error.name === 'ZodError')) {
+      return NextResponse.json({ error: 'Invalid locale update' }, { status: 400 });
+    }
     console.error('Error updating locale:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update locale' },

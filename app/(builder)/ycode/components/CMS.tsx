@@ -44,6 +44,8 @@ import { extractPlainTextFromTiptap } from '@/lib/tiptap-utils';
 import { extractCrossCollectionItemIds, parseCollectionLinkValue, resolveCollectionLinkValue } from '@/lib/link-utils';
 import { useEditorUrl } from '@/hooks/use-editor-url';
 import { useRole } from '@/hooks/use-role';
+import { buildDynamicPageUrl } from '@/lib/page-utils';
+import { StructureEditorOnly } from './CustomerWorkspaceAccess';
 import FieldsDropdown from './FieldsDropdown';
 import AirtableSyncButton from './AirtableSyncButton';
 import CollectionItemContextMenu from './CollectionItemContextMenu';
@@ -122,12 +124,13 @@ interface SortableRowProps {
   onSetAsDraft: () => void;
   onStageForPublish: () => void;
   onSetAsPublished: () => void;
+  allowDirectPublish?: boolean;
   onDuplicate: () => void;
   onDelete: () => void;
   lockInfo?: ItemLockInfo;
 }
 
-function SortableRow({ item, isSaving, isAiActive, isManualMode, isCollectionPublished, children, statusValue, onEdit, onSetAsDraft, onStageForPublish, onSetAsPublished, onDuplicate, onDelete, lockInfo }: SortableRowProps) {
+function SortableRow({ item, isSaving, isAiActive, isManualMode, isCollectionPublished, children, statusValue, onEdit, onSetAsDraft, onStageForPublish, onSetAsPublished, allowDirectPublish = true, onDuplicate, onDelete, lockInfo }: SortableRowProps) {
   const {
     attributes,
     listeners,
@@ -160,6 +163,7 @@ function SortableRow({ item, isSaving, isAiActive, isManualMode, isCollectionPub
       onSetAsDraft={onSetAsDraft}
       onStageForPublish={onStageForPublish}
       onSetAsPublished={onSetAsPublished}
+      allowDirectPublish={allowDirectPublish}
       onDuplicate={onDuplicate}
       onDelete={onDelete}
       disabled={isSaving}
@@ -352,7 +356,7 @@ function SortableCollectionItem({
   );
 }
 
-const CMS = React.memo(function CMS() {
+const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: boolean }) {
   const {
     selectedCollectionId,
     setSelectedCollectionId,
@@ -405,12 +409,14 @@ const CMS = React.memo(function CMS() {
   const getAsset = useAssetsStore((state) => state.getAsset);
   const pages = usePagesStore((state) => state.pages);
   const folders = usePagesStore((state) => state.folders);
+  const loadPages = usePagesStore((state) => state.loadPages);
   const timezone = useSettingsStore((state) => state.settingsByKey.timezone as string | null) ?? 'UTC';
   const refetchLayersForCollection = useCollectionLayerStore((state) => state.refetchLayersForCollection);
   const invalidateLayerData = useCollectionLayerStore((state) => state.invalidateLayerData);
 
   const { urlState, navigateToCollection, navigateToCollectionItem, navigateToNewCollectionItem, navigateToCollections } = useEditorUrl();
-  const { canEditStructure: canManageSchema } = useRole();
+  const { canEditStructure, role } = useRole();
+  const canManageSchema = canEditStructure || rin5Customer;
 
   // Track previous collection ID to prevent unnecessary reloads
   const prevCollectionIdRef = React.useRef<string | null>(null);
@@ -421,6 +427,7 @@ const CMS = React.memo(function CMS() {
   const [currentPage, setCurrentPage] = useState(urlState.page || 1);
   const [pageSize, setPageSize] = useState(urlState.pageSize || 25);
   const [showItemSheet, setShowItemSheet] = useState(false);
+  const [isCreatingCmsPage, setIsCreatingCmsPage] = useState(false);
   const [editingItem, setEditingItem] = useState<CollectionItemWithValues | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
@@ -488,6 +495,17 @@ const CMS = React.memo(function CMS() {
     () => (selectedCollectionId ? (items[selectedCollectionId] || []) : []),
     [selectedCollectionId, items]
   );
+  const cmsItemUrl = useMemo(() => {
+    if (!selectedCollectionId) return null;
+    const page = pages.find((candidate) => (
+      candidate.is_dynamic && candidate.settings?.cms?.collection_id === selectedCollectionId
+    ));
+    const slugField = collectionFields.find((field) => field.key === 'slug');
+    const slug = slugField && collectionItems[0]?.values[slugField.id];
+    return page && typeof slug === 'string' && slug
+      ? buildDynamicPageUrl(page, folders, slug)
+      : null;
+  }, [collectionFields, collectionItems, folders, pages, selectedCollectionId]);
   const totalItems = selectedCollectionId ? (itemsTotalCount[selectedCollectionId] || 0) : 0;
 
   // Build slug map across ALL loaded collections for cross-collection link resolution
@@ -902,6 +920,30 @@ const CMS = React.memo(function CMS() {
       setEditingItem(null);
       setShowItemSheet(true);
       navigateToNewCollectionItem(selectedCollectionId);
+    }
+  };
+
+  const handleCreateCmsPage = async () => {
+    if (!selectedCollectionId || isCreatingCmsPage) return;
+    setIsCreatingCmsPage(true);
+    try {
+      const response = await fetch('/ycode/api/rin5/cms/pages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ collectionId: selectedCollectionId }),
+      });
+      const result = await response.json() as { data?: { pathPattern?: string }; error?: string };
+      if (!response.ok) throw new Error(result.error || 'No se pudo crear la página CMS');
+      await loadPages();
+      toast.success('Página CMS preparada', {
+        description: `Cada elemento se publicará en ${result.data?.pathPattern || '/{slug}'}.`,
+      });
+    } catch (error) {
+      toast.error('No se pudo preparar la página CMS', {
+        description: error instanceof Error ? error.message : 'Vuelve a intentarlo.',
+      });
+    } finally {
+      setIsCreatingCmsPage(false);
     }
   };
 
@@ -1690,6 +1732,7 @@ const CMS = React.memo(function CMS() {
                     isAiActive={aiActiveItemIds.includes(item.id)}
                     isManualMode={isManualMode}
                     isCollectionPublished={selectedCollection?.has_published_version ?? false}
+                    allowDirectPublish={canEditStructure}
                     statusValue={statusFieldId ? parseStatusValue(item.values[statusFieldId]) : null}
                     onEdit={() => handleEditItem(item)}
                     onSetAsDraft={() => handleSetItemStatus(item.id, 'draft')}
@@ -2129,23 +2172,27 @@ const CMS = React.memo(function CMS() {
             <DropdownMenuItem onClick={handleCreateCollection}>
               New collection
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                Samples
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {getSampleCollectionOptions().map(option => (
-                  <DropdownMenuItem
-                    key={option.id}
-                    onClick={() => handleCreateSampleCollection(option.id)}
-                  >
-                    <Icon name="database" className="size-3 shrink-0" />
-                    {option.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            {!rin5Customer && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    Samples
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {getSampleCollectionOptions().map(option => (
+                      <DropdownMenuItem
+                        key={option.id}
+                        onClick={() => handleCreateSampleCollection(option.id)}
+                      >
+                        <Icon name="database" className="size-3 shrink-0" />
+                        {option.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         )}
@@ -2205,7 +2252,7 @@ const CMS = React.memo(function CMS() {
     return (
       <div className="flex-1 bg-background flex min-w-0">
         {collectionsSidebar}
-        <GlobalsManager canManageSchema={canManageSchema} timezone={timezone} />
+        <GlobalsManager canManageSchema={canEditStructure} timezone={timezone} />
       </div>
     );
   }
@@ -2280,7 +2327,7 @@ const CMS = React.memo(function CMS() {
             </Button>
           )}
 
-          {selectedCollectionId && (
+          {selectedCollectionId && canEditStructure && (
             <AirtableSyncButton
               collectionId={selectedCollectionId}
               onSyncComplete={() => loadItems(selectedCollectionId, currentPage, pageSize, currentSortBy, currentSortOrder)}
@@ -2297,15 +2344,46 @@ const CMS = React.memo(function CMS() {
           />
           )}
 
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setImportDialogOpen(true)}
-            disabled={!selectedCollectionId || collectionFields.length === 0}
-          >
-            <Icon name="upload" />
-            Import
-          </Button>
+          {rin5Customer && selectedCollectionId && collectionFields.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleCreateCmsPage}
+              disabled={isCreatingCmsPage}
+            >
+              <Icon name="page" />
+              {isCreatingCmsPage ? 'Preparando…' : 'Crear página CMS'}
+            </Button>
+          )}
+
+          {rin5Customer && cmsItemUrl && (
+            <Button
+              size="sm"
+              variant="ghost"
+              asChild
+            >
+              <a
+                href={cmsItemUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Icon name="external-link" />
+                Ver {cmsItemUrl}
+              </a>
+            </Button>
+          )}
+
+          <StructureEditorOnly role={role}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setImportDialogOpen(true)}
+              disabled={!selectedCollectionId || collectionFields.length === 0}
+            >
+              <Icon name="upload" />
+              Import
+            </Button>
+          </StructureEditorOnly>
 
           <Button
             size="sm"
@@ -2376,6 +2454,7 @@ const CMS = React.memo(function CMS() {
           }}
           collectionId={selectedCollectionId!}
           itemId={editingItem?.id || null}
+          allowDirectPublish={canEditStructure}
           onSuccess={() => {
             setShowItemSheet(false);
             setEditingItem(null);

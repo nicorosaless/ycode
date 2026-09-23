@@ -75,6 +75,7 @@ import { useTreeDragDrop } from '@/hooks/use-tree-drag-drop';
 import { toast } from 'sonner';
 import type { AffectedPageEntity, AffectedComponentEntity } from '@/lib/asset-usage-utils';
 import { fetchRemixIcons, type RemixIcon, type RemixIconCategory } from '@/lib/remix-icons-api';
+import { createAssetLoadGuard } from './file-manager-load';
 
 /** Virtual folder IDs for the icon library tree */
 const VIRTUAL_LIBRARIES_ID = '__libraries__';
@@ -620,7 +621,7 @@ export default function FileManagerDialog({
   const ASSETS_PER_PAGE = 50;
 
   // Refs for stable IntersectionObserver callback (avoids recreating observer on every state change)
-  const isLoadingAssetsRef = useRef(false);
+  const assetLoadGuardRef = useRef(createAssetLoadGuard());
   const hasMoreAssetsRef = useRef(true);
   const currentPageRef = useRef(1);
 
@@ -759,10 +760,10 @@ export default function FileManagerDialog({
 
   // Load assets when folder, search, or category changes
   const loadAssets = useCallback(async (page: number, reset: boolean = false) => {
-    if (isLoadingAssetsRef.current && !reset) return;
+    const requestId = assetLoadGuardRef.current.start(reset);
+    if (requestId === null) return;
 
     setIsLoadingAssets(true);
-    isLoadingAssetsRef.current = true;
 
     try {
       // Build folder IDs for search (include descendants)
@@ -792,6 +793,10 @@ export default function FileManagerDialog({
           page: currentFetchPage,
           limit: ASSETS_PER_PAGE,
         });
+
+        // A folder, search, or category reset may have started while this
+        // request was in flight. Only the newest reset may update the grid.
+        if (!assetLoadGuardRef.current.isCurrent(requestId)) return;
 
         hasMore = result.hasMore;
 
@@ -826,10 +831,13 @@ export default function FileManagerDialog({
         currentFetchPage++;
       }
     } catch (error) {
-      console.error('Failed to load assets:', error);
+      if (assetLoadGuardRef.current.isCurrent(requestId)) {
+        console.error('Failed to load assets:', error);
+      }
     } finally {
-      setIsLoadingAssets(false);
-      isLoadingAssetsRef.current = false;
+      if (assetLoadGuardRef.current.finish(requestId)) {
+        setIsLoadingAssets(false);
+      }
     }
   }, [fetchAssets, selectedFolderId, debouncedSearch, selectedCategories, getAllDescendantFolderIds]);
 
@@ -860,7 +868,7 @@ export default function FileManagerDialog({
         if (
           entries[0].isIntersecting &&
           hasMoreAssetsRef.current &&
-          !isLoadingAssetsRef.current
+          !assetLoadGuardRef.current.isLoading()
         ) {
           loadAssetsRef.current(currentPageRef.current + 1);
         }

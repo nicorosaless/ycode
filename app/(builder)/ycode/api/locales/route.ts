@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllLocales, createLocale } from '@/lib/repositories/localeRepository';
+import { parseCreateLocale } from '@/lib/locale-input';
 
 /**
  * GET /ycode/api/locales
@@ -25,20 +26,14 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { code, label, is_default } = body;
-    
-    if (!code || !label) {
-      return NextResponse.json(
-        { error: 'Missing required fields: code, label' },
-        { status: 400 }
-      );
-    }
-    
-    const { locale, locales } = await createLocale({ code, label, is_default });
+    const localeData = parseCreateLocale(await request.json());
+    const { locale, locales } = await createLocale(localeData);
     
     return NextResponse.json({ data: { locale, locales } }, { status: 201 });
   } catch (error) {
+    if (error instanceof SyntaxError || (error instanceof Error && error.name === 'ZodError')) {
+      return NextResponse.json({ error: 'Invalid locale' }, { status: 400 });
+    }
     console.error('Error creating locale:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create locale' },
