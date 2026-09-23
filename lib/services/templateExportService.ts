@@ -1,11 +1,7 @@
 import { getKnexClient, closeKnexClient, testKnexConnection } from '../knex-client';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET } from '@/lib/asset-constants';
+import { getStorageBucket } from '@/lib/asset-constants';
 import { YCODE_EXTERNAL_API_URL } from '@/lib/config';
-
-// API key for uploading templates to the shared template service
-const TEMPLATE_UPLOAD_API_KEY =
-  process.env.TEMPLATE_UPLOAD_API_KEY || 'f0c716a7-c78e-467d-81c2-cbe774659e60';
 
 /**
  * Tables to export (order matters for foreign key constraints).
@@ -473,7 +469,7 @@ export async function collectTemplateAssets(): Promise<
   for (const asset of assets) {
     try {
       const { data, error: downloadError } = await client.storage
-        .from(STORAGE_BUCKET)
+        .from(getStorageBucket())
         .download(asset.storage_path);
 
       if (downloadError || !data) {
@@ -512,7 +508,7 @@ export async function collectTemplateAssets(): Promise<
     for (const font of fonts) {
       try {
         const { data, error: downloadError } = await client.storage
-          .from(STORAGE_BUCKET)
+          .from(getStorageBucket())
           .download(font.storage_path);
 
         if (downloadError || !data) {
@@ -547,6 +543,10 @@ export async function exportAndUploadTemplate(
   submitterEmail = ''
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const templateUploadApiKey = process.env.TEMPLATE_UPLOAD_API_KEY;
+    if (!templateUploadApiKey) {
+      return { success: false, error: 'Template upload is not configured' };
+    }
     // 1. Generate export
     const exportResult = await exportTemplateSQL(
       templateId,
@@ -567,7 +567,7 @@ export async function exportAndUploadTemplate(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': TEMPLATE_UPLOAD_API_KEY,
+        'x-api-key': templateUploadApiKey,
       },
       body: JSON.stringify({
         manifest: exportResult.manifest,

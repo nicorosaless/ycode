@@ -23,6 +23,7 @@ import { getPublishedFonts } from '@/lib/repositories/fontRepository'
 import { getSettingByKey } from '@/lib/repositories/settingsRepository'
 import { getTranslationsByLocale } from '@/lib/repositories/translationRepository'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
+import { buildLocalizedSlugPath, buildSlugPath } from '@/lib/page-utils'
 
 import type { Locale, Page, PageFolder } from '@/types'
 
@@ -47,6 +48,7 @@ import { contentTypeFor, type OutputFile, type Writer } from './writers/types'
 import { createGithubWriter } from './writers/github'
 import { createLocalWriter } from './writers/local'
 import { createS3Writer } from './writers/s3'
+import { localizeKnownPageLinks, relativizePaths } from './path-rewriter'
 
 /**
  * Convert absolute paths to document-relative paths so exported HTML works
@@ -59,34 +61,6 @@ import { createS3Writer } from './writers/s3'
  *
  * Handles both bundled asset paths and internal page links.
  */
-const ABSOLUTE_ASSET_RE = /(?<=["'\s,=(])\/(?=a\/[A-Za-z0-9]{22}\/|assets\/|ycode\/layouts\/assets\/|swiper-minimal\.css)/g
-const INTERNAL_LINK_RE = /href="\/([^"]*?)"/g
-
-function relativizePaths(html: string, outputKey: string): string {
-  const depth = outputKey.split('/').length - 1
-  const prefix = depth === 0 ? './' : '../'.repeat(depth)
-
-  let result = html.replace(ABSOLUTE_ASSET_RE, prefix)
-
-  result = result.replace(INTERNAL_LINK_RE, (_match, path: string) => {
-    if (/^a\/[A-Za-z0-9]{22}\//.test(path)) return `href="${prefix}${path}"`
-    if (path.startsWith('ycode/layouts/assets/')) return `href="${prefix}${path}"`
-    // `assets/…` only appears under RIN5_EXPORT_ORIGINAL_ASSETS; it's a file,
-    // not a route, so it must not grow an `/index.html`.
-    if (path.startsWith('assets/')) return `href="${prefix}${path}"`
-
-    const hashIdx = path.indexOf('#')
-    const pathPart = hashIdx >= 0 ? path.slice(0, hashIdx) : path
-    const hash = hashIdx >= 0 ? path.slice(hashIdx) : ''
-    const trimmed = pathPart.replace(/^\/+/, '').replace(/\/+$/, '')
-
-    if (!trimmed) return `href="${prefix}index.html${hash}"`
-    return `href="${prefix}${trimmed}/index.html${hash}"`
-  })
-
-  return result
-}
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 async function resolvePageOgImage(page: Page): Promise<string | null> {
@@ -236,6 +210,16 @@ export async function exportSite(presetJobId?: string, overrideWriters?: readonl
     const referencedAssetPaths = new Set<string>()
 
     const renderPage = async (page: Page, ctx: LocaleContext): Promise<void> => {
+      const localizedPageRoutes = new Map<string, string>()
+      if (ctx.locale && !ctx.locale.is_default) {
+        for (const knownPage of pages) {
+          if (knownPage.is_dynamic || knownPage.error_page != null) continue
+          localizedPageRoutes.set(
+            buildSlugPath(knownPage, folders, 'page'),
+            buildLocalizedSlugPath(knownPage, folders, 'page', ctx.locale, ctx.translations),
+          )
+        }
+      }
       let yieldedAny = false
       const ogImageUrl = await resolvePageOgImage(page)
       try {
@@ -277,7 +261,8 @@ export async function exportSite(presetJobId?: string, overrideWriters?: readonl
             referencedAssetPaths.add(SWIPER_CSS_PATH)
           }
 
-          const finalHtml = relativizePaths(html, resolved.outputKey)
+          const localizedHtml = localizeKnownPageLinks(html, localizedPageRoutes)
+          const finalHtml = relativizePaths(localizedHtml, resolved.outputKey)
 
           outputs.push({
             key: resolved.outputKey,

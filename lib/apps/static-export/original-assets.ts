@@ -20,6 +20,7 @@
  */
 
 import { getAssetProxyUrl } from '@/lib/asset-utils'
+import { escapeCssSelectorPath } from './path-rewriter'
 
 /** Minimal asset row shape this module needs. */
 export interface AssetRow {
@@ -33,7 +34,7 @@ export interface AssetRow {
 export interface OriginalAsset {
   filename: string
   mimeType: string
-  publicUrl: string
+  storagePath: string
   /** Output path in the exported bundle — mirrors the input bundle's `assets/` folder. */
   outputKey: string
 }
@@ -65,7 +66,7 @@ export function buildOriginalAssetMap(assets: readonly AssetRow[]): Map<string, 
     map.set(proxyPath, {
       filename: asset.filename,
       mimeType: asset.mime_type,
-      publicUrl: asset.public_url,
+      storagePath: asset.storage_path,
       outputKey: `assets/${asset.filename}`,
     })
   }
@@ -99,9 +100,20 @@ export function rewriteToOriginalAssets(html: string, assets: Map<string, Origin
     return asset ? `/${asset.outputKey}` : match
   })
 
+  // Tailwind arbitrary-value utilities repeat the URL in both the class name
+  // and its escaped CSS selector. The plain rewrite above updates the class
+  // and declaration; update the selector too so it still matches that class.
+  let withMatchingSelectors = withOriginalSrcs
+  for (const [proxyPath, asset] of assets) {
+    withMatchingSelectors = withMatchingSelectors.replaceAll(
+      escapeCssSelectorPath(proxyPath),
+      escapeCssSelectorPath(`/${asset.outputKey}`),
+    )
+  }
+
   // `srcset`/`sizes` must go, not just be rewritten: leaving seven candidates
   // that all resolve to the same file still lets the browser pick by DPR, and
   // `sizes` would keep driving the layout width off Ycode's guess rather than
   // the source stylesheet's.
-  return withOriginalSrcs.replace(REWRITTEN_IMG_RE, (tag) => tag.replace(SRCSET_OR_SIZES_RE, ''))
+  return withMatchingSelectors.replace(REWRITTEN_IMG_RE, (tag) => tag.replace(SRCSET_OR_SIZES_RE, ''))
 }

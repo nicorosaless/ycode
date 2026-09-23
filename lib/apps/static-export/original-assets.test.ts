@@ -77,6 +77,22 @@ test('rewriteToOriginalAssets: rewrites CSS url() references too, not just <img>
   assert.match(out, new RegExp(`url\\(/assets/${asset.filename.replace('.', '\\.')}\\)`));
 });
 
+test('rewriteToOriginalAssets: keeps an arbitrary background class matched after rewriting its asset URL', () => {
+  const map = buildOriginalAssetMap(ASSETS);
+  const [proxyPath, asset] = [...map.entries()][0];
+  const escapedProxyPath = proxyPath.replaceAll('/', String.raw`\/`).replaceAll('.', String.raw`\.`);
+  const html = [
+    `<style>.\\[background\\:url\\(${escapedProxyPath}\\)_center\\] { background: url(${proxyPath}); }</style>`,
+    `<div class="[background:url(${proxyPath})_center]"></div>`,
+  ].join('');
+
+  const out = rewriteToOriginalAssets(html, map);
+  const escapedOutputPath = `/${asset.outputKey}`.replaceAll('/', String.raw`\/`).replaceAll('.', String.raw`\.`);
+
+  assert.ok(out.includes(`.\\[background\\:url\\(${escapedOutputPath}\\)_center\\]`));
+  assert.ok(out.includes(`class="[background:url(/${asset.outputKey})_center]"`));
+});
+
 test('rewriteToOriginalAssets: an unmapped proxy URL is left exactly as it was', () => {
   const map = buildOriginalAssetMap(ASSETS);
   const html = '<img src="/a/AAAAAAAAAAAAAAAAAAAAAA/other.jpg?width=640&amp;quality=85" srcset="x 1w" />';

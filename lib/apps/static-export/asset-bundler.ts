@@ -17,7 +17,9 @@ import fs from 'fs/promises'
 import path from 'path'
 
 import { base62ToUuid } from '@/lib/convertion-utils'
+import { getStorageBucket } from '@/lib/asset-constants'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
+import { isStoragePathOwnedByTenant } from '@/lib/tenant'
 
 import type { OriginalAsset } from './original-assets'
 import { mediaContentType, type OutputFile } from './writers/types'
@@ -40,12 +42,17 @@ interface SupabaseAssetClient {
         eq(col: string, val: unknown): {
           is(col: string, val: unknown): {
             maybeSingle(): Promise<{
-              data: { id: string; filename: string; mime_type: string; public_url: string | null } | null
+              data: { id: string; filename: string; mime_type: string; storage_path: string | null } | null
               error: { message: string } | null
             }>
           }
         }
       }
+    }
+  }
+  storage: {
+    from(bucket: string): {
+      download(path: string): Promise<{ data: Blob | null; error: { message: string } | null }>
     }
   }
 }
@@ -97,24 +104,29 @@ async function fetchAssetByProxyUrl(
 
   const { data: asset, error } = await client
     .from('assets')
-    .select('id, filename, mime_type, public_url')
+    .select('id, filename, mime_type, storage_path')
     .eq('id', assetId)
     .eq('is_published', true)
     .is('deleted_at', null)
     .maybeSingle()
 
-  if (error || !asset?.public_url) {
+  if (error || !asset?.storage_path) {
     console.warn(`[Static Export] Could not look up asset for ${proxyUrl}: ${error?.message ?? 'not found'}`)
     return null
   }
 
+  if (!isStoragePathOwnedByTenant(asset.storage_path)) {
+    console.warn(`[Static Export] Refusing storage path outside this tenant for ${proxyUrl}`)
+    return null
+  }
+
   try {
-    const response = await fetch(asset.public_url)
-    if (!response.ok) {
-      console.warn(`[Static Export] HTTP ${response.status} fetching ${asset.filename}`)
+    const download = await client.storage.from(getStorageBucket()).download(asset.storage_path)
+    if (download.error || !download.data) {
+      console.warn(`[Static Export] Storage fetch failed for ${asset.filename}: ${download.error?.message ?? 'not found'}`)
       return null
     }
-    const buf = Buffer.from(await response.arrayBuffer())
+    const buf = Buffer.from(await download.data.arrayBuffer())
     return {
       key: proxyUrl.replace(/^\/+/, ''),
       body: buf,
@@ -174,21 +186,28 @@ export async function collectOriginalAssets(
   }
   if (wanted.size === 0) return []
 
+  const client = await getSupabaseAdmin()
+  if (!client) throw new Error('Supabase client not configured')
+
   const queue = Array.from(wanted.values())
   const results: OutputFile[] = []
   let cursor = 0
   const workers = Array.from({ length: Math.min(PROXY_FETCH_CONCURRENCY, queue.length) }, async () => {
     while (cursor < queue.length) {
       const asset = queue[cursor++]
+      if (!isStoragePathOwnedByTenant(asset.storagePath)) {
+        console.warn(`[Static Export] Refusing storage path outside this tenant for ${asset.outputKey}`)
+        continue
+      }
       try {
-        const response = await fetch(asset.publicUrl)
-        if (!response.ok) {
-          console.warn(`[Static Export] HTTP ${response.status} fetching ${asset.filename}`)
+        const download = await client.storage.from(getStorageBucket()).download(asset.storagePath)
+        if (download.error || !download.data) {
+          console.warn(`[Static Export] Storage fetch failed for ${asset.filename}: ${download.error?.message ?? 'not found'}`)
           continue
         }
         results.push({
           key: asset.outputKey,
-          body: Buffer.from(await response.arrayBuffer()),
+          body: Buffer.from(await download.data.arrayBuffer()),
           contentType: asset.mimeType || mediaContentType(asset.outputKey),
         })
       } catch (err) {

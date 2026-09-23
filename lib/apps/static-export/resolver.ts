@@ -28,7 +28,7 @@ import {
   renderPageBody,
   type ExportedInteraction,
 } from './document'
-import { computeOutputKey } from './paths'
+import { buildStaticCmsItemPath, computeOutputKey } from './paths'
 
 export interface ResolvedPage {
   page: Page
@@ -117,7 +117,6 @@ export async function* resolvePages(
 
   // --- Dynamic CMS pages ---------------------------------------------------
   if (page.is_dynamic) {
-    if (!isDefaultLocale) return
     const cms = (page.settings as { cms?: PageCmsSettings } | undefined)?.cms
     if (!cms?.collection_id || !cms.slug_field_id) {
       console.warn(`[Static Export] Dynamic page "${page.name}" has no CMS config — skipping`)
@@ -131,8 +130,14 @@ export async function* resolvePages(
     for (const row of slugValues) {
       const itemSlug = typeof row.value === 'string' ? row.value : String(row.value ?? '')
       if (!itemSlug) continue
-      const pattern = buildSlugPath(page, folders, 'page', '{slug}')
-      const slugPath = pattern.replace(/\{slug\}/g, itemSlug).replace(/^\/+/, '')
+      const slugPath = buildStaticCmsItemPath({
+        page,
+        folders,
+        itemId: row.item_id,
+        defaultSlug: itemSlug,
+        locale: ctx.locale,
+        translations: ctx.translations,
+      })
       const data = await fetchPageByPath(slugPath, true)
       if (!data?.pageLayers?.layers) {
         console.warn(`[Static Export] Could not resolve "${page.name}" item "${itemSlug}"`)
