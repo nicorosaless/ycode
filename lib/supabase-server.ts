@@ -6,6 +6,8 @@ import { parseSupabaseConfig } from './supabase-config-parser';
 import { dbSchemaForClient, resolveDbSchema } from './tenant';
 import type { SupabaseConfig, SupabaseCredentials } from '@/types';
 import { withLimit } from './supabase-limiter';
+import { currentRin5ExportToken } from './rin5-export-context';
+import { createSupabaseServerFetch } from './supabase-server-fetch';
 
 /**
  * Supabase Server Client
@@ -71,13 +73,26 @@ export async function getSupabaseAdmin(tenantId?: string): Promise<SupabaseClien
   }
 
   const schema = resolveDbSchema();
-  const credKey = `${creds.projectUrl}:${creds.serviceRoleKey}:${schema}`;
+  const exportToken = currentRin5ExportToken();
+  const internalUrl = process.env.SUPABASE_INTERNAL_URL;
+  // Keep capture clients separate from the ordinary cached admin client. In
+  // development, HMR can leave the cached client closing over an older
+  // AsyncLocalStorage module; binding the capability to this client also makes
+  // delayed PostgREST writes observe the same export snapshot token.
+  const credKey = `${creds.projectUrl}:${creds.serviceRoleKey}:${schema}:${exportToken ?? ''}:${internalUrl ?? ''}`;
   if (globalForSupabase.__supabaseClient && globalForSupabase.__supabaseCredKey === credKey) {
     return globalForSupabase.__supabaseClient;
   }
 
-  const limitedFetch: typeof globalThis.fetch = (input, init) =>
-    withLimit(() => globalThis.fetch(input, init));
+  const limitedFetch: typeof globalThis.fetch = (input, init) => withLimit(() => {
+    const token = currentRin5ExportToken();
+    if (!token) return globalThis.fetch(input, init);
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init?.headers).forEach((value, name) => headers.set(name, value));
+    headers.set('x-rin5-export-token', token);
+    return globalThis.fetch(input, { ...init, headers });
+  });
+  const serverFetch = createSupabaseServerFetch(creds.projectUrl, internalUrl, limitedFetch);
 
   globalForSupabase.__supabaseClient = createClient(creds.projectUrl, creds.serviceRoleKey, {
     auth: {
@@ -87,7 +102,10 @@ export async function getSupabaseAdmin(tenantId?: string): Promise<SupabaseClien
     // Every table this client touches lives in the tenant's schema, which
     // PostgREST only reaches if it is listed in PGRST_DB_SCHEMAS.
     db: { schema: dbSchemaForClient() },
-    global: { fetch: limitedFetch },
+    global: {
+      fetch: serverFetch,
+      headers: exportToken ? { 'x-rin5-export-token': exportToken } : undefined,
+    },
   });
 
   globalForSupabase.__supabaseCredKey = credKey;
@@ -110,6 +128,7 @@ export async function testSupabaseConnection(
         persistSession: false,
       },
       db: { schema: dbSchemaForClient() },
+      global: { fetch: createSupabaseServerFetch(parsed.projectUrl) },
     });
 
     const { error } = await client.auth.admin.listUsers({

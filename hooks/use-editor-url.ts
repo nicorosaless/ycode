@@ -39,7 +39,7 @@ export function updateUrlQueryParam(key: string, value: string | null | undefine
  * Handles routing for pages, collections, and components with semantic routes
  */
 
-export type EditorRouteType = 'page' | 'layers' | 'collection' | 'collections-base' | 'component' | 'settings' | 'localization' | 'profile' | 'forms' | 'integrations' | null;
+export type EditorRouteType = 'page' | 'layers' | 'collection' | 'collections-base' | 'component' | 'settings' | 'site-settings' | 'localization' | 'profile' | 'forms' | 'integrations' | null;
 export type PageSettingsTab = 'general' | 'seo' | 'custom-code';
 export type EditorTab = 'layers' | 'pages' | 'cms';
 
@@ -80,6 +80,7 @@ export function useEditorUrl() {
     const collectionMatch = pathname?.match(/^\/ycode\/collections\/([^/]+)$/);
     const componentMatch = pathname?.match(/^\/ycode\/components\/([^/]+)$/);
     const settingsMatch = pathname?.match(/^\/ycode\/settings(?:\/([^/]+))?$/);
+    const siteSettingsMatch = pathname === '/ycode/site-settings';
     const localizationMatch = pathname?.match(/^\/ycode\/localization(?:\/([^/]+))?$/);
     const profileMatch = pathname?.match(/^\/ycode\/profile(?:\/([^/]+))?$/);
 
@@ -150,6 +151,12 @@ export function useEditorUrl() {
         pageSize: limitParam ? parseInt(limitParam, 10) : null,
         search: searchParam || null,
         sidebarTab: 'cms', // Inferred: collections show CMS sidebar
+      };
+    }
+
+    if (siteSettingsMatch) {
+      return {
+        type: 'site-settings', resourceId: null, tab: null, page: null, sidebarTab: 'pages',
       };
     }
 

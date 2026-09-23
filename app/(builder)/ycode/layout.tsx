@@ -1,4 +1,5 @@
 import YCodeLayoutClient from './YCodeLayoutClient';
+import { resolveRin5Navigation } from '@/lib/rin5-navigation';
 
 /**
  * YCode Editor Layout (Server Component)
@@ -14,5 +15,6 @@ import YCodeLayoutClient from './YCodeLayoutClient';
 export const dynamic = 'force-dynamic';
 
 export default function YCodeLayout({ children }: { children: React.ReactNode }) {
-  return <YCodeLayoutClient>{children}</YCodeLayoutClient>;
+  const rin5Navigation = resolveRin5Navigation(process.env);
+  return <YCodeLayoutClient rin5Navigation={rin5Navigation}>{children}</YCodeLayoutClient>;
 }

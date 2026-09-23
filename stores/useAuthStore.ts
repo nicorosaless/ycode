@@ -59,12 +59,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Validate session server-side (getUser verifies the JWT, unlike getSession)
       const { data: { user } } = await supabase.auth.getUser();
 
-      if (user) {
-        // Refresh the session so the JWT contains the latest app_metadata
-        // (role changes via Admin API don't update existing JWTs)
-        await supabase.auth.refreshSession();
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
 
       set({

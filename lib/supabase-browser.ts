@@ -11,12 +11,14 @@
 
 import { createBrowserClient as createSupabaseBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { configureBrowserStorageBucket } from '@/lib/asset-constants';
 
 /** Shape of `/ycode/api/supabase/config`. `schema` is the tenant's Postgres schema. */
 interface BrowserSupabaseConfig {
   url: string;
   anonKey: string;
   schema?: string;
+  storageBucket: string;
 }
 
 let browserClient: SupabaseClient | null = null;
@@ -75,6 +77,7 @@ async function getOrCreateClient(): Promise<SupabaseClient | null> {
 
   const config = await getSupabaseConfig();
   if (!config) return null;
+  configureBrowserStorageBucket(config.storageBucket);
 
   // The schema is a runtime value; see `dbSchemaForClient` in lib/tenant.ts
   // for why the generic is asserted back to the default instead of threaded.

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { authorizeRin5InternalRequest, parseRin5EditorBaseUrl, parseRin5ExportRequest, parseRin5HandoffRequest } from './rin5-internal-auth'
+import {
+  authorizeRin5InternalRequest,
+  parseRin5EditorBaseUrl,
+  parseRin5ExportRequest,
+  parseRin5HandoffDestination,
+  parseRin5HandoffRequest,
+} from './rin5-internal-auth'
 
 describe('rin5 internal API boundary', () => {
   it('accepts only the configured bearer secret', () => {
@@ -13,9 +19,14 @@ describe('rin5 internal API boundary', () => {
 
   it('binds an export request to the instance site', () => {
     const siteId = '123e4567-e89b-42d3-a456-426614174000'
-    assert.deepEqual(parseRin5ExportRequest({ siteId }, siteId), { siteId })
+    const actorUserId = '223e4567-e89b-42d3-a456-426614174000'
+    const requestId = '323e4567-e89b-42d3-a456-426614174000'
+    const sourceRevisionId = '423e4567-e89b-42d3-a456-426614174000'
+    assert.deepEqual(parseRin5ExportRequest({ actorUserId, requestId, siteId, sourceRevisionId }, siteId), {
+      actorUserId, requestId, siteId, sourceRevisionId,
+    })
     assert.throws(
-      () => parseRin5ExportRequest({ siteId: '223e4567-e89b-42d3-a456-426614174000' }, siteId),
+      () => parseRin5ExportRequest({ actorUserId, requestId, siteId: '523e4567-e89b-42d3-a456-426614174000', sourceRevisionId }, siteId),
       /rin5_site_mismatch/,
     )
     assert.throws(() => parseRin5ExportRequest({}, siteId), /rin5_export_request_invalid/)
@@ -23,17 +34,35 @@ describe('rin5 internal API boundary', () => {
 
   it('accepts a normalized handoff email only for the instance site', () => {
     const siteId = '123e4567-e89b-42d3-a456-426614174000'
-    assert.deepEqual(parseRin5HandoffRequest({ siteId, email: ' Client@Example.com ' }, siteId), {
+    assert.deepEqual(parseRin5HandoffRequest({ siteId, email: ' Client@Example.com ', destination: 'cms' }, siteId), {
+      destination: 'cms',
       email: 'client@example.com',
       siteId,
     })
+    assert.equal(parseRin5HandoffRequest({ siteId, email: 'client@example.com' }, siteId).destination, 'canvas')
     assert.throws(() => parseRin5HandoffRequest({ siteId, email: 'invalid' }, siteId), /rin5_handoff_request_invalid/)
+    assert.throws(
+      () => parseRin5HandoffRequest({ siteId, email: 'client@example.com', destination: 'https://evil.example' }, siteId),
+      /rin5_handoff_destination_invalid/,
+    )
+  })
+
+  it('maps handoff destinations to exact editor routes', () => {
+    assert.equal(parseRin5HandoffDestination('canvas').path, '/ycode')
+    assert.equal(parseRin5HandoffDestination('cms').path, '/ycode/collections')
+    assert.equal(parseRin5HandoffDestination('localization').path, '/ycode/localization')
+    assert.equal(parseRin5HandoffDestination('general').path, '/ycode/site-settings')
+    assert.throws(() => parseRin5HandoffDestination('/ycode/settings/general'), /rin5_handoff_destination_invalid/)
   })
 
   it('requires a safe editor origin for magic-link redirects', () => {
     assert.equal(parseRin5EditorBaseUrl('https://edit.example.test'), 'https://edit.example.test')
     assert.equal(parseRin5EditorBaseUrl('http://127.0.0.1:3002'), 'http://127.0.0.1:3002')
+    assert.equal(parseRin5EditorBaseUrl('http://rin5-demo-recovery.localhost:3007'), 'http://rin5-demo-recovery.localhost:3007')
     assert.throws(() => parseRin5EditorBaseUrl('https://edit.example.test/path'), /rin5_editor_base_url_invalid/)
     assert.throws(() => parseRin5EditorBaseUrl('http://edit.example.test'), /rin5_editor_base_url_invalid/)
+    assert.throws(() => parseRin5EditorBaseUrl('http://nested.rin5-demo-recovery.localhost:3007'), /rin5_editor_base_url_invalid/)
+    assert.throws(() => parseRin5EditorBaseUrl('http://rin5-demo-recovery.localhost.evil.test:3007'), /rin5_editor_base_url_invalid/)
+    assert.throws(() => parseRin5EditorBaseUrl('http://user:password@rin5-demo-recovery.localhost:3007'), /rin5_editor_base_url_invalid/)
   })
 })

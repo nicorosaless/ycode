@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  isStoragePathOwnedByTenant,
   isEmailAllowed,
   resolveAllowedEmails,
   resolveDbSchema,
+  resolveStorageBucket,
   resolveStoragePrefix,
   tenantStoragePath,
 } from './tenant'
@@ -30,12 +32,14 @@ describe('tenant boundary — database schema', () => {
 describe('tenant boundary — storage prefix', () => {
   it('has no prefix on the default single-tenant install', () => {
     assert.equal(resolveStoragePrefix({}), '')
+    assert.equal(resolveStorageBucket({}), 'assets')
     assert.equal(tenantStoragePath('website/1-abc.jpg', {}), 'website/1-abc.jpg')
   })
 
   it('follows the schema when no explicit prefix is set', () => {
     const env = { RIN5_DB_SCHEMA: 'cliente_a' }
     assert.equal(resolveStoragePrefix(env), 'cliente_a')
+    assert.equal(resolveStorageBucket(env), 'rin5-assets')
     assert.equal(tenantStoragePath('website/1-abc.jpg', env), 'cliente_a/website/1-abc.jpg')
   })
 
@@ -49,6 +53,23 @@ describe('tenant boundary — storage prefix', () => {
     for (const bad of ['../otro', 'a/b', 'cliente a', '.hidden']) {
       assert.throws(() => resolveStoragePrefix({ RIN5_STORAGE_PREFIX: bad }), /rin5_storage_prefix_invalid/, bad)
     }
+  })
+
+  it('accepts only normalized object paths inside the tenant prefix', () => {
+    const env = { RIN5_STORAGE_PREFIX: 'cliente_a' }
+    assert.equal(isStoragePathOwnedByTenant('cliente_a/website/foto.jpg', env), true)
+    assert.equal(isStoragePathOwnedByTenant('cliente_ab/website/foto.jpg', env), false)
+    assert.equal(isStoragePathOwnedByTenant('otro/website/foto.jpg', env), false)
+    assert.equal(isStoragePathOwnedByTenant('cliente_a/../otro/foto.jpg', env), false)
+    assert.equal(isStoragePathOwnedByTenant('cliente_a/%2e%2e/otro/foto.jpg', env), false)
+    assert.equal(isStoragePathOwnedByTenant('../cliente_a/foto.jpg', env), false)
+  })
+
+  it('rejects traversal even in the unrestricted single-tenant install', () => {
+    assert.equal(isStoragePathOwnedByTenant('website/foto.jpg', {}), true)
+    assert.equal(isStoragePathOwnedByTenant('/website/foto.jpg', {}), false)
+    assert.equal(isStoragePathOwnedByTenant('website/../../secret', {}), false)
+    assert.equal(isStoragePathOwnedByTenant(String.raw`website\..\secret`, {}), false)
   })
 })
 

@@ -47,7 +47,11 @@
 
 import { canEditStructure, canManageSettings, type UserRole } from './roles';
 
-export type ApiPermission = 'authenticated' | 'editStructure' | 'manageSettings';
+export type ApiPermission = 'authenticated' | 'editStructure' | 'manageSettings' | 'rin5Customer';
+
+export interface ApiAuthorizationContext {
+  tenantMode: boolean;
+}
 
 const MUTATING = ['POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
@@ -61,6 +65,19 @@ interface AuthzRule {
 
 /** Ordered rules — first match wins. */
 export const API_AUTHZ_RULES: readonly AuthzRule[] = [
+  // Narrow rin5 customer capabilities. Editors receive these only when this
+  // deployment is bound to an allowlisted tenant (see roleHasPermission).
+  { pattern: '/ycode/api/rin5/settings', permission: 'rin5Customer' },
+  { pattern: '/ycode/api/locales', methods: MUTATING, permission: 'rin5Customer' },
+  { pattern: '/ycode/api/rin5/cms/pages', methods: ['POST'], permission: 'rin5Customer' },
+  // Customer CMS schema management is deliberately exact. Imports and direct
+  // publish routes remain covered by the structural/settings rules below.
+  { pattern: /^\/ycode\/api\/collections$/, methods: ['POST'], permission: 'rin5Customer' },
+  { pattern: /^\/ycode\/api\/collections\/reorder$/, methods: ['PUT'], permission: 'rin5Customer' },
+  { pattern: /^\/ycode\/api\/collections\/[^/]+$/, methods: ['PUT', 'DELETE'], permission: 'rin5Customer' },
+  { pattern: /^\/ycode\/api\/collections\/[^/]+\/fields$/, methods: ['POST'], permission: 'rin5Customer' },
+  { pattern: /^\/ycode\/api\/collections\/[^/]+\/fields\/reorder$/, methods: ['PUT'], permission: 'rin5Customer' },
+  { pattern: /^\/ycode\/api\/collections\/[^/]+\/fields\/[^/]+$/, methods: ['PUT', 'DELETE'], permission: 'rin5Customer' },
   // ---- Editor-allowed content operations (explicit allow-list) ----
   { pattern: '/ycode/api/layers', methods: ['PUT'], permission: 'authenticated' },
   { pattern: '/ycode/api/assets', permission: 'authenticated' },
@@ -125,7 +142,11 @@ export function requiredPermission(pathname: string, method: string): ApiPermiss
   return 'authenticated';
 }
 
-export function roleHasPermission(role: UserRole, permission: ApiPermission): boolean {
+export function roleHasPermission(
+  role: UserRole,
+  permission: ApiPermission,
+  context: ApiAuthorizationContext = { tenantMode: false },
+): boolean {
   switch (permission) {
     case 'authenticated':
       return true;
@@ -133,5 +154,7 @@ export function roleHasPermission(role: UserRole, permission: ApiPermission): bo
       return canEditStructure(role);
     case 'manageSettings':
       return canManageSettings(role);
+    case 'rin5Customer':
+      return canEditStructure(role) || (role === 'editor' && context.tenantMode);
   }
 }

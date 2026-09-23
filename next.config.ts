@@ -6,6 +6,11 @@ const imageRemotePatterns: NonNullable<NonNullable<NextConfig['images']>['remote
     hostname: '**.supabase.co',
     pathname: '/storage/v1/object/public/**',
   },
+  {
+    protocol: 'https',
+    hostname: 'db.editor.rin5.app',
+    pathname: '/storage/v1/object/public/**',
+  },
 ];
 
 // Self-hosted Supabase: allow the custom domain for storage image optimization.
@@ -74,16 +79,6 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
-      {
-        // Asset proxy: immutable caching (content-addressed by hash)
-        source: '/a/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
       {
         // Apply to public pages ONLY (exclude /ycode/*, /_next/*, /a/*)
         // NOTE: Do NOT set Cache-Control here. Vercel recommends letting

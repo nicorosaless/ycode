@@ -1,5 +1,6 @@
 import { noCache } from '@/lib/api-response';
 import { getSupabaseConfig } from '@/lib/supabase-server';
+import { createSupabaseServerFetch } from '@/lib/supabase-server-fetch';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -22,7 +23,8 @@ export async function GET() {
       );
     }
 
-    const settingsResponse = await fetch(
+    const serverFetch = createSupabaseServerFetch(creds.projectUrl);
+    const settingsResponse = await serverFetch(
       `${creds.projectUrl}/auth/v1/settings`,
       {
         headers: { 'apikey': creds.anonKey },

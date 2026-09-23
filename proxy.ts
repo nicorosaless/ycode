@@ -5,6 +5,7 @@ import { applySecurityHeaders } from '@/lib/security-headers-server';
 import { requiredPermission, roleHasPermission } from '@/lib/api-authz';
 import { resolveRole } from '@/lib/roles';
 import { isEmailAllowed, resolveAllowedEmails } from '@/lib/tenant';
+import { createSupabaseServerFetch } from '@/lib/supabase-server-fetch';
 
 /**
  * Public API routes that skip authentication.
@@ -21,6 +22,7 @@ const PUBLIC_COLLECTION_ITEM_SUFFIXES = ['/items/filter', '/items/load-more'];
 
 const PUBLIC_API_EXACT = [
   '/ycode/api/rin5/export', // Server-to-server bearer auth in the route itself
+  '/ycode/api/rin5/restore', // Signed internal request; ownership checked by rin5
   '/ycode/api/rin5/handoff', // Server-to-server bearer auth in the route itself
   '/ycode/api/setup/status', // Read-only bootstrap state
   '/ycode/api/supabase/config', // Public anon config used to initialize auth
@@ -70,7 +72,7 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
     return true;
   }
   // POST to form-submissions is public (website visitors submitting forms)
-  if (pathname === '/ycode/api/form-submissions' && method === 'POST') {
+  if (resolveAllowedEmails() === null && pathname === '/ycode/api/form-submissions' && method === 'POST') {
     return true;
   }
 
@@ -79,7 +81,7 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
   if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
 
   // Collection item endpoints for published pages (POST only — filter, load-more)
-  if (method === 'POST' && pathname.startsWith('/ycode/api/collections/') &&
+  if (resolveAllowedEmails() === null && method === 'POST' && pathname.startsWith('/ycode/api/collections/') &&
       PUBLIC_COLLECTION_ITEM_SUFFIXES.some(suffix => pathname.endsWith(suffix))) {
     return true;
   }
@@ -109,6 +111,7 @@ async function verifyApiAuth(request: NextRequest): Promise<NextResponse | null>
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(config.url, config.anonKey, {
+    global: { fetch: createSupabaseServerFetch(config.url) },
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -128,10 +131,21 @@ async function verifyApiAuth(request: NextRequest): Promise<NextResponse | null>
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json(
+    const unauthorized = NextResponse.json(
       { error: 'Not authenticated' },
       { status: 401 }
     );
+    unauthorized.headers.set('Cache-Control', 'private, no-store');
+    return unauthorized;
+  }
+
+  if (!user.email_confirmed_at) {
+    const unverified = NextResponse.json(
+      { error: 'Forbidden', reason: 'verified_email_required' },
+      { status: 403 },
+    );
+    unverified.headers.set('Cache-Control', 'private, no-store');
+    return unverified;
   }
 
   // Tenant authorization (P-2609). GoTrue is global to the shared Supabase
@@ -139,10 +153,12 @@ async function verifyApiAuth(request: NextRequest): Promise<NextResponse | null>
   // valid session here. `RIN5_ALLOWED_EMAILS` is the only thing that keeps
   // them out of this client's site; unset means single-tenant, everyone in.
   if (!isEmailAllowed(user.email, resolveAllowedEmails())) {
-    return NextResponse.json(
+    const forbidden = NextResponse.json(
       { error: 'Forbidden', reason: 'email_not_allowed_for_this_site' },
       { status: 403 }
     );
+    forbidden.headers.set('Cache-Control', 'private, no-store');
+    return forbidden;
   }
 
   // Role-based authorization for API routes (see lib/api-authz.ts).
@@ -151,7 +167,7 @@ async function verifyApiAuth(request: NextRequest): Promise<NextResponse | null>
   if (pathname.startsWith('/ycode/api') || pathname.startsWith('/api/templates')) {
     const role = resolveRole(user.app_metadata?.role as string | undefined);
     const permission = requiredPermission(pathname, request.method);
-    if (!roleHasPermission(role, permission)) {
+    if (!roleHasPermission(role, permission, { tenantMode: resolveAllowedEmails() !== null })) {
       return NextResponse.json(
         { error: 'Forbidden', required: permission, role },
         { status: 403 }
@@ -170,6 +186,7 @@ async function verifyApiAuth(request: NextRequest): Promise<NextResponse | null>
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const tenantMode = resolveAllowedEmails() !== null;
 
   // MCP endpoints use their own token-based authentication — skip session auth.
   // Cloud overlay proxies MUST also exempt these paths to avoid login redirects.
@@ -188,7 +205,12 @@ export async function proxy(request: NextRequest) {
   // Protect API and preview routes with auth. `/api/templates` lives outside the
   // `/ycode` tree (public site route group) but exposes destructive builder-only
   // operations (apply/export), so it must be gated here too.
-  if (!skipPreviewAuth && (pathname.startsWith('/ycode/api') || pathname.startsWith('/ycode/preview') || pathname.startsWith('/api/templates'))) {
+  const tenantPrivateSiteRoute = tenantMode
+    && !pathname.startsWith('/ycode')
+    && !pathname.startsWith('/_next')
+    && pathname !== '/favicon.ico';
+  const tenantPrivateApi = tenantMode && pathname.startsWith('/api/');
+  if (!skipPreviewAuth && (pathname.startsWith('/ycode/api') || pathname.startsWith('/ycode/preview') || pathname.startsWith('/api/templates') || tenantPrivateSiteRoute || tenantPrivateApi)) {
     const authResponse = await verifyApiAuth(request);
     if (authResponse) {
       if (authResponse.status === 401) {
@@ -199,6 +221,7 @@ export async function proxy(request: NextRequest) {
       }
       // Authenticated — pass through
       authResponse.headers.set('x-pathname', pathname);
+      if (tenantMode) authResponse.headers.set('Cache-Control', 'private, no-store');
       return authResponse;
     }
   }

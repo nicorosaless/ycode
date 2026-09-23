@@ -94,6 +94,7 @@ import { cloneDeep } from 'lodash';
 
 // 5. Types
 import type { Layer, Asset } from '@/types';
+import type { Rin5Navigation } from '@/lib/rin5-navigation';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/field';
@@ -103,9 +104,10 @@ import { Alert, AlertTitle } from '@/components/ui/alert';
 
 interface YCodeBuilderProps {
   children?: React.ReactNode;
+  rin5Navigation?: Rin5Navigation | null;
 }
 
-export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCodeBuilderProps) {
+export default function YCodeBuilder({ children, rin5Navigation = null }: YCodeBuilderProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { routeType, resourceId, sidebarTab, navigateToLayers, navigateToCollection, navigateToCollections, navigateToComponent, urlState, updateQueryParams } = useEditorUrl();
@@ -205,6 +207,12 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
   const [viewportMode, setViewportMode] = useState<'desktop' | 'tablet' | 'mobile'>(
     urlState.view || 'desktop'
   );
+
+  useEffect(() => {
+    if (!urlState.view && window.matchMedia('(max-width: 639px)').matches) {
+      setViewportMode('mobile');
+    }
+  }, [urlState.view]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks the last-seen layers reference per page. Reference equality is
   // sufficient because store mutators always produce a new layers array on
@@ -2273,15 +2281,18 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
           useCollectionsStore.getState().reloadCurrentItems();
         }}
         isSettingsRoute={routeType === 'settings' || routeType === 'localization' || routeType === 'profile' || routeType === 'forms' || routeType === 'integrations'}
+        rin5Navigation={rin5Navigation}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Settings Route - Render Settings Content */}
-        {routeType === 'settings' ? (
+        {routeType === 'site-settings' ? (
+          <>{children}</>
+        ) : routeType === 'settings' ? (
           <SettingsContent>{children}</SettingsContent>
         ) : routeType === 'localization' ? (
-          <LocalizationContent>{children}</LocalizationContent>
+          <LocalizationContent canManageLocales={canEditStructure || (isEditor && rin5Navigation !== null)}>{children}</LocalizationContent>
         ) : routeType === 'profile' ? (
           <ProfileContent>{children}</ProfileContent>
         ) : routeType === 'forms' ? (
@@ -2317,7 +2328,7 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
             {/* CMS View - kept mounted for instant switching */}
             <div className={activeTab === 'cms' ? 'flex flex-1 min-w-0 overflow-hidden' : 'hidden'}>
               <Suspense fallback={null}>
-                <CMS />
+                <CMS rin5Customer={isEditor && rin5Navigation !== null} />
               </Suspense>
               {!isEditor && agentEnabled && (
                 <div className="w-64 shrink-0 bg-background border-l flex flex-col h-full overflow-hidden">
@@ -2336,6 +2347,7 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
             <div className={activeTab !== 'cms' ? 'contents' : 'hidden'}>
               {/* Center Canvas - Preview */}
               <CenterCanvas
+                customerSectionReorder={isEditor && rin5Navigation !== null}
                 currentPageId={currentPageId}
                 viewportMode={viewportMode}
                 setViewportMode={setViewportMode}
@@ -2362,6 +2374,7 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
           }}
           collectionId={collectionItemSheet.collectionId}
           itemId={collectionItemSheet.itemId}
+          allowDirectPublish={!(isEditor && rin5Navigation !== null)}
           onSuccess={() => {
             // Close sheet after successful save
             closeCollectionItemSheet();

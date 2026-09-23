@@ -2,7 +2,7 @@ import type { EmailOtpType } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { createRouteClient } from '@/lib/supabase-route-client'
-import { parseRin5EditorBaseUrl } from '@/lib/rin5-internal-auth'
+import { parseRin5EditorBaseUrl, parseRin5HandoffDestination } from '@/lib/rin5-internal-auth'
 
 export async function GET(request: NextRequest) {
   let editorBaseUrl: string
@@ -13,11 +13,17 @@ export async function GET(request: NextRequest) {
   }
   const tokenHash = request.nextUrl.searchParams.get('token_hash')
   const type = request.nextUrl.searchParams.get('type')
+  let destinationPath: string
+  try {
+    destinationPath = parseRin5HandoffDestination(request.nextUrl.searchParams.get('destination')).path
+  } catch {
+    return NextResponse.redirect(new URL('/ycode?auth=invalid', editorBaseUrl))
+  }
   if (!tokenHash || type !== 'magiclink') return NextResponse.redirect(new URL('/ycode?auth=invalid', editorBaseUrl))
 
   const supabase = await createRouteClient()
   if (!supabase) return NextResponse.redirect(new URL('/ycode?auth=unavailable', editorBaseUrl))
   const verified = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as EmailOtpType })
   if (verified.error) return NextResponse.redirect(new URL('/ycode?auth=invalid', editorBaseUrl))
-  return NextResponse.redirect(new URL('/ycode', editorBaseUrl))
+  return NextResponse.redirect(new URL(destinationPath, editorBaseUrl))
 }

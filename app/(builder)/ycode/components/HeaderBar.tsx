@@ -40,6 +40,8 @@ import { BackupRestoreDialog } from '@/components/project/BackupRestoreDialog';
 import { isCloudVersion } from '@/lib/utils';
 import { useRole } from '@/hooks/use-role';
 import BrandLogo from '@/components/BrandLogo';
+import type { Rin5Navigation } from '@/lib/rin5-navigation';
+import { Rin5CustomerLocalizationNav } from './CustomerWorkspaceAccess';
 
 interface HeaderBarProps {
   user: User | null;
@@ -60,6 +62,7 @@ interface HeaderBarProps {
   onExitComponentEditMode?: () => void;
   onPublishSuccess: () => void;
   isSettingsRoute?: boolean;
+  rin5Navigation?: Rin5Navigation | null;
 }
 
 export default function HeaderBar({
@@ -81,6 +84,7 @@ export default function HeaderBar({
   onExitComponentEditMode,
   onPublishSuccess,
   isSettingsRoute = false,
+  rin5Navigation = null,
 }: HeaderBarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -115,7 +119,7 @@ export default function HeaderBar({
   const { navigateToLayers, navigateToCollection, navigateToCollections, updateQueryParams, routeType } = useEditorUrl();
 
   // Optimistic nav button state - set immediately on click, cleared when URL catches up
-  type NavButton = 'design' | 'cms' | 'forms';
+  type NavButton = 'design' | 'cms' | 'forms' | 'localization';
   const [optimisticNav, setOptimisticNav] = useState<NavButton | null>(null);
 
   // Clear optimistic state once the URL reflects the clicked route
@@ -124,11 +128,13 @@ export default function HeaderBar({
     const isDesignRoute = routeType === 'layers' || routeType === 'page' || routeType === 'component' || routeType === null;
     const isCmsRoute = routeType === 'collection' || routeType === 'collections-base';
     const isFormsRoute = routeType === 'forms';
+    const isLocalizationRoute = routeType === 'localization';
 
     if (
       (optimisticNav === 'design' && isDesignRoute) ||
       (optimisticNav === 'cms' && isCmsRoute) ||
-      (optimisticNav === 'forms' && isFormsRoute)
+      (optimisticNav === 'forms' && isFormsRoute) ||
+      (optimisticNav === 'localization' && isLocalizationRoute)
     ) {
       setOptimisticNav(null);
     }
@@ -149,6 +155,7 @@ export default function HeaderBar({
     if (optimisticNav) return optimisticNav;
     if (routeType === 'collection' || routeType === 'collections-base') return 'cms';
     if (routeType === 'forms') return 'forms';
+    if (routeType === 'localization') return 'localization';
     if (routeType === 'layers' || routeType === 'page' || routeType === 'component' || routeType === null) return 'design';
     return null;
   }, [optimisticNav, routeType]);
@@ -374,9 +381,9 @@ export default function HeaderBar({
 
   return (
     <>
-    <header className="h-14 bg-background border-b grid grid-cols-3 items-center px-4">
+    <header className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b bg-background px-2 py-2 md:h-14 md:grid-cols-3 md:px-4 md:py-0">
       {/* Left: Logo & Navigation */}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1 md:gap-2">
 
         {/* User Menu */}
         <DropdownMenu>
@@ -478,6 +485,7 @@ export default function HeaderBar({
           {isEditor ? (
             <>
               <Button
+                aria-label={rin5Navigation ? 'Canvas' : 'Content editor'}
                 variant={(activeNavButton === 'design' && editorSidebarTab !== 'pages') ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => {
@@ -494,9 +502,10 @@ export default function HeaderBar({
                 }}
               >
                 <Icon name="pencil" />
-                Content editor
+                <span className="hidden lg:inline">{rin5Navigation ? 'Canvas' : 'Content editor'}</span>
               </Button>
               <Button
+                aria-label="Pages"
                 variant={editorSidebarTab === 'pages' ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => {
@@ -508,7 +517,7 @@ export default function HeaderBar({
                 }}
               >
                 <Icon name="page" />
-                Pages
+                <span className="hidden lg:inline">Pages</span>
               </Button>
             </>
           ) : (
@@ -533,6 +542,7 @@ export default function HeaderBar({
             </Button>
           )}
           <Button
+            aria-label={isEditor && rin5Navigation ? 'Contenido' : 'CMS'}
             variant={activeNavButton === 'cms' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => {
@@ -552,8 +562,38 @@ export default function HeaderBar({
             }}
           >
             <Icon name="database" />
-            CMS
+            <span className="hidden lg:inline">{isEditor && rin5Navigation ? 'Contenido' : 'CMS'}</span>
           </Button>
+          <Rin5CustomerLocalizationNav
+            active={activeNavButton === 'localization'}
+            enabled={isEditor && rin5Navigation !== null}
+            onSelect={() => {
+              const isDesignRoute = routeType === 'layers' || routeType === 'page' || routeType === 'component';
+              if (isDesignRoute) {
+                setLastDesignUrl(window.location.pathname + window.location.search);
+              }
+              setOptimisticNav('localization');
+              router.push('/ycode/localization');
+            }}
+          />
+          {isEditor && rin5Navigation && (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                asChild
+              >
+                <a href={rin5Navigation.analyticsUrl}>Estadísticas</a>
+              </Button>
+              <Button
+                size="sm"
+                variant={routeType === 'site-settings' ? 'secondary' : 'ghost'}
+                asChild
+              >
+                <a href={rin5Navigation.settingsUrl}>Ajustes</a>
+              </Button>
+            </>
+          )}
           {!isEditor && (
             <Button
               variant={activeNavButton === 'forms' ? 'secondary' : 'ghost'}
@@ -574,7 +614,7 @@ export default function HeaderBar({
         </div>
       </div>
 
-      <div className="flex gap-1.5 items-center justify-center">
+      <div className="hidden min-w-0 items-center justify-center gap-1.5 md:flex">
         <LocaleSelector />
 
         <div className="h-5">
@@ -597,15 +637,60 @@ export default function HeaderBar({
       </div>
 
       {/* Right: User & Actions */}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex min-w-0 items-center justify-end gap-1 md:gap-2">
+        {isEditor && rin5Navigation && (
+          <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                className="md:hidden"
+                size="xs"
+                variant="ghost"
+              >
+                rin5
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {[
+                ['Publicar', rin5Navigation.publishUrl],
+                ['Ayuda', rin5Navigation.helpUrl],
+              ].map(([label, href]) => (
+                <DropdownMenuItem key={href} asChild>
+                  <a href={href}>
+                    {label}
+                  </a>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <nav aria-label="rin5" className="hidden items-center gap-1 md:flex">
+            {[
+              ['Publicar', rin5Navigation.publishUrl],
+              ['Ayuda', rin5Navigation.helpUrl],
+            ].map(([label, href]) => (
+              <Button
+                key={href}
+                size="xs"
+                variant="ghost"
+                asChild
+              >
+                <a href={href}>
+                  {label}
+                </a>
+              </Button>
+            ))}
+          </nav>
+          </>
+        )}
+
         {/* Active Users */}
-        <ActiveUsersInHeader />
+        <div className="hidden md:block"><ActiveUsersInHeader /></div>
 
         {/* Invite User */}
         {canManageMembers && <InviteUserButton />}
 
         {/* Save Status Indicator */}
-        <div className="flex items-center justify-end w-16 text-xs text-zinc-500 dark:text-white/50">
+        <div className="hidden w-16 items-center justify-end text-xs text-zinc-500 dark:text-white/50 sm:flex">
           {isSaving ? (
             <>
               <span>Saving</span>

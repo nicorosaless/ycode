@@ -1,7 +1,7 @@
 import { credentials } from '@/lib/credentials';
 import { parseSupabaseConfig } from '@/lib/supabase-config-parser';
 import { noCache } from '@/lib/api-response';
-import { resolveDbSchema } from '@/lib/tenant';
+import { resolveDbSchema, resolveStorageBucket } from '@/lib/tenant';
 import type { SupabaseConfig } from '@/types';
 
 // Disable caching for this route
@@ -48,6 +48,7 @@ export async function GET() {
         url: parsed.projectUrl,
         anonKey: parsed.anonKey,
         schema: resolveDbSchema(),
+        storageBucket: resolveStorageBucket(),
       },
     });
   } catch (error) {

@@ -22,7 +22,17 @@ interface RightPanelProps {
  * When the agent is turned off in Settings → Agent, the switch is hidden
  * entirely and only the manual editor is rendered.
  */
-export default function RightPanel({ onLayerUpdate, contentOnly = false }: RightPanelProps) {
+function ContentOnlyRightPanel() {
+  return (
+    <div className="hidden w-64 shrink-0 bg-background border-l flex-col h-full overflow-hidden md:flex">
+      <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted-foreground">
+        Selecciona un texto o una imagen en la web para editar su contenido.
+      </div>
+    </div>
+  );
+}
+
+function FullRightPanel({ onLayerUpdate }: Pick<RightPanelProps, 'onLayerUpdate'>) {
   const isAgent = useAiChatStore((state) => state.isOpen);
   const open = useAiChatStore((state) => state.open);
   const close = useAiChatStore((state) => state.close);
@@ -55,15 +65,15 @@ export default function RightPanel({ onLayerUpdate, contentOnly = false }: Right
             </p>
           </div>
         ) : (
-          contentOnly ? (
-            <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted-foreground">
-              Selecciona un texto o una imagen en la web para editar su contenido.
-            </div>
-          ) : (
-            <RightSidebar embedded onLayerUpdate={onLayerUpdate} />
-          )
+          <RightSidebar embedded onLayerUpdate={onLayerUpdate} />
         )}
       </div>
     </div>
   );
+}
+
+export default function RightPanel({ onLayerUpdate, contentOnly = false }: RightPanelProps) {
+  return contentOnly
+    ? <ContentOnlyRightPanel />
+    : <FullRightPanel onLayerUpdate={onLayerUpdate} />;
 }

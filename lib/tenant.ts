@@ -25,6 +25,8 @@
 export type TenantEnv = Record<string, string | undefined>
 
 export const DEFAULT_DB_SCHEMA = 'public'
+export const DEFAULT_STORAGE_BUCKET = 'assets'
+export const RIN5_STORAGE_BUCKET = 'rin5-assets'
 
 /** A bare Postgres identifier — no quoting, no dots, nothing to escape. */
 const SCHEMA_RE = /^[a-z_][a-z0-9_]{0,62}$/
@@ -58,6 +60,11 @@ export function resolveStoragePrefix(env: TenantEnv = process.env): string {
   return schema === DEFAULT_DB_SCHEMA ? '' : schema
 }
 
+/** Tenant containers use a private bucket; unrestricted installs keep the legacy public bucket. */
+export function resolveStorageBucket(env: TenantEnv = process.env): string {
+  return resolveStoragePrefix(env) ? RIN5_STORAGE_BUCKET : DEFAULT_STORAGE_BUCKET
+}
+
 /**
  * Scope a storage object path to this tenant. Idempotent-safe only for fresh
  * paths — call it once, where the path is generated, never on a path read back
@@ -67,6 +74,24 @@ export function tenantStoragePath(path: string, env: TenantEnv = process.env): s
   const prefix = resolveStoragePrefix(env)
   const clean = path.replace(/^\/+/, '')
   return prefix ? `${prefix}/${clean}` : clean
+}
+
+/** Whether a stored object path is normalized and belongs to the current tenant. */
+export function isStoragePathOwnedByTenant(path: string, env: TenantEnv = process.env): boolean {
+  if (!path || path !== path.trim() || path.startsWith('/') || path.includes('\\')) return false
+
+  let decodedPath: string
+  try {
+    decodedPath = decodeURIComponent(path)
+  } catch {
+    return false
+  }
+
+  const segments = decodedPath.split('/')
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return false
+
+  const prefix = resolveStoragePrefix(env)
+  return !prefix || decodedPath.startsWith(`${prefix}/`)
 }
 
 /**

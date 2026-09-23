@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { noCache } from '@/lib/api-response';
 import { getAuthUser } from '@/lib/supabase-auth';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
-import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { getStorageBucket, STORAGE_FOLDERS } from '@/lib/asset-constants';
 import { tenantStoragePath } from '@/lib/tenant';
 import { generateId } from '@/lib/utils';
 import sharp from 'sharp';
@@ -61,11 +61,11 @@ export async function POST(request: NextRequest) {
     if (oldAvatarUrl) {
       try {
         // Extract storage path from public URL (after bucket name segment)
-        const bucketSegment = `/object/public/${STORAGE_BUCKET}/`;
+        const bucketSegment = `/object/public/${getStorageBucket()}/`;
         const idx = oldAvatarUrl.indexOf(bucketSegment);
         if (idx !== -1) {
           const oldPath = oldAvatarUrl.substring(idx + bucketSegment.length);
-          await adminClient.storage.from(STORAGE_BUCKET).remove([oldPath]);
+          await adminClient.storage.from(getStorageBucket()).remove([oldPath]);
         }
       } catch (error) {
         console.error('Failed to delete old avatar:', error);
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Upload new avatar
     const { data: uploadData, error: uploadError } = await adminClient.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .upload(storagePath, webpBuffer, {
         cacheControl: '3600',
         upsert: true,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // Get public URL
     const { data: urlData } = adminClient.storage
-      .from(STORAGE_BUCKET)
+      .from(getStorageBucket())
       .getPublicUrl(uploadData.path);
 
     // Update user metadata with new avatar URL

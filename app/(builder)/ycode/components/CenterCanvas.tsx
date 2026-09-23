@@ -77,6 +77,7 @@ import { DropContainerIndicator, DropLineIndicator } from '@/components/DropIndi
 import { DragCaptureOverlay } from '@/components/DragCaptureOverlay';
 import ElementPickerOverlay from './ElementPickerOverlay';
 import { setDragCursor, clearDragCursor } from '@/lib/drag-cursor';
+import { moveCustomerSection, type SectionMoveDirection } from '@/lib/rin5-customer-reorder';
 
 // 7. Types
 import type { Layer, Page, CollectionField, Asset } from '@/types';
@@ -103,6 +104,7 @@ import { useCanvasDropDetection } from '@/hooks/use-canvas-drop-detection';
 import { useCanvasSiblingReorder } from '@/hooks/use-canvas-sibling-reorder';
 
 interface CenterCanvasProps {
+  customerSectionReorder?: boolean;
   currentPageId: string | null;
   viewportMode: ViewportMode;
   setViewportMode: (mode: ViewportMode) => void;
@@ -145,13 +147,26 @@ function ViewportZoomControls({
   onZoomToFit,
   onAutofit,
 }: ViewportZoomControlsProps) {
+  const compactLabels: Record<ViewportMode, string> = {
+    desktop: 'D',
+    tablet: 'T',
+    mobile: 'M',
+  };
+
   return (
-    <div className="flex justify-center gap-2">
+    <div className="flex justify-start gap-1 sm:justify-center sm:gap-2">
       <Tabs value={viewportMode} onValueChange={(v) => onViewportChange(v as ViewportMode)}>
-        <TabsList className="w-50">
-          <TabsTrigger value="desktop" title="Desktop View">Desktop</TabsTrigger>
-          <TabsTrigger value="tablet" title="Tablet View">Tablet</TabsTrigger>
-          <TabsTrigger value="mobile" title="Mobile View">Phone</TabsTrigger>
+        <TabsList className="w-28 sm:w-50">
+          {(['desktop', 'tablet', 'mobile'] satisfies ViewportMode[]).map((mode) => (
+            <TabsTrigger
+              key={mode}
+              value={mode}
+              title={`${viewportSizes[mode].label} View`}
+            >
+              <span className="sm:hidden">{compactLabels[mode]}</span>
+              <span className="hidden sm:inline">{mode === 'mobile' ? 'Phone' : viewportSizes[mode].label}</span>
+            </TabsTrigger>
+          ))}
         </TabsList>
       </Tabs>
       <DropdownMenu>
@@ -159,7 +174,7 @@ function ViewportZoomControls({
           <Button
             variant="input"
             size="sm"
-            className="w-18"
+            className="w-14 sm:w-18"
           >
             <span className="flex-1 text-center">{Math.round(zoom)}%</span>
             <Icon name="chevronDown" className="size-2.5! opacity-50" />
@@ -583,6 +598,7 @@ function CanvasSiblingReorderOverlay({
 }
 
 const CenterCanvas = React.memo(function CenterCanvas({
+  customerSectionReorder = false,
   currentPageId,
   viewportMode,
   setViewportMode,
@@ -1228,6 +1244,20 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
     return currentDraft ? currentDraft.layers : [];
   }, [editingComponentId, activeComponentVariantId, componentDrafts, currentPageId, currentDraft]);
+
+  const customerMoveAvailability = useMemo(() => {
+    if (!customerSectionReorder || !selectedLayerId || editingComponentId) return { up: false, down: false };
+    return {
+      up: moveCustomerSection(layers, selectedLayerId, 'up').moved,
+      down: moveCustomerSection(layers, selectedLayerId, 'down').moved,
+    };
+  }, [customerSectionReorder, editingComponentId, layers, selectedLayerId]);
+
+  const moveSelectedCustomerSection = useCallback((direction: SectionMoveDirection) => {
+    if (!customerSectionReorder || !currentPageId || !selectedLayerId || editingComponentId) return;
+    const result = moveCustomerSection(layers, selectedLayerId, direction);
+    if (result.moved) setDraftLayers(currentPageId, result.layers);
+  }, [customerSectionReorder, currentPageId, editingComponentId, layers, selectedLayerId, setDraftLayers]);
 
   // Check if we're waiting for a draft to load (page selected but no draft yet)
   const isDraftLoading = useMemo(() => {
@@ -2208,7 +2238,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   return (
     <div className="flex-1 min-w-0 flex flex-col relative">
       {/* Top Bar */}
-      <div className="grid grid-cols-3 items-center p-4 border-b bg-background">
+      <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-b bg-background p-2 sm:grid-cols-3 sm:p-4">
         {/* Page Selector or Back to Page Button */}
         {editingComponentId ? (
           <Button
@@ -2240,7 +2270,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
             })()}
           </Button>
         ) : (
-          <div className="flex items-center gap-1.5">
+          <div className="hidden items-center gap-1.5 sm:flex">
             <PageSelector
               value={currentPageId}
               onValueChange={handlePageSelect}
@@ -2568,6 +2598,22 @@ const CenterCanvas = React.memo(function CenterCanvas({
         ref={canvasContainerRef}
         className="flex-1 relative overflow-hidden bg-neutral-50 dark:bg-neutral-950/80 select-none"
       >
+        {customerSectionReorder && selectedLayerId && (customerMoveAvailability.up || customerMoveAvailability.down) && (
+          <div className="absolute right-3 top-3 z-30 flex gap-2 rounded-lg border bg-background/95 p-2 shadow-sm" aria-label="Orden de la sección">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!customerMoveAvailability.up}
+              onClick={() => moveSelectedCustomerSection('up')}
+            >Subir sección</Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!customerMoveAvailability.down}
+              onClick={() => moveSelectedCustomerSection('down')}
+            >Bajar sección</Button>
+          </div>
+        )}
         {/* Loading skeleton overlay when draft is being fetched */}
         {isDraftLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-50/80 dark:bg-neutral-950/80 backdrop-blur-sm">

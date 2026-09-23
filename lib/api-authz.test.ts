@@ -47,3 +47,41 @@ test('unknown and missing roles fail closed to editor', () => {
   assert.equal(extractRoleFromUser({ app_metadata: { role: 'super-admin' } }), 'editor');
   assert.equal(extractRoleFromUser(null), null);
 });
+
+test('rin5 customer capabilities are available to editors only in tenant mode', () => {
+  for (const [method, pathname] of [
+    ['POST', '/ycode/api/locales'],
+    ['PUT', '/ycode/api/locales/locale-1'],
+    ['DELETE', '/ycode/api/locales/locale-1'],
+    ['POST', '/ycode/api/locales/locale-1/default'],
+    ['PUT', '/ycode/api/rin5/settings'],
+    ['POST', '/ycode/api/collections'],
+    ['PUT', '/ycode/api/collections/reorder'],
+    ['PUT', '/ycode/api/collections/collection-1'],
+    ['DELETE', '/ycode/api/collections/collection-1'],
+    ['POST', '/ycode/api/collections/collection-1/fields'],
+    ['PUT', '/ycode/api/collections/collection-1/fields/field-1'],
+    ['DELETE', '/ycode/api/collections/collection-1/fields/field-1'],
+    ['PUT', '/ycode/api/collections/collection-1/fields/reorder'],
+    ['POST', '/ycode/api/rin5/cms/pages'],
+  ] as const) {
+    const permission = requiredPermission(pathname, method);
+    assert.equal(roleHasPermission('editor', permission), false);
+    assert.equal(roleHasPermission('editor', permission, { tenantMode: true }), true);
+    assert.equal(roleHasPermission('owner', permission), true);
+  }
+});
+
+test('rin5 customer CMS access excludes imports and every direct publish route', () => {
+  for (const [method, pathname] of [
+    ['POST', '/ycode/api/collections/sample'],
+    ['POST', '/ycode/api/collections/import/process'],
+    ['POST', '/ycode/api/collections/collection-1/import'],
+    ['POST', '/ycode/api/collections/collection-1/publish'],
+    ['POST', '/ycode/api/collections/items/publish'],
+  ] as const) {
+    const permission = requiredPermission(pathname, method);
+    assert.equal(roleHasPermission('editor', permission, { tenantMode: true }), false);
+    assert.equal(roleHasPermission('designer', permission, { tenantMode: true }), true);
+  }
+});

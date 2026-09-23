@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { getSupabaseAdmin } from '@/lib/supabase-server'
-import { authorizeRin5InternalRequest, parseRin5EditorBaseUrl, parseRin5HandoffRequest } from '@/lib/rin5-internal-auth'
+import {
+  authorizeRin5InternalRequest,
+  parseRin5EditorBaseUrl,
+  parseRin5HandoffDestination,
+  parseRin5HandoffRequest,
+} from '@/lib/rin5-internal-auth'
 import { isEmailAllowed, resolveAllowedEmails } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { email, siteId } = parseRin5HandoffRequest(await request.json(), process.env.RIN5_SITE_ID)
+    const { destination, email, siteId } = parseRin5HandoffRequest(await request.json(), process.env.RIN5_SITE_ID)
     // The handoff is what mints the session, so this is where a foreign email
     // has to be stopped: creating the GoTrue user first would leave a valid
     // account for another client's site behind even on a rejected request.
@@ -48,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     const link = await admin.auth.admin.generateLink({
       email,
-      options: { redirectTo: `${editorBaseUrl}/ycode` },
+      options: { redirectTo: `${editorBaseUrl}${parseRin5HandoffDestination(destination).path}` },
       type: 'magiclink',
     })
     if (link.error || !link.data.properties?.hashed_token) throw link.error ?? new Error('Magic link was not generated')
@@ -56,6 +61,7 @@ export async function POST(request: NextRequest) {
     const actionLink = new URL('/ycode/api/auth/confirm', editorBaseUrl)
     actionLink.searchParams.set('token_hash', link.data.properties.hashed_token)
     actionLink.searchParams.set('type', 'magiclink')
+    actionLink.searchParams.set('destination', destination)
 
     return NextResponse.json(
       { actionLink: actionLink.toString(), siteId },

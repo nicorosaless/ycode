@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { credentials } from './credentials';
 import { parseSupabaseConfig } from './supabase-config-parser';
 import { dbSchemaForClient } from './tenant';
+import { createSupabaseServerFetch } from './supabase-server-fetch';
 import type { SupabaseConfig } from '@/types';
 
 /**
@@ -22,6 +23,7 @@ export async function createRouteClient() {
 
   return createServerClient(parsed.projectUrl, parsed.anonKey, {
     db: { schema: dbSchemaForClient() },
+    global: { fetch: createSupabaseServerFetch(parsed.projectUrl) },
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value;
