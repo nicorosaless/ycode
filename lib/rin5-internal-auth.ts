@@ -23,6 +23,33 @@ export function parseRin5HandoffDestination(value: unknown): {
   return { destination: key, path: RIN5_HANDOFF_DESTINATIONS[key] }
 }
 
+// `embed=1` means the editor is framed inside the rin5 Canvas, which already
+// draws its own navigation. Only the literal '1' or an absent flag is valid:
+// anything else is a caller bug, not a softer way of saying "no".
+export function parseRin5HandoffEmbed(value: unknown): boolean {
+  if (value === undefined || value === null) return false
+  if (value === '1') return true
+  throw new Error('rin5_handoff_embed_invalid')
+}
+
+// The confirm step turns the flag into a cookie scoped to /ycode, so the
+// server layout knows on every later navigation that the editor is framed. A
+// direct (non-embedded) sign-in clears it, which keeps a stale embed from an
+// earlier session from hiding the header of a full-window editor.
+export function rin5EmbedCookie(embed: boolean, editorBaseUrl: string) {
+  return {
+    name: 'rin5_embed',
+    value: embed ? '1' : '',
+    options: {
+      httpOnly: false,
+      maxAge: embed ? 60 * 60 * 24 * 30 : 0,
+      path: '/ycode',
+      sameSite: 'lax' as const,
+      secure: editorBaseUrl.startsWith('https:'),
+    },
+  }
+}
+
 export function authorizeRin5InternalRequest(headers: Headers, configuredSecret: string | undefined): boolean {
   if (!configuredSecret || configuredSecret.length < 32) return false
   const header = headers.get('authorization')
@@ -60,6 +87,7 @@ export function parseRin5ExportRequest(value: unknown, configuredSiteId: string 
 export function parseRin5HandoffRequest(value: unknown, configuredSiteId: string | undefined): {
   destination: Rin5HandoffDestination
   email: string
+  embed: boolean
   siteId: string
 } {
   const { record, siteId } = parseSiteId(value, configuredSiteId)
@@ -70,7 +98,8 @@ export function parseRin5HandoffRequest(value: unknown, configuredSiteId: string
     throw new Error('rin5_handoff_request_invalid')
   }
   const { destination } = parseRin5HandoffDestination(record.destination)
-  return { destination, email, siteId }
+  const embed = parseRin5HandoffEmbed(record.embed)
+  return { destination, email, embed, siteId }
 }
 
 export function parseRin5EditorBaseUrl(value: string | undefined): string {

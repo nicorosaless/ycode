@@ -104,10 +104,12 @@ import { Alert, AlertTitle } from '@/components/ui/alert';
 
 interface YCodeBuilderProps {
   children?: React.ReactNode;
+  /** Framed inside the rin5 Canvas, which already draws the navigation. */
+  embedded?: boolean;
   rin5Navigation?: Rin5Navigation | null;
 }
 
-export default function YCodeBuilder({ children, rin5Navigation = null }: YCodeBuilderProps = {}) {
+export default function YCodeBuilder({ children, embedded = false, rin5Navigation = null }: YCodeBuilderProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { routeType, resourceId, sidebarTab, navigateToLayers, navigateToCollection, navigateToCollections, navigateToComponent, urlState, updateQueryParams } = useEditorUrl();
@@ -2260,6 +2262,7 @@ export default function YCodeBuilder({ children, rin5Navigation = null }: YCodeB
     <>
       <div className="h-screen flex flex-col">
       {/* Top Header Bar */}
+      {!embedded && (
       <HeaderBar
         user={user}
         signOut={signOut}
@@ -2283,6 +2286,7 @@ export default function YCodeBuilder({ children, rin5Navigation = null }: YCodeB
         isSettingsRoute={routeType === 'settings' || routeType === 'localization' || routeType === 'profile' || routeType === 'forms' || routeType === 'integrations'}
         rin5Navigation={rin5Navigation}
       />
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">

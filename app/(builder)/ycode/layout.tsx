@@ -1,3 +1,5 @@
+import { cookies } from 'next/headers';
+
 import YCodeLayoutClient from './YCodeLayoutClient';
 import { resolveRin5Navigation } from '@/lib/rin5-navigation';
 
@@ -14,7 +16,9 @@ import { resolveRin5Navigation } from '@/lib/rin5-navigation';
 // This prevents useSearchParams errors during build
 export const dynamic = 'force-dynamic';
 
-export default function YCodeLayout({ children }: { children: React.ReactNode }) {
+export default async function YCodeLayout({ children }: { children: React.ReactNode }) {
   const rin5Navigation = resolveRin5Navigation(process.env);
-  return <YCodeLayoutClient rin5Navigation={rin5Navigation}>{children}</YCodeLayoutClient>;
+  // Set by /ycode/api/auth/confirm when the rin5 Canvas framed the editor.
+  const embedded = (await cookies()).get('rin5_embed')?.value === '1';
+  return <YCodeLayoutClient embedded={embedded} rin5Navigation={rin5Navigation}>{children}</YCodeLayoutClient>;
 }

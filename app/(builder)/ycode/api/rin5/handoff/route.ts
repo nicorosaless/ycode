@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { destination, email, siteId } = parseRin5HandoffRequest(await request.json(), process.env.RIN5_SITE_ID)
+    const { destination, email, embed, siteId } = parseRin5HandoffRequest(await request.json(), process.env.RIN5_SITE_ID)
     // The handoff is what mints the session, so this is where a foreign email
     // has to be stopped: creating the GoTrue user first would leave a valid
     // account for another client's site behind even on a rejected request.
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     const link = await admin.auth.admin.generateLink({
       email,
-      options: { redirectTo: `${editorBaseUrl}${parseRin5HandoffDestination(destination).path}` },
+      options: { redirectTo: `${editorBaseUrl}${parseRin5HandoffDestination(destination).path}${embed ? '?embed=1' : ''}` },
       type: 'magiclink',
     })
     if (link.error || !link.data.properties?.hashed_token) throw link.error ?? new Error('Magic link was not generated')
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     actionLink.searchParams.set('token_hash', link.data.properties.hashed_token)
     actionLink.searchParams.set('type', 'magiclink')
     actionLink.searchParams.set('destination', destination)
+    if (embed) actionLink.searchParams.set('embed', '1')
 
     return NextResponse.json(
       { actionLink: actionLink.toString(), siteId },

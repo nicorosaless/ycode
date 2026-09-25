@@ -38,7 +38,7 @@ import type { Rin5Navigation } from '@/lib/rin5-navigation';
  */
 
 // Inner component that uses useSearchParams (via useEditorUrl)
-function YCodeLayoutInner({ children, rin5Navigation }: { children: React.ReactNode; rin5Navigation: Rin5Navigation | null }) {
+function YCodeLayoutInner({ children, embedded, rin5Navigation }: { children: React.ReactNode; embedded: boolean; rin5Navigation: Rin5Navigation | null }) {
   const pathname = usePathname();
   const { routeType } = useEditorUrl();
   const { initialize } = useAuthStore();
@@ -74,20 +74,20 @@ function YCodeLayoutInner({ children, rin5Navigation }: { children: React.ReactN
 
   // For settings, localization, profile, forms, and integrations routes, pass children to YCodeBuilder so it can render them
   if (routeType === 'settings' || routeType === 'site-settings' || routeType === 'localization' || routeType === 'profile' || routeType === 'forms' || routeType === 'integrations') {
-    return <YCodeBuilder rin5Navigation={rin5Navigation}>{children}</YCodeBuilder>;
+    return <YCodeBuilder embedded={embedded} rin5Navigation={rin5Navigation}>{children}</YCodeBuilder>;
   }
 
   // YCodeBuilder handles all rendering based on URL
   // Children are ignored - routes are just for URL structure
-  return <YCodeBuilder rin5Navigation={rin5Navigation} />;
+  return <YCodeBuilder embedded={embedded} rin5Navigation={rin5Navigation} />;
 }
 
 // Client layout wrapped in Suspense to handle useSearchParams
 // Required by Next.js 14+ to prevent static rendering bailout
-export default function YCodeLayoutClient({ children, rin5Navigation }: { children: React.ReactNode; rin5Navigation: Rin5Navigation | null }) {
+export default function YCodeLayoutClient({ children, embedded, rin5Navigation }: { children: React.ReactNode; embedded: boolean; rin5Navigation: Rin5Navigation | null }) {
   return (
     <Suspense fallback={null}>
-      <YCodeLayoutInner rin5Navigation={rin5Navigation}>{children}</YCodeLayoutInner>
+      <YCodeLayoutInner embedded={embedded} rin5Navigation={rin5Navigation}>{children}</YCodeLayoutInner>
     </Suspense>
   );
 }
