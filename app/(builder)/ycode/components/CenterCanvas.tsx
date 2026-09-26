@@ -2236,7 +2236,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   }, [isPreviewMode, handleUndo, handleRedo]);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col relative">
+    <div className="flex-1 min-w-0 flex flex-col relative" data-rin5-tour="canvas">
       {/* Top Bar */}
       <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-b bg-background p-2 sm:grid-cols-3 sm:p-4">
         {/* Page Selector or Back to Page Button */}

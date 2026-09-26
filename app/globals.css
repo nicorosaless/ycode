@@ -405,3 +405,88 @@
 [data-sonner-toast][data-styled='true'] [data-content] {
   gap: 0;
 }
+
+/* ── rin5: el editor como app del cliente ─────────────────────────────────
+   Solo cuando el editor es «tu web» de un cliente de rin5 (rol editor con
+   navegación rin5, fuera del iframe): `html[data-rin5-workspace]` lo pone
+   Rin5Workspace. Los valores son el tema oscuro de rin5 tal cual
+   (rin5 web/app/globals.css ← design/system/rin5-tokens.css); no se inventan
+   aquí. Se mapean sobre los tokens de Ycode para que paneles, menús y
+   diálogos del editor hablen la misma paleta que la cabecera. */
+@font-face {
+  font-family: "Satoshi";
+  src: url("/ycode/rin5/satoshi-variable.woff2") format("woff2-variations");
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+html[data-rin5-workspace] {
+  --rin5-canvas: oklch(0.172 0.007 152);
+  --rin5-paper: oklch(0.216 0.008 152);
+  --rin5-sunken: oklch(0.142 0.006 152);
+  --rin5-overlay: oklch(0.248 0.009 152);
+  --rin5-scrim: oklch(0.08 0.008 152 / 0.68);
+  --rin5-ink: oklch(0.968 0.004 130);
+  --rin5-ink-2: oklch(0.795 0.007 130);
+  --rin5-ink-muted: oklch(0.655 0.008 130);
+  --rin5-ink-faint: oklch(0.515 0.009 130);
+  --rin5-border: oklch(0.298 0.009 152);
+  --rin5-border-strong: oklch(0.392 0.011 152);
+  --rin5-hairline: oklch(0.252 0.008 152);
+  --rin5-lime: #c6ff3d;
+  --rin5-lime-ink: oklch(0.885 0.19 126);
+  --rin5-lime-veil: oklch(0.75 0.18 124 / 0.15);
+  --rin5-live-border: oklch(0.56 0.14 126 / 0.55);
+  --rin5-on-lime: oklch(0.205 0.011 130);
+  --rin5-primary-face: linear-gradient(176deg, oklch(0.975 0.185 122) 0%, #c6ff3d 48%, oklch(0.895 0.21 128) 100%);
+  --rin5-primary-line: oklch(0.855 0.19 126);
+  --rin5-primary-edge: inset 0 1px 0 oklch(1 0 0 / 0.92), inset 0 0 0 1px oklch(1 0 0 / 0.3), inset 0 -1px 0 oklch(0.74 0.17 128 / 0.45);
+  --rin5-primary-cast: 0 1px 2px oklch(0 0 0 / 0.5), 0 10px 26px -8px oklch(0.85 0.2 126 / 0.42);
+  --rin5-primary-cast-hover: 0 2px 5px oklch(0 0 0 / 0.45), 0 22px 44px -12px oklch(0.85 0.2 126 / 0.6);
+  --rin5-shadow-md: 0 1px 3px oklch(0 0 0 / 0.42), 0 22px 44px -22px oklch(0 0 0 / 0.78);
+  --rin5-shadow-float: 0 2px 8px oklch(0 0 0 / 0.4), 0 30px 60px -24px oklch(0 0 0 / 0.7), 0 80px 120px -60px oklch(0 0 0 / 0.8);
+  --rin5-edge-halo: inset 0 1px 0 oklch(1 0 0 / 0.1), inset 0 0 0 1px oklch(1 0 0 / 0.045);
+  --rin5-ring-focus: 0 0 0 3px oklch(0.955 0.215 124 / 0.45), 0 0 0 1px oklch(0.9 0.2 126);
+  --rin5-r-xs: 8px;
+  --rin5-r-sm: 12px;
+  --rin5-r-md: 16px;
+  --rin5-r-lg: 20px;
+  --rin5-r-pill: 999px;
+  --rin5-dur-2: 200ms;
+  --rin5-ease: cubic-bezier(0.2, 0, 0.15, 1);
+  --rin5-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --rin5-font: "Satoshi", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+html[data-rin5-workspace].dark {
+  --background: var(--rin5-canvas);
+  --foreground: var(--rin5-ink);
+  --card: var(--rin5-paper);
+  --card-foreground: var(--rin5-ink);
+  --popover: var(--rin5-overlay);
+  --popover-foreground: var(--rin5-ink-2);
+  --primary: var(--rin5-lime);
+  --primary-foreground: var(--rin5-on-lime);
+  --muted: var(--rin5-paper);
+  --muted-foreground: var(--rin5-ink-muted);
+  --accent: var(--rin5-overlay);
+  --accent-foreground: var(--rin5-ink);
+  --border: var(--rin5-hairline);
+  --input: var(--rin5-border);
+  --ring: var(--rin5-lime-ink);
+  --sidebar: var(--rin5-paper);
+  --sidebar-foreground: var(--rin5-ink);
+  --sidebar-primary: var(--rin5-lime);
+  --sidebar-primary-foreground: var(--rin5-on-lime);
+  --sidebar-accent: var(--rin5-overlay);
+  --sidebar-accent-foreground: var(--rin5-ink);
+  --sidebar-border: var(--rin5-hairline);
+  --sidebar-ring: var(--rin5-lime-ink);
+}
+
+/* La fuente del builder vive en la clase de next/font del <body>; esta regla
+   la gana por especificidad solo en el espacio del cliente. */
+html[data-rin5-workspace] body {
+  --font-inter: var(--rin5-font);
+}

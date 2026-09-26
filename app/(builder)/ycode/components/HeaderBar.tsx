@@ -42,6 +42,8 @@ import { useRole } from '@/hooks/use-role';
 import BrandLogo from '@/components/BrandLogo';
 import type { Rin5Navigation } from '@/lib/rin5-navigation';
 import { Rin5CustomerLocalizationNav } from './CustomerWorkspaceAccess';
+import { Rin5Onboarding } from './rin5/Rin5Onboarding';
+import { Rin5WorkspaceHeader, type Rin5WorkspaceTab } from './rin5/Rin5WorkspaceHeader';
 
 interface HeaderBarProps {
   user: User | null;
@@ -349,6 +351,12 @@ export default function HeaderBar({
   useEffect(() => {
     const root = document.documentElement;
 
+    // rin5 customers have one theme, rin5's dark palette; there is no switcher.
+    if (isEditor && rin5Navigation) {
+      root.classList.add('dark');
+      return;
+    }
+
     if (theme === 'system') {
       const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (systemPrefersDark) {
@@ -363,7 +371,7 @@ export default function HeaderBar({
     }
 
     localStorage.setItem('theme', theme);
-  }, [theme]);
+  }, [theme, isEditor, rin5Navigation]);
 
   // Close page dropdown when clicking outside
   useEffect(() => {
@@ -378,6 +386,67 @@ export default function HeaderBar({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showPageDropdown, setShowPageDropdown]);
+
+  // A rin5 customer: this bar is the navigation of the whole product, in the
+  // rin5 palette. Same editor handlers as the Ycode bar below.
+  if (isEditor && rin5Navigation) {
+    const rememberDesignUrl = () => {
+      const isDesignRoute = routeType === 'layers' || routeType === 'page' || routeType === 'component';
+      if (isDesignRoute) setLastDesignUrl(window.location.pathname + window.location.search);
+    };
+    const selectTab = (tab: Rin5WorkspaceTab) => {
+      if (tab === 'canvas') {
+        setOptimisticNav('design');
+        setActiveSidebarTab('layers');
+        if (lastDesignUrl) {
+          router.push(lastDesignUrl);
+        } else {
+          const targetPageId = storeCurrentPageId || findHomepage(storePages)?.id || storePages[0]?.id;
+          if (targetPageId) navigateToLayers(targetPageId);
+        }
+        return;
+      }
+      rememberDesignUrl();
+      if (tab === 'cms') {
+        setOptimisticNav('cms');
+        setActiveSidebarTab('cms');
+        const targetCollectionId = storeSelectedCollectionId || collections[0]?.id;
+        if (targetCollectionId) {
+          setSelectedCollectionId(targetCollectionId);
+          navigateToCollection(targetCollectionId);
+        } else {
+          navigateToCollections();
+        }
+        return;
+      }
+      setOptimisticNav('localization');
+      router.push('/ycode/localization');
+    };
+    const activeRin5Tab: Rin5WorkspaceTab | null = activeNavButton === 'cms'
+      ? 'cms'
+      : activeNavButton === 'localization'
+        ? 'localization'
+        : activeNavButton === 'design' ? 'canvas' : null;
+    return (
+      <>
+        <Rin5WorkspaceHeader
+          navigation={rin5Navigation}
+          active={activeRin5Tab}
+          onSelect={selectTab}
+          saveState={isSaving ? 'saving' : hasUnsavedChanges ? 'unsaved' : lastSaved ? 'saved' : 'idle'}
+          previewing={isPreviewMode}
+          previewDisabled={!currentPage || isSaving}
+          onTogglePreview={handleTogglePreview}
+          beforePublish={async () => {
+            if (hasUnsavedChanges && currentPageId) await saveImmediately(currentPageId);
+          }}
+          userEmail={user?.email ?? null}
+          onSignOut={signOut}
+        />
+        <Rin5Onboarding />
+      </>
+    );
+  }
 
   return (
     <>
