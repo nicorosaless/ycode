@@ -127,7 +127,7 @@ export function Rin5WorkspaceHeader({
           <DropdownMenuTrigger asChild>
             <button type="button" className={styles.tab} aria-current="page" aria-label={`Sección: ${current.label}. Cambiar de sección`}>
               <current.Icon aria-hidden />
-              {current.label}
+              <span className={styles.tabLabel}>{current.label}</span>
               <ChevronDown aria-hidden />
             </button>
           </DropdownMenuTrigger>

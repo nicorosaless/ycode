@@ -15,7 +15,9 @@
   color: var(--rin5-ink);
   flex: none;
   position: relative;
-  z-index: 40;
+  /* Por encima de las capas del canvas de Ycode (z-50), para que el panel de
+     primeros pasos no quede bajo el borde de selección. */
+  z-index: 55;
 }
 
 .brand {
@@ -55,7 +57,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 34px;
+  height: 36px;
   padding: 0 12px;
   border: 0;
   border-radius: var(--rin5-r-xs);
@@ -106,7 +108,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 36px;
+  height: 40px;
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: var(--rin5-r-sm);
@@ -124,7 +126,7 @@
 .quiet:disabled { opacity: 0.42; pointer-events: none; }
 
 .iconButton {
-  width: 36px;
+  width: 40px;
   padding: 0;
   justify-content: center;
 }
@@ -134,8 +136,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 36px;
-  padding: 0 16px;
+  height: 40px;
+  padding: 0 17px;
   border: 1px solid var(--rin5-primary-line);
   border-radius: var(--rin5-r-sm);
   background: var(--rin5-primary-face);
@@ -208,6 +210,7 @@
   .quietLabel { display: none; }
 }
 
+@media (max-width: 479px) { .tabLabel { display: none; } }
 @media (max-width: 767px) {
   .header { gap: 8px; padding: 0 8px 0 12px; }
   .wide { display: none; }
