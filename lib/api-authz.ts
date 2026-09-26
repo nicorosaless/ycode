@@ -68,6 +68,9 @@ export const API_AUTHZ_RULES: readonly AuthzRule[] = [
   // Narrow rin5 customer capabilities. Editors receive these only when this
   // deployment is bound to an allowlisted tenant (see roleHasPermission).
   { pattern: '/ycode/api/rin5/settings', permission: 'rin5Customer' },
+  // The welcome is the customer's own state; the route adds the internal
+  // secret server-side and rin5 scopes it to this container's site.
+  { pattern: '/ycode/api/rin5/onboarding', permission: 'rin5Customer' },
   { pattern: '/ycode/api/locales', methods: MUTATING, permission: 'rin5Customer' },
   { pattern: '/ycode/api/rin5/cms/pages', methods: ['POST'], permission: 'rin5Customer' },
   // Customer CMS schema management is deliberately exact. Imports and direct

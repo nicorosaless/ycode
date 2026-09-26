@@ -2,9 +2,13 @@ export type Rin5Navigation = Readonly<{
   dashboardUrl: string
   analyticsUrl: string
   settingsUrl: string
+  accountUrl: string
+  domainUrl: string
   siteUrl: string
   publishUrl: string
   helpUrl: string
+  /** POST-only: rin5 checks that the form comes from this editor's origin. */
+  logoutUrl: string
 }>
 
 type Rin5NavigationEnvironment = Readonly<Record<string, string | undefined>>
@@ -36,9 +40,12 @@ export function resolveRin5Navigation(environment: Rin5NavigationEnvironment): R
   return {
     dashboardUrl: `${appOrigin}/dashboard`,
     analyticsUrl: `${appOrigin}/dashboard/analytics`,
-    settingsUrl: `${appOrigin}/dashboard/settings`,
+    settingsUrl: `${appOrigin}/dashboard/ajustes`,
+    accountUrl: `${appOrigin}/dashboard/ajustes#perfil`,
+    domainUrl: `${appOrigin}/dashboard/ajustes#dominio`,
     siteUrl: `${appOrigin}${sitePath}`,
     publishUrl: `${appOrigin}${sitePath}/publish`,
     helpUrl: `${appOrigin}/ayuda`,
+    logoutUrl: `${appOrigin}/auth/logout`,
   }
 }

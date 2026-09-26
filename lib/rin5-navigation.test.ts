@@ -14,10 +14,13 @@ test('builds the Basic customer navigation from runtime-only rin5 configuration'
     {
       dashboardUrl: 'https://app.rin5.test/dashboard',
       analyticsUrl: 'https://app.rin5.test/dashboard/analytics',
-      settingsUrl: 'https://app.rin5.test/dashboard/settings',
+      settingsUrl: 'https://app.rin5.test/dashboard/ajustes',
+      accountUrl: 'https://app.rin5.test/dashboard/ajustes#perfil',
+      domainUrl: 'https://app.rin5.test/dashboard/ajustes#dominio',
       siteUrl: `https://app.rin5.test/dashboard/sites/${siteId}`,
       publishUrl: `https://app.rin5.test/dashboard/sites/${siteId}/publish`,
       helpUrl: 'https://app.rin5.test/ayuda',
+      logoutUrl: 'https://app.rin5.test/auth/logout',
     },
   )
 })
