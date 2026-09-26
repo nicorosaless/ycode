@@ -20,7 +20,7 @@ const STEP_COPY: Record<Rin5ChecklistStepId, { label: string; hint?: string }> =
   linked: { label: 'Vincula tu web a tu cuenta' },
   trial: { label: 'Empieza la prueba de 14 días' },
   text: { label: 'Cambia un texto', hint: 'Haz doble clic en cualquier texto de tu web y escribe.' },
-  image: { label: 'Cambia una foto', hint: 'Haz clic en una foto y elige otra en el panel de la derecha.' },
+  image: { label: 'Cambia una foto', hint: 'Haz doble clic en una foto y elige otra, o sube la tuya.' },
   published: { label: 'Publica tu primer cambio', hint: 'Hasta que publicas, nadie ve tus cambios.' },
   domain: { label: 'Conecta tu dominio', hint: 'Tu web en tu propia dirección, sin cambiar de proveedor.' },
 }
@@ -35,7 +35,7 @@ const TOUR: Record<Rin5TourStep, { index: number; title: string; body: string; a
   image: {
     index: 1,
     title: 'Cambia una foto',
-    body: 'Haz clic en una foto de tu web y elige otra en el panel de la derecha.',
+    body: 'Haz doble clic en una foto de tu web y elige otra, o sube la tuya.',
     anchor: '[data-rin5-tour="canvas"]',
   },
   publish: {
@@ -137,6 +137,8 @@ type Placement = { top: number; left: number; arrowLeft: number; side: 'below' |
 const TIP_WIDTH = 300
 
 function place(step: Rin5TourStep): Placement | null {
+  // While the file manager or any other dialog is open, the tip would cover it.
+  if (document.querySelector('[role="dialog"][data-state="open"]')) return null
   const anchor = document.querySelector(TOUR[step].anchor)
   if (!anchor) return null
   const rect = anchor.getBoundingClientRect()

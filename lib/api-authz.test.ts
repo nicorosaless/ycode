@@ -57,6 +57,7 @@ test('rin5 customer capabilities are available to editors only in tenant mode', 
     ['PUT', '/ycode/api/rin5/settings'],
     ['GET', '/ycode/api/rin5/onboarding'],
     ['POST', '/ycode/api/rin5/onboarding'],
+    ['PUT', '/ycode/api/settings/draft_css'],
     ['POST', '/ycode/api/collections'],
     ['PUT', '/ycode/api/collections/reorder'],
     ['PUT', '/ycode/api/collections/collection-1'],
@@ -76,6 +77,7 @@ test('rin5 customer capabilities are available to editors only in tenant mode', 
 
 test('rin5 customer CMS access excludes imports and every direct publish route', () => {
   for (const [method, pathname] of [
+    ['PUT', '/ycode/api/settings/published_css'],
     ['POST', '/ycode/api/collections/sample'],
     ['POST', '/ycode/api/collections/import/process'],
     ['POST', '/ycode/api/collections/collection-1/import'],

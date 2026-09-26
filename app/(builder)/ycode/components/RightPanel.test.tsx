@@ -7,7 +7,7 @@ import RightPanel from './RightPanel'
 test('content-only customers see editing guidance without agent or tier promotion', () => {
   const markup = renderToStaticMarkup(<RightPanel contentOnly onLayerUpdate={() => undefined} />)
 
-  assert.match(markup, /Selecciona un texto o una imagen/)
+  assert.match(markup, /doble clic en un texto para escribir encima, o en una foto para cambiarla/)
   assert.doesNotMatch(markup, /Human|Agent|Agente IA|tier|futuro/i)
 })
 
