@@ -51,7 +51,7 @@ import { getAcceptString, getAssetIcon, getAssetProxyUrl, getOptimizedImageUrl, 
 import { ASSET_CATEGORIES } from '@/lib/asset-constants';
 import type { AssetCategory, AssetCategoryFilter } from '@/types';
 
-const FILE_MANAGER_CATEGORY_OPTIONS: ReadonlyArray<{ id: AssetCategory; label: string; icon: 'icon' | 'image' | 'video' | 'audio' | 'file-text' }> = [
+const FILE_MANAGER_CATEGORY_OPTIONS: ReadonlyArray<{ id: AssetCategory; label: 'Icons' | 'Images' | 'Videos' | 'Audio' | 'Documents'; icon: 'icon' | 'image' | 'video' | 'audio' | 'file-text' }> = [
   { id: ASSET_CATEGORIES.ICONS, label: 'Icons', icon: 'icon' },
   { id: ASSET_CATEGORIES.IMAGES, label: 'Images', icon: 'image' },
   { id: ASSET_CATEGORIES.VIDEOS, label: 'Videos', icon: 'video' },
@@ -75,6 +75,7 @@ import { useTreeDragDrop } from '@/hooks/use-tree-drag-drop';
 import { toast } from 'sonner';
 import type { AffectedPageEntity, AffectedComponentEntity } from '@/lib/asset-usage-utils';
 import { fetchRemixIcons, type RemixIcon, type RemixIconCategory } from '@/lib/remix-icons-api';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 import { createAssetLoadGuard } from './file-manager-load';
 
 /** Virtual folder IDs for the icon library tree */
@@ -126,6 +127,7 @@ function FolderRow({
   onDelete,
   onEdit,
 }: FolderRowProps) {
+  const t = useCustomerCopy();
   // Setup drag and drop
   const { setNodeRef: setDropRef } = useDroppable({
     id: node.id,
@@ -270,7 +272,7 @@ function FolderRow({
                 onEdit(node.id);
               }}
             >
-              Edit
+              {t('Edit')}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={(e) => {
@@ -278,7 +280,7 @@ function FolderRow({
                 onDelete(node.id);
               }}
             >
-              Delete
+              {t('Delete')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -321,6 +323,7 @@ function FileGridItem({
   content,
   file,
 }: FileGridItemProps) {
+  const t = useCustomerCopy();
   const showMenu = (type === 'folder' || type === 'asset') && (onDelete || onEdit || onPreview);
   const isUploading = type === 'uploading';
   const isImage = type === 'asset' && mimeType?.startsWith('image/') && (imageUrl || content);
@@ -478,7 +481,7 @@ function FileGridItem({
                     onPreview();
                   }}
                 >
-                  Preview
+                  {t('Preview')}
                 </DropdownMenuItem>
               )}
               {onEdit && (
@@ -488,7 +491,7 @@ function FileGridItem({
                     onEdit();
                   }}
                 >
-                  Edit
+                  {t('Edit')}
                 </DropdownMenuItem>
               )}
               {onDelete && (
@@ -498,7 +501,7 @@ function FileGridItem({
                     onDelete();
                   }}
                 >
-                  Delete
+                  {t('Delete')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -543,6 +546,7 @@ export default function FileManagerDialog({
   assetId,
   category,
 }: FileManagerDialogProps) {
+  const t = useCustomerCopy();
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
@@ -930,7 +934,7 @@ export default function FileManagerDialog({
       data: {
         id: 'root',
         asset_folder_id: null,
-        name: 'All files',
+        name: t('All files'),
         depth: 0,
         order: 0,
         is_published: false,
@@ -952,7 +956,7 @@ export default function FileManagerDialog({
     const actualFolders = flattenAssetFolderTree(folders, null, collapsedIds, 1);
 
     return [virtualRoot, ...actualFolders];
-  }, [folders, collapsedIds]);
+  }, [folders, collapsedIds, t]);
 
   const handleToggle = (id: string) => {
     setCollapsedIds((prev) => {
@@ -1088,7 +1092,7 @@ export default function FileManagerDialog({
   // Build breadcrumb path from root to selected folder
   const breadcrumbPath = useMemo(() => {
     const path: Array<{ id: string | null; name: string }> = [
-      { id: null, name: 'All files' }
+      { id: null, name: t('All files') }
     ];
 
     if (selectedFolderId) {
@@ -1106,11 +1110,11 @@ export default function FileManagerDialog({
     }
 
     return path;
-  }, [selectedFolderId, folders]);
+  }, [selectedFolderId, folders, t]);
 
   // Build full path for a folder (for select dropdown)
   const buildFolderPath = useCallback((folderId: string | null): string => {
-    if (!folderId) return 'All files';
+    if (!folderId) return t('All files');
 
     const pathParts: string[] = [];
     let currentId: string | null = folderId;
@@ -1122,8 +1126,8 @@ export default function FileManagerDialog({
       currentId = folder.asset_folder_id;
     }
 
-    return `All files / ${pathParts.join(' / ')}`;
-  }, [folders]);
+    return `${t('All files')} / ${pathParts.join(' / ')}`;
+  }, [folders, t]);
 
   // Create new folder
   const handleCreateFolder = async (folderName: string, parentFolderId: string | null) => {
@@ -1427,7 +1431,7 @@ export default function FileManagerDialog({
           addAsset(asset);
         });
         setAssets(prev => [...assetsToDelete.map(({ asset }) => asset), ...prev]);
-        toast.error('Failed to delete assets', {
+        toast.error(t('Failed to delete assets'), {
           description: response.error,
         });
         return;
@@ -1460,8 +1464,8 @@ export default function FileManagerDialog({
         }
 
         if (failed.length > 0) {
-          toast.error('Some assets could not be deleted', {
-            description: `${success.length} deleted, ${failed.length} failed`,
+          toast.error(t('Some assets could not be deleted'), {
+            description: t('{done} deleted, {failed} failed', { done: success.length, failed: failed.length }),
           });
         }
 
@@ -1477,7 +1481,7 @@ export default function FileManagerDialog({
         addAsset(asset);
       });
       setAssets(prev => [...assetsToDelete.map(({ asset }) => asset), ...prev]);
-      toast.error('Failed to delete assets');
+      toast.error(t('Failed to delete assets'));
     }
   };
 
@@ -1519,7 +1523,7 @@ export default function FileManagerDialog({
           updateAsset(id, { asset_folder_id: originalFolderId });
         });
         setAssets(prev => [...assetsToMove.map(({ asset }) => asset), ...prev]);
-        toast.error('Failed to move assets', {
+        toast.error(t('Failed to move assets'), {
           description: response.error,
         });
         return;
@@ -1544,8 +1548,8 @@ export default function FileManagerDialog({
         }
 
         if (failed.length > 0) {
-          toast.error('Some assets could not be moved', {
-            description: `${success.length} moved, ${failed.length} failed`,
+          toast.error(t('Some assets could not be moved'), {
+            description: t('{done} moved, {failed} failed', { done: success.length, failed: failed.length }),
           });
         }
       }
@@ -1556,7 +1560,7 @@ export default function FileManagerDialog({
         updateAsset(id, { asset_folder_id: originalFolderId });
       });
       setAssets(prev => [...assetsToMove.map(({ asset }) => asset), ...prev]);
-      toast.error('Failed to move assets');
+      toast.error(t('Failed to move assets'));
     }
   };
 
@@ -1600,7 +1604,7 @@ export default function FileManagerDialog({
       });
 
       if (response.error) {
-        toast.error('Unable to create SVG icon', {
+        toast.error(t('Unable to create SVG icon'), {
           description: response.error,
         });
         return;
@@ -1627,7 +1631,7 @@ export default function FileManagerDialog({
       setIsCreateSvgMode(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create SVG asset';
-      toast.error('Unable to create SVG icon', {
+      toast.error(t('Unable to create SVG icon'), {
         description: errorMessage,
       });
     }
@@ -1693,7 +1697,7 @@ export default function FileManagerDialog({
         if (folderChanged) {
           setAssets(prev => [originalAsset, ...prev]);
         }
-        toast.error('Unable to update asset', {
+        toast.error(t('Unable to update asset'), {
           description: response.error,
         });
         return;
@@ -1710,7 +1714,7 @@ export default function FileManagerDialog({
         setAssets(prev => [originalAsset, ...prev]);
       }
       const errorMessage = error instanceof Error ? error.message : 'Failed to update asset';
-      toast.error('Unable to update asset', {
+      toast.error(t('Unable to update asset'), {
         description: errorMessage,
       });
     }
@@ -1785,15 +1789,30 @@ export default function FileManagerDialog({
 
             // Remove the temp asset once real asset is added
             setUploadingAssets((prev) => prev.filter((temp) => temp.id !== tempAsset.id));
+            return true;
           }
+          // uploadFileApi returns null on failure: drop the spinner and count it.
+          setUploadingAssets((prev) => prev.filter((temp) => temp.id !== tempAsset.id));
+          return false;
         } catch (error) {
           console.error(`Failed to upload ${tempAsset.filename}:`, error);
           // Remove the temp asset on error too
           setUploadingAssets((prev) => prev.filter((temp) => temp.id !== tempAsset.id));
+          return false;
         }
       });
 
-      await Promise.all(uploadPromises);
+      const uploaded = await Promise.all(uploadPromises);
+      const failed = tempAssets.filter((_, index) => !uploaded[index]);
+      if (failed.length === 1) {
+        toast.error(t('{name} could not be uploaded', { name: failed[0].filename }), {
+          description: t('Use a JPG, PNG or WebP photo under 50 MB and try again.'),
+        });
+      } else if (failed.length > 1) {
+        toast.error(t('{count} files could not be uploaded', { count: failed.length }), {
+          description: t('Use a JPG, PNG or WebP photo under 50 MB and try again.'),
+        });
+      }
     } catch (error) {
       console.error('Failed to upload files:', error);
     } finally {
@@ -1823,7 +1842,7 @@ export default function FileManagerDialog({
           aria-describedby={undefined}
         >
           <DialogHeader className="-mt-8.75">
-            <DialogTitle className="sr-only">File Manager</DialogTitle>
+            <DialogTitle className="sr-only">{t('File Manager')}</DialogTitle>
 
             <div className="flex items-center justify-between gap-2 pr-7 -ml-2.5">
               <div className="flex items-center gap-2 flex-1">
@@ -1834,7 +1853,7 @@ export default function FileManagerDialog({
                     </InputGroupAddon>
 
                     <InputGroupInput
-                      placeholder="Search..."
+                      placeholder={t('Search...')}
                       autoFocus={false}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -1846,7 +1865,7 @@ export default function FileManagerDialog({
                         <button
                           onClick={() => setSearchQuery('')}
                           className="size-6 transition-opacity flex items-center justify-center cursor-pointer rounded-sm hover:bg-secondary/80"
-                          aria-label="Clear search"
+                          aria-label={t('Clear search')}
                         >
                           <Icon name="x" className="size-3" />
                         </button>
@@ -1867,7 +1886,7 @@ export default function FileManagerDialog({
                         {selectedCategories === null || selectedCategories.length === 0 ? (
                           <>
                             <Icon name="layers" className="size-3 shrink-0 text-muted-foreground" />
-                            <span className="truncate">All types</span>
+                            <span className="truncate">{t('All types')}</span>
                           </>
                         ) : (
                           <>
@@ -1883,7 +1902,10 @@ export default function FileManagerDialog({
                             })}
                             <span className="truncate">
                               {selectedCategories
-                                .map((c) => FILE_MANAGER_CATEGORY_OPTIONS.find((o) => o.id === c)?.label)
+                                .map((c) => {
+                                  const label = FILE_MANAGER_CATEGORY_OPTIONS.find((o) => o.id === c)?.label;
+                                  return label ? t(label) : null;
+                                })
                                 .filter(Boolean)
                                 .join(', ')}
                             </span>
@@ -1908,7 +1930,7 @@ export default function FileManagerDialog({
                           }}
                         />
                         <Icon name="layers" className="size-3 text-muted-foreground" />
-                        All types
+                        {t('All types')}
                       </label>
                       {FILE_MANAGER_CATEGORY_OPTIONS.map(({ id, label, icon }) => {
                         // Only show checked if explicitly selected (not when "All" is selected)
@@ -1935,7 +1957,7 @@ export default function FileManagerDialog({
                               }}
                             />
                             <Icon name={icon} className="size-3 text-muted-foreground" />
-                            {label}
+                            {t(label)}
                           </label>
                         );
                       })}
@@ -1961,7 +1983,7 @@ export default function FileManagerDialog({
                   disabled={isUploading}
                 >
                   <Icon name="upload" />
-                  Upload
+                  {t('Upload')}
                 </Button>
               </div>
 
@@ -1981,7 +2003,7 @@ export default function FileManagerDialog({
             {/* Folder Sidebar */}
             <div className="w-64 border-r h-full overflow-y-auto px-4">
               <header className="py-5 flex justify-between">
-                <span className="font-medium">File manager</span>
+                <span className="font-medium">{t('File manager')}</span>
                 <div className="-my-1">
                   <Button
                     size="xs"
@@ -2056,7 +2078,7 @@ export default function FileManagerDialog({
 
                         {/* Label */}
                         <span className="grow text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap pointer-events-none">
-                          All files
+                          {t('All files')}
                         </span>
 
                         {/* Asset Count - shown when not hovering */}
@@ -2137,7 +2159,7 @@ export default function FileManagerDialog({
                             className={`size-3 ml-1 mr-2 ${isLibrariesSelected ? 'opacity-90' : 'opacity-50'}`}
                           />
                           <span className="grow text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap pointer-events-none">
-                            Libraries
+                            {t('Libraries')}
                           </span>
                         </div>
 
@@ -2185,7 +2207,7 @@ export default function FileManagerDialog({
                                   className={`size-3 ml-1 mr-2 ${isIconsSelected ? 'opacity-90' : 'opacity-50'}`}
                                 />
                                 <span className="grow text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap pointer-events-none">
-                                  Icons
+                                  {t('Icons')}
                                 </span>
                               </div>
 
@@ -2271,10 +2293,10 @@ export default function FileManagerDialog({
                         onClick={() => setSelectedFolderId(VIRTUAL_LIBRARIES_ID)}
                         className="hover:text-foreground transition-colors cursor-pointer"
                       >
-                        Libraries
+                        {t('Libraries')}
                       </button>
                       <Icon name="chevronRight" className="size-2.5 opacity-50" />
-                      <span className="text-foreground font-medium">Icons</span>
+                      <span className="text-foreground font-medium">{t('Icons')}</span>
                     </div>
                   </FileGridHeader>
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-4">
@@ -2303,14 +2325,14 @@ export default function FileManagerDialog({
                         onClick={() => setSelectedFolderId(VIRTUAL_LIBRARIES_ID)}
                         className="hover:text-foreground transition-colors cursor-pointer"
                       >
-                        Libraries
+                        {t('Libraries')}
                       </button>
                       <Icon name="chevronRight" className="size-2.5 opacity-50" />
                       <button
                         onClick={() => setSelectedFolderId(VIRTUAL_ICONS_ID)}
                         className="hover:text-foreground transition-colors cursor-pointer"
                       >
-                        Icons
+                        {t('Icons')}
                       </button>
                       <Icon name="chevronRight" className="size-2.5 opacity-50" />
                       <span className="text-foreground font-medium">Remix</span>
@@ -2327,8 +2349,8 @@ export default function FileManagerDialog({
                       {remixTotal > 0 && (
                         <span className="text-xs text-muted-foreground">
                           {remixIcons.length === remixTotal
-                            ? `${remixTotal.toLocaleString()} icons`
-                            : `${remixIcons.length.toLocaleString()} of ${remixTotal.toLocaleString()} icons`}
+                            ? t('{count} icons', { count: remixTotal.toLocaleString() })
+                            : t('{shown} of {total} icons', { shown: remixIcons.length.toLocaleString(), total: remixTotal.toLocaleString() })}
                         </span>
                       )}
 
@@ -2339,10 +2361,10 @@ export default function FileManagerDialog({
                         onValueChange={(value) => setRemixCategory(value === '__all__' ? undefined : value)}
                       >
                         <SelectTrigger className="h-7 text-xs w-32">
-                          <SelectValue placeholder="All categories" />
+                          <SelectValue placeholder={t('All categories')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__all__">All categories</SelectItem>
+                          <SelectItem value="__all__">{t('All categories')}</SelectItem>
                           {remixCategories.map((cat) => (
                             <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
                           ))}
@@ -2356,12 +2378,12 @@ export default function FileManagerDialog({
                         onValueChange={(value) => setRemixStyle(value === '__all__' ? undefined : value as 'fill' | 'line')}
                       >
                         <SelectTrigger className="h-7 text-xs w-24">
-                          <SelectValue placeholder="All styles" />
+                          <SelectValue placeholder={t('All styles')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__all__">All styles</SelectItem>
-                          <SelectItem value="fill">Fill</SelectItem>
-                          <SelectItem value="line">Line</SelectItem>
+                          <SelectItem value="__all__">{t('All styles')}</SelectItem>
+                          <SelectItem value="fill">{t('Fill')}</SelectItem>
+                          <SelectItem value="line">{t('Line')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2375,9 +2397,9 @@ export default function FileManagerDialog({
                   ) : remixIcons.length === 0 ? (
                     <div className="flex-1 flex flex-col">
                       <div className="flex-1 w-full flex-col flex gap-1 items-center justify-center">
-                        <div>No icons found</div>
+                        <div>{t('No icons found')}</div>
                         <div className="text-muted-foreground">
-                          Try a different search or filter
+                          {t('Try a different search or filter')}
                         </div>
                       </div>
                       <div className="flex-1" />
@@ -2454,15 +2476,15 @@ export default function FileManagerDialog({
                       {assets.length > 0 && selectedAssetIds.size === 0 && (
                         <span className="text-xs text-muted-foreground">
                           {assets.length >= totalAssets
-                            ? `${assets.length} ${assets.length === 1 ? 'file' : 'files'}`
-                            : `${assets.length} of ${totalAssets} files`}
+                            ? t(assets.length === 1 ? '{count} file' : '{count} files', { count: assets.length })
+                            : t('{shown} of {total} files', { shown: assets.length, total: totalAssets })}
                         </span>
                       )}
 
                       {selectedAssetIds.size > 0 ? (
                         <>
                           <span className="text-xs text-muted-foreground">
-                            {selectedAssetIds.size} selected
+                            {t('{count} selected', { count: selectedAssetIds.size })}
                           </span>
 
                           <Button
@@ -2475,7 +2497,7 @@ export default function FileManagerDialog({
                             }}
                           >
                             <Icon name="folder" />
-                            Move
+                            {t('Move')}
                           </Button>
 
                           <Button
@@ -2485,7 +2507,7 @@ export default function FileManagerDialog({
                             onClick={() => setShowBulkDeleteConfirmDialog(true)}
                           >
                             <Icon name="trash" />
-                            Delete
+                            {t('Delete')}
                           </Button>
 
                           <Button
@@ -2493,7 +2515,7 @@ export default function FileManagerDialog({
                             variant="secondary"
                             onClick={handleClearSelection}
                           >
-                            Deselect all
+                            {t('Deselect all')}
                           </Button>
                         </>
                       ) : (
@@ -2504,7 +2526,7 @@ export default function FileManagerDialog({
                           disabled={assets.length === 0}
                           className="text-xs"
                         >
-                          Select all
+                          {t('Select all')}
                         </Button>
                       )}
                     </div>
@@ -2519,14 +2541,14 @@ export default function FileManagerDialog({
                     <div className="flex-1 flex flex-col">
                       <div className="flex-1 w-full flex-col flex gap-1 items-center justify-center">
                         <div>
-                          No files found
+                          {t('No files found')}
                         </div>
                         <div className="text-muted-foreground">
                           {searchQuery.trim() || selectedCategories !== null
-                            ? 'No files were found using the current filters'
+                            ? t('No files were found using the current filters')
                             : selectedFolderId === null
-                              ? 'No files'
-                              : 'No folders or assets in this folder'}
+                              ? t('No files')
+                              : t('No folders or assets in this folder')}
                         </div>
                       </div>
                       <div className="flex-1"></div>
@@ -2631,9 +2653,9 @@ export default function FileManagerDialog({
       <ConfirmDialog
         open={showDeleteConfirmDialog}
         onOpenChange={setShowDeleteConfirmDialog}
-        title="Delete folder"
+        title={t('Delete folder')}
         description={(() => {
-          if (!deletingFolderId) return 'Are you sure you want to delete this folder?';
+          if (!deletingFolderId) return t('Are you sure you want to delete this folder?');
 
           const descendantIds = getDescendantFolderIds(deletingFolderId);
           // Count assets from cache (may not include all assets)
@@ -2645,18 +2667,18 @@ export default function FileManagerDialog({
           if (descendantIds.length > 0 || assetsCount > 0) {
             const parts = [];
             if (descendantIds.length > 0) {
-              parts.push(`${descendantIds.length} subfolder${descendantIds.length > 1 ? 's' : ''}`);
+              parts.push(t(descendantIds.length > 1 ? '{count} subfolders' : '{count} subfolder', { count: descendantIds.length }));
             }
             if (assetsCount > 0) {
-              parts.push(`${assetsCount} asset${assetsCount > 1 ? 's' : ''}`);
+              parts.push(t(assetsCount > 1 ? '{count} files' : '{count} file', { count: assetsCount }));
             }
-            return `Are you sure you want to delete this folder and all its contents (${parts.join(' and ')})? This action cannot be undone.`;
+            return t('Are you sure you want to delete this folder and all its contents ({contents})? This action cannot be undone.', { contents: parts.join(t(' and ')) });
           }
 
-          return 'Are you sure you want to delete this folder? This action cannot be undone.';
+          return t('Are you sure you want to delete this folder? This action cannot be undone.');
         })()}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        confirmLabel={t('Delete')}
+        cancelLabel={t('Cancel')}
         confirmVariant="destructive"
         onConfirm={handleConfirmDeleteFolder}
       />
@@ -2671,34 +2693,34 @@ export default function FileManagerDialog({
             setLoadingUsage(false);
           }
         }}
-        title="Delete asset"
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        title={t('Delete asset')}
+        confirmLabel={t('Delete')}
+        cancelLabel={t('Cancel')}
         confirmVariant="destructive"
         onConfirm={handleConfirmDeleteAsset}
       >
         {loadingUsage ? (
           <span className="flex items-center gap-2">
             <Spinner />
-            Checking asset usage...
+            {t('Checking asset usage...')}
           </span>
         ) : assetUsage && assetUsage.total > 0 ? (
           <div className="space-y-3">
             <p>
-              Deleting{' '}
+              {t('Deleting')}{' '}
               <span className="text-foreground">
-                {(assetsById[deletingAssetId ?? ''] || assets.find((a) => a.id === deletingAssetId))?.filename ?? 'this asset'}
+                {(assetsById[deletingAssetId ?? ''] || assets.find((a) => a.id === deletingAssetId))?.filename ?? t('this asset')}
               </span>{' '}
-              will break the asset where it is being used. Are you sure you want to delete it? This action cannot be undone.
-              This asset is used in:
+              {t('will break the asset where it is being used. Are you sure you want to delete it? This action cannot be undone.')}
+              {' '}{t('This asset is used in:')}
             </p>
             <div className="space-y-2 text-muted-foreground">
               {assetUsage.pages.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Pages</span>
+                    <span className="text-foreground">{t('Pages')}</span>
                     <span>&mdash;</span>
-                    <span>{assetUsage.pages.length} item{assetUsage.pages.length > 1 ? 's' : ''}</span>
+                    <span>{t(assetUsage.pages.length > 1 ? '{count} items' : '{count} item', { count: assetUsage.pages.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {assetUsage.pages.map((p) => (
@@ -2710,9 +2732,9 @@ export default function FileManagerDialog({
               {assetUsage.components.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Components</span>
+                    <span className="text-foreground">{t('Components')}</span>
                     <span>&mdash;</span>
-                    <span>{assetUsage.components.length} item{assetUsage.components.length > 1 ? 's' : ''}</span>
+                    <span>{t(assetUsage.components.length > 1 ? '{count} items' : '{count} item', { count: assetUsage.components.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {assetUsage.components.map((c) => (
@@ -2724,9 +2746,9 @@ export default function FileManagerDialog({
               {assetUsage.cmsItems.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">CMS items</span>
+                    <span className="text-foreground">{t('CMS items')}</span>
                     <span>&mdash;</span>
-                    <span>{assetUsage.cmsItems.length} item{assetUsage.cmsItems.length > 1 ? 's' : ''}</span>
+                    <span>{t(assetUsage.cmsItems.length > 1 ? '{count} items' : '{count} item', { count: assetUsage.cmsItems.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {assetUsage.cmsItems.map((i) => {
@@ -2743,16 +2765,16 @@ export default function FileManagerDialog({
               {assetUsage.fieldDefaults.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Field default values</span>
+                    <span className="text-foreground">{t('Field default values')}</span>
                     <span>&mdash;</span>
-                    <span>{assetUsage.fieldDefaults.length} field{assetUsage.fieldDefaults.length > 1 ? 's' : ''}</span>
+                    <span>{t(assetUsage.fieldDefaults.length > 1 ? '{count} fields' : '{count} field', { count: assetUsage.fieldDefaults.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {assetUsage.fieldDefaults.map((f) => {
                       const field = f as FieldDefaultUsageEntry;
                       return (
                         <li key={field.id}>
-                          Field &quot;{field.name}&quot; in the &quot;{field.collectionName}&quot; collection
+                          {t('Field "{field}" in the "{collection}" collection', { field: field.name, collection: field.collectionName })}
                         </li>
                       );
                     })}
@@ -2762,7 +2784,7 @@ export default function FileManagerDialog({
             </div>
           </div>
         ) : (
-          'Are you sure you want to delete this asset? This action cannot be undone.'
+          t('Are you sure you want to delete this asset? This action cannot be undone.')
         )}
       </ConfirmDialog>
 
@@ -2770,10 +2792,10 @@ export default function FileManagerDialog({
       <ConfirmDialog
         open={showBulkDeleteConfirmDialog}
         onOpenChange={setShowBulkDeleteConfirmDialog}
-        title={`Delete ${selectedAssetIds.size} file${selectedAssetIds.size > 1 ? 's' : ''}`}
-        description={`Are you sure you want to delete ${selectedAssetIds.size} file${selectedAssetIds.size > 1 ? 's' : ''}? This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        title={t(selectedAssetIds.size > 1 ? 'Delete {count} files' : 'Delete {count} file', { count: selectedAssetIds.size })}
+        description={t(selectedAssetIds.size > 1 ? 'Are you sure you want to delete {count} files? This action cannot be undone.' : 'Are you sure you want to delete {count} file? This action cannot be undone.', { count: selectedAssetIds.size })}
+        confirmLabel={t('Delete')}
+        cancelLabel={t('Cancel')}
         confirmVariant="destructive"
         onConfirm={() => {
           handleBulkDelete();
@@ -2792,12 +2814,12 @@ export default function FileManagerDialog({
           className="gap-0"
         >
           <DialogHeader>
-            <DialogTitle>Move {selectedAssetIds.size} asset{selectedAssetIds.size > 1 ? 's' : ''}</DialogTitle>
+            <DialogTitle>{t(selectedAssetIds.size > 1 ? 'Move {count} files' : 'Move {count} file', { count: selectedAssetIds.size })}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4.5 pt-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="bulk-move-folder">Folder</Label>
+              <Label htmlFor="bulk-move-folder">{t('Folder')}</Label>
               <Select
                 value={bulkMoveTargetFolderId || 'root'}
                 onValueChange={(value) => setBulkMoveTargetFolderId(value === 'root' ? null : value)}
@@ -2806,7 +2828,7 @@ export default function FileManagerDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="root">All files</SelectItem>
+                  <SelectItem value="root">{t('All files')}</SelectItem>
                   {folders.map((folder) => (
                     <SelectItem key={folder.id} value={folder.id}>
                       {buildFolderPath(folder.id)}
@@ -2824,7 +2846,7 @@ export default function FileManagerDialog({
                   setBulkMoveTargetFolderId(null);
                 }}
               >
-                Cancel
+                {t('Cancel')}
               </Button>
               <Button
                 onClick={() => {
@@ -2832,7 +2854,7 @@ export default function FileManagerDialog({
                   setBulkMoveTargetFolderId(null);
                 }}
               >
-                Move
+                {t('Move')}
               </Button>
             </DialogFooter>
           </div>
@@ -2858,12 +2880,12 @@ export default function FileManagerDialog({
           className="gap-0"
         >
           <DialogHeader>
-            <DialogTitle>{isCreateSvgMode ? 'New SVG icon' : 'Edit asset'}</DialogTitle>
+            <DialogTitle>{isCreateSvgMode ? t('New SVG icon') : t('Edit asset')}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4.5 pt-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="asset-name">File name</Label>
+              <Label htmlFor="asset-name">{t('File name')}</Label>
               <Input
                 id="asset-name"
                 value={editAssetName}
@@ -2881,7 +2903,7 @@ export default function FileManagerDialog({
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="asset-folder">Folder</Label>
+              <Label htmlFor="asset-folder">{t('Folder')}</Label>
               <Select
                 value={editAssetFolderId || 'root'}
                 onValueChange={(value) => setEditAssetFolderId(value === 'root' ? null : value)}
@@ -2890,7 +2912,7 @@ export default function FileManagerDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="root">All files</SelectItem>
+                  <SelectItem value="root">{t('All files')}</SelectItem>
                   {folders.map((folder) => (
                     <SelectItem key={folder.id} value={folder.id}>
                       {buildFolderPath(folder.id)}
@@ -2902,7 +2924,7 @@ export default function FileManagerDialog({
 
             {(isCreateSvgMode || editAssetContent !== null) && (
               <div className="flex flex-col gap-2">
-                <Label htmlFor="svg-code">SVG code</Label>
+                <Label htmlFor="svg-code">{t('SVG code')}</Label>
                 <Textarea
                   id="svg-code"
                   value={editAssetContent || ''}
@@ -2919,7 +2941,7 @@ export default function FileManagerDialog({
                 variant="secondary"
                 onClick={() => setShowEditAssetDialog(false)}
               >
-                Cancel
+                {t('Cancel')}
               </Button>
               <Button
                 onClick={() => {
@@ -2928,7 +2950,7 @@ export default function FileManagerDialog({
                 }}
                 disabled={!editAssetName.trim() || (isCreateSvgMode && !editAssetContent?.trim())}
               >
-                {isCreateSvgMode ? 'Create' : 'Save'}
+                {isCreateSvgMode ? t('Create') : t('Save')}
               </Button>
             </DialogFooter>
           </div>
@@ -2947,7 +2969,7 @@ export default function FileManagerDialog({
           >
             <Icon name="folder" className="size-3 mr-2 opacity-90" />
             <span className="text-xs font-medium">
-              {flattenedFolders.find(n => n.id === activeId)?.data.name || 'Folder'}
+              {flattenedFolders.find(n => n.id === activeId)?.data.name || t('Folder')}
             </span>
           </div>
         ) : null}

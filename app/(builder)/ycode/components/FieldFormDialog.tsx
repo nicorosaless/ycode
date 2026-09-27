@@ -28,7 +28,8 @@ import {
 import Icon from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FIELD_TYPES_BY_CATEGORY, ASSET_FIELD_TYPES, supportsDefaultValue, isAssetFieldType, getFileManagerCategory, getAssetFieldLabel, type FieldType } from '@/lib/collection-field-utils';
+import { FIELD_TYPES_BY_CATEGORY, ASSET_FIELD_TYPES, supportsDefaultValue, isAssetFieldType, getFileManagerCategory, getAssetFieldAddLabel, type FieldType } from '@/lib/collection-field-utils';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 import { parseMultiReferenceValue } from '@/lib/collection-utils';
 import { clampDateInputValue } from '@/lib/date-format-utils';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
@@ -64,6 +65,7 @@ export default function FieldFormDialog({
   open,
   onOpenChange,
 }: FieldFormDialogProps) {
+  const t = useCustomerCopy();
   // Snapshot the field when the dialog opens so content stays stable during close animation
   const stableFieldRef = useRef<CollectionField | null | undefined>(field);
   useEffect(() => {
@@ -304,21 +306,21 @@ export default function FieldFormDialog({
       <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'New field' : `Edit field "${stableField?.name}"`}
+            {mode === 'create' ? t('New field') : t('Edit field "{name}"', { name: stableField?.name ?? '' })}
           </DialogTitle>
         </DialogHeader>
 
         <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); if (!isSubmitDisabled && !isSubmitting) handleSubmit(); }}>
           <div className="grid grid-cols-5 items-center gap-4">
             <Label htmlFor="field-name" className="text-right">
-              Name
+              {t('Name')}
             </Label>
             <div className="col-span-4">
               <Input
                 id="field-name"
                 value={fieldName}
                 onChange={(e) => setFieldName(e.target.value)}
-                placeholder="Field name"
+                placeholder={t('Field name')}
                 autoComplete="off"
               />
             </div>
@@ -326,7 +328,7 @@ export default function FieldFormDialog({
 
           <div className="grid grid-cols-5 items-center gap-4">
             <Label htmlFor="field-type" className="text-right">
-              Type
+              {t('Type')}
             </Label>
             <div className="col-span-4">
               <Select
@@ -349,7 +351,7 @@ export default function FieldFormDialog({
                           <SelectItem key={type.value} value={type.value}>
                             <span className="flex items-center gap-2">
                               <Icon name={type.icon} className="size-3 shrink-0 opacity-60" />
-                              {type.label}
+                              {t(type.label)}
                             </span>
                           </SelectItem>
                         ))}
@@ -365,7 +367,7 @@ export default function FieldFormDialog({
           {isReferenceType && (
             <div className="grid grid-cols-5 items-center gap-4">
               <Label htmlFor="field-reference-collection" className="text-right">
-                Collection
+                {t('Collection')}
               </Label>
               <div className="col-span-4">
                 <Select
@@ -374,7 +376,7 @@ export default function FieldFormDialog({
                   disabled={mode === 'edit'}
                 >
                   <SelectTrigger id="field-reference-collection" className="w-full">
-                    <SelectValue placeholder="Select..." />
+                    <SelectValue placeholder={t('Select...')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -386,7 +388,7 @@ export default function FieldFormDialog({
                         ))
                       ) : (
                         <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No collections available
+                          {t('No collections available')}
                         </div>
                       )}
                     </SelectGroup>
@@ -401,7 +403,7 @@ export default function FieldFormDialog({
             <>
               <div className="grid grid-cols-5 items-center gap-4">
                 <Label htmlFor="field-count-collection" className="text-right">
-                  Collection
+                  {t('Collection')}
                 </Label>
                 <div className="col-span-4">
                   <Select
@@ -410,7 +412,7 @@ export default function FieldFormDialog({
                     disabled={mode === 'edit'}
                   >
                     <SelectTrigger id="field-count-collection" className="w-full">
-                      <SelectValue placeholder={countableCollections.length === 0 ? 'No collections reference this one' : 'Select collection...'} />
+                      <SelectValue placeholder={countableCollections.length === 0 ? t('No collections reference this one') : t('Select collection...')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -422,7 +424,7 @@ export default function FieldFormDialog({
                           ))
                         ) : (
                           <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                            No collections reference this one
+                            {t('No collections reference this one')}
                           </div>
                         )}
                       </SelectGroup>
@@ -433,7 +435,7 @@ export default function FieldFormDialog({
 
               <div className="grid grid-cols-5 items-center gap-4">
                 <Label htmlFor="field-count-field" className="text-right">
-                  Field
+                  {t('Field')}
                 </Label>
                 <div className="col-span-4">
                   <Select
@@ -442,7 +444,7 @@ export default function FieldFormDialog({
                     disabled={mode === 'edit' || !countCollectionId || countCandidateFields.length === 0}
                   >
                     <SelectTrigger id="field-count-field" className="w-full">
-                      <SelectValue placeholder={!countCollectionId ? 'Pick a collection first' : countCandidateFields.length === 0 ? 'No reference fields' : 'Select field...'} />
+                      <SelectValue placeholder={!countCollectionId ? t('Pick a collection first') : countCandidateFields.length === 0 ? t('No reference fields') : t('Select field...')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -463,7 +465,7 @@ export default function FieldFormDialog({
           {isAssetType && (
             <div className="grid grid-cols-5 items-center gap-4">
               <Label htmlFor="field-multiple" className="text-right">
-                Multiple
+                {t('Multiple')}
               </Label>
               <div className="col-span-4 flex items-center gap-2">
                 <Checkbox
@@ -476,7 +478,7 @@ export default function FieldFormDialog({
                   htmlFor="field-multiple"
                   className="text-xs text-muted-foreground font-normal cursor-pointer"
                 >
-                  Allows multiple files
+                  {t('Allows multiple files')}
                 </Label>
               </div>
             </div>
@@ -486,7 +488,7 @@ export default function FieldFormDialog({
           {isOptionType && (
             <div className="grid grid-cols-5 items-start gap-4">
               <Label className="text-right mt-2">
-                Options
+                {t('Options')}
               </Label>
               <div className="col-span-4 flex flex-col gap-2">
                 {fieldOptions.length > 0 && (
@@ -496,7 +498,7 @@ export default function FieldFormDialog({
                         <Input
                           value={option.name}
                           onChange={(e) => handleUpdateOptionName(option.id, e.target.value)}
-                          placeholder="Option name"
+                          placeholder={t('Option name')}
                           autoComplete="off"
                           className="flex-1"
                         />
@@ -505,7 +507,7 @@ export default function FieldFormDialog({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveOption(option.id)}
-                          aria-label="Remove option"
+                          aria-label={t('Remove option')}
                         >
                           <Icon name="x" />
                         </Button>
@@ -521,7 +523,7 @@ export default function FieldFormDialog({
                   onClick={handleAddOption}
                 >
                   <Icon name="plus" className="size-3" />
-                  Add option
+                  {t('Add option')}
                 </Button>
               </div>
             </div>
@@ -531,7 +533,7 @@ export default function FieldFormDialog({
           {hasDefault && (
             <div className="grid grid-cols-5 items-start gap-4">
               <Label htmlFor="field-default" className="text-right mt-2">
-                Default
+                {t('Default')}
               </Label>
               <div className="col-span-4">
                 {isAssetFieldType(fieldType) ? (
@@ -556,7 +558,7 @@ export default function FieldFormDialog({
                   <ExpandableRichTextEditor
                     value={fieldDefault}
                     onChange={setFieldDefault}
-                    placeholder="Default value"
+                    placeholder={t('Default value')}
                     sheetDescription="Field default value"
                   />
                 ) : fieldType === 'link' ? (
@@ -576,11 +578,11 @@ export default function FieldFormDialog({
                     disabled={fieldOptions.length === 0}
                   >
                     <SelectTrigger id="field-default" className="w-full">
-                      <SelectValue placeholder={fieldOptions.length === 0 ? 'Add options first' : 'Select default...'} />
+                      <SelectValue placeholder={fieldOptions.length === 0 ? t('Add options first') : t('Select default...')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="__none__">No default</SelectItem>
+                        <SelectItem value="__none__">{t('No default')}</SelectItem>
                         {fieldOptions
                           .filter((o) => o.name.trim().length > 0)
                           .map((option) => (
@@ -602,7 +604,7 @@ export default function FieldFormDialog({
                       htmlFor="field-default"
                       className="text-xs text-muted-foreground font-normal cursor-pointer gap-1"
                     >
-                      Value is set to <span className="text-foreground">{fieldDefault === 'true' ? 'YES' : 'NO'}</span>
+                      {t('Value is set to')} <span className="text-foreground">{fieldDefault === 'true' ? t('YES') : t('NO')}</span>
                     </Label>
                   </div>
                 ) : fieldType === 'number' ? (
@@ -653,7 +655,7 @@ export default function FieldFormDialog({
                     id="field-default"
                     value={fieldDefault}
                     onChange={(e) => setFieldDefault(e.target.value)}
-                    placeholder="Default value"
+                    placeholder={t('Default value')}
                     autoComplete="off"
                   />
                 )}
@@ -669,7 +671,7 @@ export default function FieldFormDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button
               type="submit"
@@ -678,8 +680,8 @@ export default function FieldFormDialog({
             >
               {isSubmitting && <Spinner className="size-3" />}
               {mode === 'create'
-                ? (isSubmitting ? 'Creating...' : 'Create field')
-                : (isSubmitting ? 'Updating...' : 'Update field')}
+                ? (isSubmitting ? t('Creating...') : t('Create field'))
+                : (isSubmitting ? t('Updating...') : t('Update field'))}
             </Button>
           </div>
         </form>
@@ -703,7 +705,8 @@ interface AssetDefaultProps {
 /** Single-asset default value picker */
 function AssetDefaultSingle({ fieldType, value, onChange, openFileManager, getAsset }: AssetDefaultProps) {
   const asset = value ? getAsset(value) : null;
-  const label = getAssetFieldLabel(fieldType);
+  const t = useCustomerCopy();
+  const addLabel = t(getAssetFieldAddLabel(fieldType));
 
   const handleSelect = () => {
     openFileManager(
@@ -723,7 +726,7 @@ function AssetDefaultSingle({ fieldType, value, onChange, openFileManager, getAs
         onClick={(e) => { e.stopPropagation(); handleSelect(); }}
       >
         <Icon name="plus" className="size-3" />
-        Add {label}
+        {addLabel}
       </Button>
     );
   }
@@ -743,7 +746,8 @@ function AssetDefaultSingle({ fieldType, value, onChange, openFileManager, getAs
 /** Multiple-asset default value picker */
 function AssetDefaultMultiple({ fieldType, value, onChange, openFileManager, getAsset }: AssetDefaultProps) {
   const assetIds = parseMultiReferenceValue(value);
-  const label = getAssetFieldLabel(fieldType);
+  const t = useCustomerCopy();
+  const addLabel = t(getAssetFieldAddLabel(fieldType));
 
   const handleAdd = () => {
     openFileManager(
@@ -795,7 +799,7 @@ function AssetDefaultMultiple({ fieldType, value, onChange, openFileManager, get
         onClick={(e) => { e.stopPropagation(); handleAdd(); }}
       >
         <Icon name="plus" className="size-3" />
-        Add {label}
+        {addLabel}
       </Button>
     </div>
   );

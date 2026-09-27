@@ -903,6 +903,17 @@ export function getAssetFieldLabel(fieldType: CollectionFieldType): string {
   }
 }
 
+/** The add-button text of an asset field ("Add an image"), a literal so each one can be translated. */
+export function getAssetFieldAddLabel(fieldType: CollectionFieldType) {
+  switch (fieldType) {
+    case 'image': return 'Add an image' as const;
+    case 'audio': return 'Add an audio' as const;
+    case 'video': return 'Add a video' as const;
+    case 'document': return 'Add a document' as const;
+    default: return 'Add a file' as const;
+  }
+}
+
 /** Get short label for asset field types (e.g. "image") */
 export function getAssetFieldTypeLabel(fieldType: CollectionFieldType): string {
   switch (fieldType) {

@@ -17,6 +17,7 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import RichTextEditor from './RichTextEditor';
 import type { CollectionField, Collection } from '@/types';
 import { RICH_TEXT_FIELD_TYPES, type FieldGroup } from '@/lib/collection-field-utils';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 interface RichTextEditorSheetProps {
   open: boolean;
@@ -38,16 +39,19 @@ interface RichTextEditorSheetProps {
 export default function RichTextEditorSheet({
   open,
   onOpenChange,
-  title = 'Content editor',
+  title: titleProp,
   description,
   value,
   onChange,
-  placeholder = 'Enter value...',
+  placeholder: placeholderProp,
   fieldGroups,
   allFields,
   collections,
   hidePageContextOptions = false,
 }: RichTextEditorSheetProps) {
+  const t = useCustomerCopy();
+  const title = titleProp ?? t('Content editor');
+  const placeholder = placeholderProp ?? t('Enter value...');
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent aria-describedby={undefined}>
@@ -69,7 +73,7 @@ export default function RichTextEditorSheet({
             className="gap-2"
             onClick={() => onOpenChange(false)}
           >
-            Close
+            {t('Close')}
             <Icon name="x" className="size-3" />
           </Button>
         </div>

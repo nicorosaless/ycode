@@ -32,6 +32,7 @@ import { usePagesStore } from '@/stores/usePagesStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 
 import { applyCmsTranslations, injectTranslatedText, translateComponentOverrides } from '@/lib/localisation-utils';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 import type { Layer, Component, CollectionItemWithValues, CollectionField, Breakpoint, Asset, ComponentVariable, Locale, Translation } from '@/types';
 import type { UseLiveLayerUpdatesReturn } from '@/hooks/use-live-layer-updates';
@@ -322,6 +323,7 @@ const Canvas = React.memo(function Canvas({
   availableLocales,
   translations,
 }: CanvasProps) {
+  const t = useCustomerCopy();
   // Refs
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const rootRef = useRef<Root | null>(null);
@@ -1076,7 +1078,7 @@ const Canvas = React.memo(function Canvas({
         'w-full h-full border-0',
         editingComponentId ? 'bg-transparent' : 'bg-white'
       )}
-      title="Canvas Editor"
+      title={t('Canvas Editor')}
       tabIndex={-1}
     />
   );

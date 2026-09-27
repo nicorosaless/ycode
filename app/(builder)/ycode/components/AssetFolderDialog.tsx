@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import type { AssetFolder } from '@/types';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 interface AssetFolderDialogProps {
   open: boolean;
@@ -48,6 +49,7 @@ export default function AssetFolderDialog({
   folders = [],
   currentFolderId = null,
 }: AssetFolderDialogProps) {
+  const t = useCustomerCopy();
   const [folderName, setFolderName] = useState(initialName);
   const [parentFolderId, setParentFolderId] = useState<string | null>(initialParentFolderId);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -86,7 +88,7 @@ export default function AssetFolderDialog({
 
   // Build full path for a folder (for select dropdown)
   const buildFolderPath = (folderId: string | null): string => {
-    if (!folderId) return 'All files';
+    if (!folderId) return t('All files');
 
     const pathParts: string[] = [];
     let currentId: string | null = folderId;
@@ -98,7 +100,7 @@ export default function AssetFolderDialog({
       currentId = folder.asset_folder_id;
     }
 
-    return `All files / ${pathParts.join(' / ')}`;
+    return `${t('All files')} / ${pathParts.join(' / ')}`;
   };
 
   const handleConfirm = async () => {
@@ -129,16 +131,16 @@ export default function AssetFolderDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'New folder' : 'Edit folder'}
+            {mode === 'create' ? t('New folder') : t('Edit folder')}
           </DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-4.5 pt-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="folder-name">Name</Label>
+            <Label htmlFor="folder-name">{t('Name')}</Label>
             <Input
               id="folder-name"
-              placeholder="Folder name"
+              placeholder={t('Folder name')}
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -149,7 +151,7 @@ export default function AssetFolderDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="parent-folder">Parent folder</Label>
+            <Label htmlFor="parent-folder">{t('Parent folder')}</Label>
             <Select
               value={parentFolderId || 'root'}
               onValueChange={(value) => setParentFolderId(value === 'root' ? null : value)}
@@ -159,7 +161,7 @@ export default function AssetFolderDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="root">All files</SelectItem>
+                <SelectItem value="root">{t('All files')}</SelectItem>
                 {availableFolders.map((folder) => (
                   <SelectItem key={folder.id} value={folder.id}>
                     {buildFolderPath(folder.id)}
@@ -175,7 +177,7 @@ export default function AssetFolderDialog({
               onClick={handleCancel}
               disabled={isProcessing}
             >
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button
               onClick={handleConfirm}
@@ -184,10 +186,10 @@ export default function AssetFolderDialog({
               {isProcessing ? (
                 <>
                   <Spinner />
-                  {mode === 'create' ? 'Creating...' : 'Saving...'}
+                  {mode === 'create' ? t('Creating...') : t('Saving...')}
                 </>
               ) : (
-                mode === 'create' ? 'Create' : 'Save'
+                mode === 'create' ? t('Create') : t('Save')
               )}
             </Button>
           </DialogFooter>

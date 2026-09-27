@@ -4,6 +4,7 @@ import { SelectItem, SelectSeparator } from '@/components/ui/select';
 import type { CollectionItemWithValues, CollectionField } from '@/types';
 import type { ReferenceItemOption } from '@/lib/collection-field-utils';
 import { COLLECTION_ITEM_KEYWORDS } from '@/lib/link-utils';
+import { customerCopy, useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 interface CollectionItemSelectOptionsProps {
   canUseCurrentPageItem: boolean;
@@ -58,10 +59,10 @@ export function resolveCollectionItemSelectLabel(
 ): string | null {
   if (!value) return null;
   switch (value) {
-    case COLLECTION_ITEM_KEYWORDS.CURRENT_PAGE: return 'Current page item';
-    case COLLECTION_ITEM_KEYWORDS.CURRENT_COLLECTION: return 'Current collection item';
-    case COLLECTION_ITEM_KEYWORDS.PREVIOUS_ITEM: return 'Previous item';
-    case COLLECTION_ITEM_KEYWORDS.NEXT_ITEM: return 'Next item';
+    case COLLECTION_ITEM_KEYWORDS.CURRENT_PAGE: return customerCopy('Current page item');
+    case COLLECTION_ITEM_KEYWORDS.CURRENT_COLLECTION: return customerCopy('Current collection item');
+    case COLLECTION_ITEM_KEYWORDS.PREVIOUS_ITEM: return customerCopy('Previous item');
+    case COLLECTION_ITEM_KEYWORDS.NEXT_ITEM: return customerCopy('Next item');
   }
   const refOption = referenceItemOptions.find(opt => opt.value === value);
   if (refOption) return refOption.label;
@@ -90,13 +91,14 @@ export default function LinkItemOptions({
   isSearching = false,
   slugFieldId,
 }: CollectionItemSelectOptionsProps) {
+  const t = useCustomerCopy();
   const query = searchValue?.trim().toLowerCase() ?? '';
   const matches = (label: string) => !query || label.toLowerCase().includes(query);
 
-  const showCurrentPageItem = canUseCurrentPageItem && matches('Current page item');
-  const showCurrentCollectionItem = canUseCurrentCollectionItem && matches('Current collection item');
-  const showPreviousItem = canUseNextPreviousItem && matches('Previous item');
-  const showNextItem = canUseNextPreviousItem && matches('Next item');
+  const showCurrentPageItem = canUseCurrentPageItem && matches(t('Current page item'));
+  const showCurrentCollectionItem = canUseCurrentCollectionItem && matches(t('Current collection item'));
+  const showPreviousItem = canUseNextPreviousItem && matches(t('Previous item'));
+  const showNextItem = canUseNextPreviousItem && matches(t('Next item'));
   const filteredReferenceOptions = referenceItemOptions.filter(opt => matches(opt.label));
   const filteredItems = collectionItems.filter(item => matches(getCollectionItemDisplayName(item, collectionFields, slugFieldId)));
 
@@ -111,7 +113,7 @@ export default function LinkItemOptions({
   if (!hasAnyResults) {
     return (
       <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-        {isSearching ? 'Searching...' : (query ? 'No items found' : 'No items available')}
+        {isSearching ? t('Searching...') : (query ? t('No items found') : t('No items available'))}
       </div>
     );
   }
@@ -120,22 +122,22 @@ export default function LinkItemOptions({
     <>
       {showCurrentPageItem && (
         <SelectItem value={COLLECTION_ITEM_KEYWORDS.CURRENT_PAGE}>
-          <div className="flex items-center gap-2">Current page item</div>
+          <div className="flex items-center gap-2">{t('Current page item')}</div>
         </SelectItem>
       )}
       {showCurrentCollectionItem && (
         <SelectItem value={COLLECTION_ITEM_KEYWORDS.CURRENT_COLLECTION}>
-          <div className="flex items-center gap-2">Current collection item</div>
+          <div className="flex items-center gap-2">{t('Current collection item')}</div>
         </SelectItem>
       )}
       {showPreviousItem && (
         <SelectItem value={COLLECTION_ITEM_KEYWORDS.PREVIOUS_ITEM}>
-          <div className="flex items-center gap-2">Previous item</div>
+          <div className="flex items-center gap-2">{t('Previous item')}</div>
         </SelectItem>
       )}
       {showNextItem && (
         <SelectItem value={COLLECTION_ITEM_KEYWORDS.NEXT_ITEM}>
-          <div className="flex items-center gap-2">Next item</div>
+          <div className="flex items-center gap-2">{t('Next item')}</div>
         </SelectItem>
       )}
       {filteredReferenceOptions.map((opt) => (

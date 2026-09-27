@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Icon } from '@/components/ui/icon';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 interface CollectionItemSelectorProps {
   collectionId: string;
@@ -28,6 +29,7 @@ export default function CollectionItemSelector({
   value,
   onValueChange,
 }: CollectionItemSelectorProps) {
+  const t = useCustomerCopy();
   const itemsByCollection = useCollectionsStore((s) => s.items);
   const fieldsByCollection = useCollectionsStore((s) => s.fields);
   const searchAndMergeItems = useCollectionsStore((s) => s.searchAndMergeItems);
@@ -83,7 +85,7 @@ export default function CollectionItemSelector({
     return dropdownItems.filter((item) => item.label.toLowerCase().includes(needle));
   }, [dropdownItems, search]);
 
-  const selectedLabel = dropdownItems.find((item) => item.id === value)?.label || 'Select item';
+  const selectedLabel = dropdownItems.find((item) => item.id === value)?.label || t('Select item');
   const hasNoItems = dropdownItems.length === 0 && !isSearching;
 
   const handleOpenChange = (open: boolean) => {
@@ -108,7 +110,7 @@ export default function CollectionItemSelector({
                 <Icon name="database" className="size-3 opacity-50" />
               </span>
             </TooltipTrigger>
-            <TooltipContent>Collection item</TooltipContent>
+            <TooltipContent>{t('Collection item')}</TooltipContent>
           </Tooltip>
           <span className="truncate">{selectedLabel}</span>
         </div>
@@ -118,14 +120,14 @@ export default function CollectionItemSelector({
         searchable
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search items..."
+        searchPlaceholder={t('Search items...')}
         searchLoading={isSearching}
         align="start"
         className="min-w-72 max-w-96"
       >
         {filteredItems.length === 0 ? (
           <div className="px-2 py-4 text-center text-xs text-muted-foreground">
-            {search ? (isSearching ? 'Searching...' : 'No items found') : 'No items available'}
+            {search ? (isSearching ? t('Searching...') : t('No items found')) : t('No items available')}
           </div>
         ) : (
           filteredItems.map((item) => (

@@ -19,7 +19,7 @@
  */
 
 // 1. React/Next.js
-import { useEffect, useState, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
+import { useEffect, useLayoutEffect, useState, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 // 2. Internal components
@@ -95,6 +95,8 @@ import { cloneDeep } from 'lodash';
 // 5. Types
 import type { Layer, Asset } from '@/types';
 import type { Rin5Navigation } from '@/lib/rin5-navigation';
+import { setRin5CustomerMode, translateCustomerCopy } from '@/lib/rin5-customer-copy';
+import { Rin5SessionExpired } from './rin5/Rin5SessionExpired';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/field';
@@ -116,6 +118,16 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
 
   // Role-based access
   const { isEditor, canEditStructure } = useRole();
+
+  // The rin5 customer workspace reads Spanish; known before the first paint.
+  const rin5Customer = isEditor && rin5Navigation !== null;
+  useLayoutEffect(() => {
+    setRin5CustomerMode(rin5Customer);
+  }, [rin5Customer]);
+  // Before the session is known there is no role yet, but a rin5 container
+  // only ever serves its customer: the loading screens already read Spanish.
+  const rin5Container = rin5Navigation !== null;
+  const [rin5PasswordLogin, setRin5PasswordLogin] = useState(false);
 
   // Agent can be turned off in Settings → Agent; the builder then only shows
   // manual mode (RightPanel handles its own fallback, this gates the CMS panel).
@@ -511,7 +523,9 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
   }, [canEditStructure, clipboardLayer, clipboardLayers, editingComponentId, components, getCurrentLayers, updateCurrentLayers, currentPageId, pasteInside, pasteAfter]);
 
   useImportPaste({
-    enabled: !!(currentPageId || editingComponentId),
+    // A rin5 customer edits content only: pasting layers would be a no-op
+    // announced by an English toast.
+    enabled: !!(currentPageId || editingComponentId) && !rin5Customer,
     insertLayers: insertImportedLayers,
     onNormalPaste: handleNormalPaste,
   });
@@ -2168,12 +2182,17 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
 
   // Show loading screen while checking Supabase config
   if (supabaseConfigured === null) {
-    return <BuilderLoading message="Checking configuration..." />;
+    return <BuilderLoading title={translateCustomerCopy('Please wait', rin5Container)} message={translateCustomerCopy('Checking configuration...', rin5Container)} />;
   }
 
   // Show loading screen while checking authentication
   if (!authInitialized) {
-    return <BuilderLoading message="Checking authentication..." />;
+    return <BuilderLoading title={translateCustomerCopy('Please wait', rin5Container)} message={translateCustomerCopy('Checking authentication...', rin5Container)} />;
+  }
+
+  // A rin5 customer has no password here: send them back through rin5.
+  if (!user && rin5Navigation && !rin5PasswordLogin) {
+    return <Rin5SessionExpired navigation={rin5Navigation} onPasswordLogin={() => setRin5PasswordLogin(true)} />;
   }
 
   // Show login form if not authenticated
@@ -2254,7 +2273,7 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
 
   // Wait for builder data to be preloaded (BLOCKING) - prevents race conditions
   if (!builderDataPreloaded) {
-    return <BuilderLoading message="Loading builder data..." />;
+    return <BuilderLoading title={translateCustomerCopy('Please wait', rin5Container)} message={translateCustomerCopy('Loading builder data...', rin5Container)} />;
   }
 
   // Authenticated - show builder (only after migrations AND data preload complete)
@@ -2296,7 +2315,7 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
         ) : routeType === 'settings' ? (
           <SettingsContent>{children}</SettingsContent>
         ) : routeType === 'localization' ? (
-          <LocalizationContent canManageLocales={canEditStructure || (isEditor && rin5Navigation !== null)}>{children}</LocalizationContent>
+          <LocalizationContent canManageLocales={canEditStructure || rin5Customer}>{children}</LocalizationContent>
         ) : routeType === 'profile' ? (
           <ProfileContent>{children}</ProfileContent>
         ) : routeType === 'forms' ? (
@@ -2332,7 +2351,7 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
             {/* CMS View - kept mounted for instant switching */}
             <div className={activeTab === 'cms' ? 'flex flex-1 min-w-0 overflow-hidden' : 'hidden'}>
               <Suspense fallback={null}>
-                <CMS rin5Customer={isEditor && rin5Navigation !== null} />
+                <CMS rin5Customer={rin5Customer} />
               </Suspense>
               {!isEditor && agentEnabled && (
                 <div className="w-64 shrink-0 bg-background border-l flex flex-col h-full overflow-hidden">
@@ -2351,7 +2370,7 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
             <div className={activeTab !== 'cms' ? 'contents' : 'hidden'}>
               {/* Center Canvas - Preview */}
               <CenterCanvas
-                customerSectionReorder={isEditor && rin5Navigation !== null}
+                customerSectionReorder={rin5Customer}
                 currentPageId={currentPageId}
                 viewportMode={viewportMode}
                 setViewportMode={setViewportMode}
@@ -2378,7 +2397,7 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
           }}
           collectionId={collectionItemSheet.collectionId}
           itemId={collectionItemSheet.itemId}
-          allowDirectPublish={!(isEditor && rin5Navigation !== null)}
+          allowDirectPublish={!rin5Customer}
           onSuccess={() => {
             // Close sheet after successful save
             closeCollectionItemSheet();
@@ -2462,7 +2481,7 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
     )}
 
     {/* Toast notifications */}
-    <Toaster />
+    <Toaster containerAriaLabel={translateCustomerCopy('Notifications', rin5Customer)} />
 
     {/* Drag preview portal - follows cursor during element drag */}
     <Suspense fallback={null}>

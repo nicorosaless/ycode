@@ -85,6 +85,7 @@ import RichTextHtmlEmbedBlock from './RichTextHtmlEmbedBlock';
 import RichTextHtmlEmbedDialog from './RichTextHtmlEmbedDialog';
 import type { CollectionFieldType, Layer, LinkSettings, LinkType, Asset } from '@/types';
 import { DEFAULT_TEXT_STYLES } from '@/lib/text-format-utils';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 import { useEditorStore } from '@/stores/useEditorStore';
 
 interface RichTextEditorProps {
@@ -440,6 +441,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   onExpandClick,
   allowedFieldTypes = RICH_TEXT_ONLY_FIELD_TYPES,
 }, ref) => {
+  const t = useCustomerCopy();
   const isFullVariant = variant === 'full';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [tableContextMenuOpen, setTableContextMenuOpen] = useState(false);
@@ -1013,13 +1015,13 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="paragraph">Paragraph</SelectItem>
-              <SelectItem value="h1">Heading 1</SelectItem>
-              <SelectItem value="h2">Heading 2</SelectItem>
-              <SelectItem value="h3">Heading 3</SelectItem>
-              <SelectItem value="h4">Heading 4</SelectItem>
-              <SelectItem value="h5">Heading 5</SelectItem>
-              <SelectItem value="h6">Heading 6</SelectItem>
+              <SelectItem value="paragraph">{t('Paragraph')}</SelectItem>
+              <SelectItem value="h1">{t('Heading {level}', { level: 1 })}</SelectItem>
+              <SelectItem value="h2">{t('Heading {level}', { level: 2 })}</SelectItem>
+              <SelectItem value="h3">{t('Heading {level}', { level: 3 })}</SelectItem>
+              <SelectItem value="h4">{t('Heading {level}', { level: 4 })}</SelectItem>
+              <SelectItem value="h5">{t('Heading {level}', { level: 5 })}</SelectItem>
+              <SelectItem value="h6">{t('Heading {level}', { level: 6 })}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -1051,7 +1053,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                     <button
                       type="button"
                       disabled={disabled}
-                      title="Link"
+                      title={t('Link')}
                       className="w-auto min-w-0 shrink-0"
                     >
                       <Icon name="link" className="size-3" />
@@ -1172,7 +1174,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                   <ToggleGroupItem value="variable" asChild>
                     <button
                       type="button"
-                      title="Insert Variable"
+                      title={t('Insert Variable')}
                       disabled={disabled}
                       className="w-auto min-w-0 shrink-0"
                     >
@@ -1214,7 +1216,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 >
                   <button
                     type="button"
-                    title={editor.isActive('richTextImage') ? 'Image settings' : 'Insert Image'}
+                    title={editor.isActive('richTextImage') ? t('Image settings') : t('Insert Image')}
                     disabled={disabled}
                     className="w-auto min-w-0 shrink-0"
                     onClick={(e) => {
@@ -1246,7 +1248,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             >
               <button
                 type="button"
-                title="Insert Component"
+                title={t('Insert Component')}
                 disabled={disabled}
                 className="w-auto min-w-0 shrink-0"
                 onClick={() => setComponentPickerOpen(true)}
@@ -1260,7 +1262,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             >
               <button
                 type="button"
-                title="Insert Table"
+                title={t('Insert Table')}
                 disabled={disabled}
                 className="w-auto min-w-0 shrink-0"
                 onClick={() => editor.chain().focus().insertRichTextTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
@@ -1274,7 +1276,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             >
               <button
                 type="button"
-                title="Insert HTML Embed"
+                title={t('Insert HTML Embed')}
                 disabled={disabled}
                 className="w-auto min-w-0 shrink-0"
                 onClick={() => editor.chain().focus().insertHtmlEmbed().run()}
@@ -1298,7 +1300,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               value="undo"
               onClick={() => editor.chain().focus().undo().run()}
               disabled={disabled || !editor.can().undo()}
-              title="Undo (⌘Z)"
+              title={t('Undo (⌘Z)')}
             >
               <Icon name="undo" className="size-3" />
             </ToggleGroupItem>
@@ -1306,7 +1308,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               value="redo"
               onClick={() => editor.chain().focus().redo().run()}
               disabled={disabled || !editor.can().redo()}
-              title="Redo (⌘⇧Z)"
+              title={t('Redo (⌘⇧Z)')}
             >
               <Icon name="redo" className="size-3" />
             </ToggleGroupItem>
@@ -1322,7 +1324,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               <ToggleGroupItem
                 value="expand"
                 onClick={onExpandClick}
-                title="Open full editor"
+                title={t('Open full editor')}
               >
                 <Icon name="expand" className="size-3" />
               </ToggleGroupItem>
@@ -1347,7 +1349,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 editor.commands.toggleMark('bold', {}, { extendEmptyMarkRange: true });
               }
             }}
-            title="Bold"
+            title={t('Bold')}
           >
             <Icon name="bold" className="size-3" />
           </Button>
@@ -1364,7 +1366,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 editor.commands.toggleMark('italic', {}, { extendEmptyMarkRange: true });
               }
             }}
-            title="Italic"
+            title={t('Italic')}
           >
             <Icon name="italic" className="size-3" />
           </Button>
@@ -1381,7 +1383,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 editor.commands.toggleMark('underline', {}, { extendEmptyMarkRange: true });
               }
             }}
-            title="Underline"
+            title={t('Underline')}
           >
             <Icon name="underline" className="size-3" />
           </Button>
@@ -1398,7 +1400,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 editor.commands.toggleMark('strike', {}, { extendEmptyMarkRange: true });
               }
             }}
-            title="Strikethrough"
+            title={t('Strikethrough')}
           >
             <Icon name="strikethrough" className="size-3" />
           </Button>
@@ -1415,7 +1417,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 editor.commands.toggleSuperscript();
               }
             }}
-            title="Superscript"
+            title={t('Superscript')}
           >
             <Icon name="superscript" className="size-3" />
           </Button>
@@ -1432,7 +1434,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 editor.commands.toggleSubscript();
               }
             }}
-            title="Subscript"
+            title={t('Subscript')}
           >
             <Icon name="subscript" className="size-3" />
           </Button>
@@ -1449,7 +1451,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 editor.chain().focus().toggleBulletList().run();
               }
             }}
-            title="Bullet List"
+            title={t('Bullet List')}
           >
             <Icon name="listUnordered" className="size-3" />
           </Button>
@@ -1465,7 +1467,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 editor.chain().focus().toggleOrderedList().run();
               }
             }}
-            title="Numbered List"
+            title={t('Numbered List')}
           >
             <Icon name="listOrdered" className="size-3" />
           </Button>
@@ -1479,7 +1481,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 variant="ghost"
                 size="xs"
                 className="size-6!"
-                title={canShowVariables ? 'Insert Variable' : 'No variables available'}
+                title={canShowVariables ? t('Insert Variable') : t('No variables available')}
                 disabled={!canShowVariables || disabled}
               >
                 <Icon name="database" className="size-3" />
@@ -1519,7 +1521,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                     size="xs"
                     className={cn('size-6!', isLinkActive && 'bg-accent')}
                     disabled={disabled}
-                    title="Link"
+                    title={t('Link')}
                   >
                     <Icon name="link" className="size-3" />
                   </Button>
@@ -1542,7 +1544,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 size="xs"
                 className={cn('size-6!', editor.isActive('richTextImage') && 'bg-accent')}
                 disabled={disabled}
-                title={editor.isActive('richTextImage') ? 'Image settings' : 'Insert Image'}
+                title={editor.isActive('richTextImage') ? t('Image settings') : t('Insert Image')}
                 onClick={(e) => {
                   if (!editor.isActive('richTextImage')) {
                     e.preventDefault();
@@ -1570,7 +1572,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             variant="ghost"
             size="xs"
             className="size-6!"
-            title="Insert Component"
+            title={t('Insert Component')}
             disabled={disabled}
             onClick={() => setComponentPickerOpen(true)}
           >
@@ -1581,7 +1583,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             variant="ghost"
             size="xs"
             className="size-6!"
-            title="Insert Table"
+            title={t('Insert Table')}
             disabled={disabled}
             onClick={() => editor.chain().focus().insertRichTextTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
           >
@@ -1592,7 +1594,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             variant="ghost"
             size="xs"
             className="size-6!"
-            title="Insert HTML Embed"
+            title={t('Insert HTML Embed')}
             disabled={disabled}
             onClick={() => editor.chain().focus().insertHtmlEmbed().run()}
           >
@@ -1612,7 +1614,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               e.preventDefault();
               if (!disabled) editor.chain().focus().undo().run();
             }}
-            title="Undo (⌘Z)"
+            title={t('Undo (⌘Z)')}
           >
             <Icon name="undo" className="size-3" />
           </Button>
@@ -1626,7 +1628,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               e.preventDefault();
               if (!disabled) editor.chain().focus().redo().run();
             }}
-            title="Redo (⌘⇧Z)"
+            title={t('Redo (⌘⇧Z)')}
           >
             <Icon name="redo" className="size-3" />
           </Button>
@@ -1667,45 +1669,45 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               onClick={() => editor.chain().focus().addColumnBefore().run()}
               disabled={!editor.can().addColumnBefore()}
             >
-              Insert column before
+              {t('Insert column before')}
             </ContextMenuItem>
             <ContextMenuItem
               onClick={() => editor.chain().focus().addColumnAfter().run()}
               disabled={!editor.can().addColumnAfter()}
             >
-              Insert column after
+              {t('Insert column after')}
             </ContextMenuItem>
             <ContextMenuItem
               onClick={() => editor.chain().focus().addRowBefore().run()}
               disabled={!editor.can().addRowBefore()}
             >
-              Insert row above
+              {t('Insert row above')}
             </ContextMenuItem>
             <ContextMenuItem
               onClick={() => editor.chain().focus().addRowAfter().run()}
               disabled={!editor.can().addRowAfter()}
             >
-              Insert row below
+              {t('Insert row below')}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
               onClick={() => editor.chain().focus().deleteColumn().run()}
               disabled={!editor.can().deleteColumn()}
             >
-              Delete column
+              {t('Delete column')}
             </ContextMenuItem>
             <ContextMenuItem
               onClick={() => editor.chain().focus().deleteRow().run()}
               disabled={!editor.can().deleteRow()}
             >
-              Delete row
+              {t('Delete row')}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
               onClick={() => editor.chain().focus().toggleCurrentRowHeader().run()}
               disabled={!editor.can().toggleCurrentRowHeader()}
             >
-              Toggle header row
+              {t('Toggle header row')}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
@@ -1713,7 +1715,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               onClick={() => editor.chain().focus().deleteTable().run()}
               disabled={!editor.can().deleteTable()}
             >
-              Delete table
+              {t('Delete table')}
             </ContextMenuItem>
           </ContextMenuContent>
         )}
@@ -1728,7 +1730,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 type="button"
                 variant="secondary"
                 size="xs"
-                title="Insert Variable"
+                title={t('Insert Variable')}
               >
                 <Icon name="database" className="size-2.5" />
               </Button>

@@ -15,6 +15,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 interface FieldsDropdownProps {
   fields: CollectionField[];
@@ -61,7 +62,7 @@ function SortableFieldItem({ field, onToggleVisibility }: SortableFieldItemProps
       <Checkbox
         checked={!field.hidden}
         onCheckedChange={() => onToggleVisibility(field.id)}
-        disabled={field.name.toLowerCase() === 'name'}
+        disabled={field.key === 'name' || field.name.toLowerCase() === 'name'}
         className="shrink-0"
       />
       <span className="truncate text-xs text-muted-foreground select-none">{field.name}</span>
@@ -76,6 +77,7 @@ export default function FieldsDropdown({
   onToggleVisibility,
   onReorder,
 }: FieldsDropdownProps) {
+  const t = useCustomerCopy();
   const [orderedFields, setOrderedFields] = useState<CollectionField[]>(
     [...fields].sort((a, b) => a.order - b.order)
   );
@@ -126,7 +128,7 @@ export default function FieldsDropdown({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="sm" variant="ghost">
-          Fields
+          {t('Fields')}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
@@ -139,7 +141,7 @@ export default function FieldsDropdown({
           >
             <InputGroup>
               <InputGroupInput
-                placeholder="Search..."
+                placeholder={t('Search...')}
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
               />
@@ -161,7 +163,7 @@ export default function FieldsDropdown({
               <div className="flex flex-col gap-0.5">
                 {orderedFields.length === 0 ? (
                   <div className="text-sm text-muted-foreground text-center py-4">
-                    No fields found
+                    {t('No fields found')}
                   </div>
                 ) : (
                   orderedFields.map((field) => (

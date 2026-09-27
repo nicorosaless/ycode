@@ -27,6 +27,7 @@ import { usePagesStore } from '@/stores/usePagesStore';
 // 6. Utils
 import { buildPageTree, getNodeIcon, getPageIcon } from '@/lib/page-utils';
 import { cn } from '@/lib/utils';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 // 7. Types
 import type { Page, PageFolder } from '@/types';
@@ -199,6 +200,7 @@ function PageSelectorImpl({
   align = 'end',
   popoverClassName,
 }: PageSelectorProps) {
+  const t = useCustomerCopy();
   const [isOpen, setIsOpen] = useState(false);
 
   const pages = usePagesStore((state) => state.pages);
@@ -240,7 +242,7 @@ function PageSelectorImpl({
 
     const virtualFolder: PageFolder = {
       id: 'virtual-error-pages-folder',
-      name: 'Error pages',
+      name: t('Error pages'),
       slug: 'error-pages',
       page_folder_id: null,
       depth: 0,
@@ -265,7 +267,7 @@ function PageSelectorImpl({
       data: virtualFolder,
       children: errorPageNodes,
     };
-  }, [includeErrorPages, errorPages]);
+  }, [includeErrorPages, errorPages, t]);
 
   // Initialize the collapsed set lazily on mount so a parent re-render that
   // hands us a fresh `folders` reference (same content) doesn't blow away the
@@ -395,7 +397,7 @@ function PageSelectorImpl({
                 )}
               </>
             ) : (
-              <span className="truncate">{placeholder}</span>
+              <span className="truncate">{placeholder === 'Select...' ? t('Select...') : placeholder}</span>
             )}
           </div>
           <div className="shrink-0">
@@ -424,7 +426,7 @@ function PageSelectorImpl({
 
           {pageTree.length === 0 && !errorPagesNode && (
             <div className="text-sm text-muted-foreground text-center py-4">
-              No pages found
+              {t('No pages found')}
             </div>
           )}
         </div>

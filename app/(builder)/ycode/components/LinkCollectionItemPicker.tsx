@@ -9,6 +9,7 @@ import {
 import { useCollectionItemSearch } from '@/hooks/use-collection-item-search';
 import LinkItemOptions, { resolveCollectionItemSelectLabel } from './LinkItemOptions';
 import type { ReferenceItemOption } from '@/lib/collection-field-utils';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 interface LinkCollectionItemPickerProps {
   /** Collection id whose items power the picker; null disables it. */
@@ -44,6 +45,7 @@ export default function LinkCollectionItemPicker({
   slugFieldId,
   disabled = false,
 }: LinkCollectionItemPickerProps) {
+  const t = useCustomerCopy();
   const {
     search,
     setSearch,
@@ -72,14 +74,14 @@ export default function LinkCollectionItemPicker({
       disabled={disabled}
     >
       <SelectTrigger className="w-full">
-        {resolvedLabel ? <span className="truncate">{resolvedLabel}</span> : <SelectValue placeholder="Select..." />}
+        {resolvedLabel ? <span className="truncate">{resolvedLabel}</span> : <SelectValue placeholder={t('Select...')} />}
       </SelectTrigger>
       <SelectContent
         searchable
         searchValue={search}
         onSearchChange={setSearch}
         searchLoading={isSearching}
-        searchPlaceholder="Search items..."
+        searchPlaceholder={t('Search items...')}
         className="w-72"
       >
         <LinkItemOptions

@@ -9,6 +9,7 @@
  */
 
 import React, { useState } from 'react';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 import {
   Dialog,
   DialogContent,
@@ -41,11 +42,11 @@ export interface ConfirmDialogProps {
 export function ConfirmDialog({
   open,
   onOpenChange,
-  title = 'Are you sure?',
-  description = 'This action cannot be undone.',
+  title,
+  description,
   children,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   confirmVariant = 'destructive',
   onConfirm,
   onCancel,
@@ -55,6 +56,7 @@ export function ConfirmDialog({
   saveLabel,
   onSave,
 }: ConfirmDialogProps) {
+  const t = useCustomerCopy();
   const [loading, setLoading] = useState(false);
 
   const handleCancel = () => {
@@ -114,7 +116,7 @@ export function ConfirmDialog({
         className="overflow-hidden"
       >
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>{title ?? t('Are you sure?')}</DialogTitle>
         </DialogHeader>
 
         {children ? (
@@ -123,7 +125,7 @@ export function ConfirmDialog({
           </div>
         ) : (
           <DialogDescription className="leading-relaxed">
-            {description}
+            {description ?? t('This action cannot be undone.')}
           </DialogDescription>
         )}
 
@@ -135,7 +137,7 @@ export function ConfirmDialog({
             disabled={loading || disableConfirm}
           >
             {loading && <Spinner />}
-            {confirmLabel}
+            {confirmLabel ?? t('Confirm')}
           </Button>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             {showCancelButton && (
@@ -145,7 +147,7 @@ export function ConfirmDialog({
                 onClick={handleCancel}
                 disabled={loading}
               >
-                {cancelLabel}
+                {cancelLabel ?? t('Cancel')}
               </Button>
             )}
             {saveLabel && onSave && (

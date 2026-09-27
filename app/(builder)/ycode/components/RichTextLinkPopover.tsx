@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import RichTextLinkSettings from './RichTextLinkSettings';
 import SettingsPanel from './SettingsPanel';
 import { getLinkSettingsFromMark } from '@/lib/tiptap-extensions/rich-text-link';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 import type { Layer, CollectionField, Collection, LinkSettings, LinkType } from '@/types';
 import type { FieldGroup } from './CollectionFieldSelector';
 
@@ -63,6 +64,7 @@ export default function RichTextLinkPopover({
   excludedLinkTypes = [],
   hidePageContextOptions = false,
 }: RichTextLinkPopoverProps) {
+  const t = useCustomerCopy();
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -236,7 +238,7 @@ export default function RichTextLinkPopover({
       variant={hasLink ? 'default' : 'ghost'}
       size="icon"
       className="size-7"
-      title={disabled ? 'Links cannot be nested' : 'Link'}
+      title={disabled ? t('Links cannot be nested') : t('Link')}
       disabled={disabled}
     >
       <Icon name="link" className="size-3.5" />
@@ -259,7 +261,7 @@ export default function RichTextLinkPopover({
         sideOffset={8}
       >
         <SettingsPanel
-          title="Link"
+          title={t('Link')}
           isOpen={true}
           onToggle={() => {}}
         >

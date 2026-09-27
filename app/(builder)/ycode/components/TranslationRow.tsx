@@ -18,6 +18,9 @@ import type { Translation, CollectionField, Collection, CreateTranslationData, U
 import { useAsset } from '@/hooks/use-asset';
 import { getAssetIcon, isAssetOfType, getAssetCategoryFromMimeType, ASSET_CATEGORIES } from '@/lib/asset-utils';
 import { buildAssetFolderPath } from '@/lib/asset-folder-utils';
+import { translateKnownCustomerCopy, useCustomerCopy, useRin5CustomerMode } from '@/lib/rin5-customer-copy';
+import { customerLocaleLabel } from '@/lib/rin5-customer-locale';
+import { LOCALES } from '@/lib/localisation-utils';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { toast } from 'sonner';
 import type { IconProps } from '@/components/ui/icon';
@@ -70,6 +73,9 @@ export default function TranslationRow({
   folders = [],
   sourceItem,
 }: TranslationRowProps) {
+  const t = useCustomerCopy();
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
+  const known = (text: string) => translateKnownCustomerCopy(text, rin5Customer);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -262,7 +268,7 @@ export default function TranslationRow({
         }
 
         if (!validationResult.isValid) {
-          setValidationError(validationResult.error || 'This slug is already in use');
+          setValidationError(rin5Customer ? t('This slug is already in use') : (validationResult.error || 'This slug is already in use'));
           // Update local value to show the finalized slug
           onLocalValueChange(item.key, finalValue);
           return; // Don't save if validation fails
@@ -431,18 +437,16 @@ export default function TranslationRow({
     // Validate asset type matches source asset category
     if (assetCategory && asset.mime_type) {
       if (!isAssetOfType(asset.mime_type, assetCategory)) {
-        const categoryLabels: Record<AssetCategory, string> = {
-          images: 'an image',
-          videos: 'a video',
-          audio: 'an audio file',
-          icons: 'an icon',
-          documents: 'a document',
-        };
+        const categoryMessages = {
+          images: 'Please select an image.',
+          videos: 'Please select a video.',
+          audio: 'Please select an audio file.',
+          icons: 'Please select an icon.',
+          documents: 'Please select a document.',
+        } as const satisfies Record<AssetCategory, string>;
 
-        const expectedType = categoryLabels[assetCategory] || 'file with the correct type';
-
-        toast.error('Invalid asset type', {
-          description: `Please select ${expectedType}.`,
+        toast.error(t('Invalid asset type'), {
+          description: t(categoryMessages[assetCategory] ?? 'Please select file with the correct type.'),
         });
 
         return false; // Don't close file manager
@@ -486,17 +490,17 @@ export default function TranslationRow({
 
     // If asset has no folder, show "All files" as root
     if (!asset.asset_folder_id) {
-      return 'All files';
+      return t('All files');
     }
 
     const folder = assetFolders.find((f) => f.id === asset.asset_folder_id);
     if (!folder) {
-      return 'All files';
+      return t('All files');
     }
 
     // Build folder path and prepend "All files / "
     const folderPath = buildAssetFolderPath(folder, assetFolders) as string;
-    return `All files / ${folderPath}`;
+    return `${t('All files')} / ${folderPath}`;
   };
 
   // Render asset preview based on type
@@ -564,7 +568,7 @@ export default function TranslationRow({
                 <div className="size-5 flex items-center justify-center rounded-[6px] bg-secondary/50">
                   <Icon name={segment.icon} className="shrink-0 size-2.5 opacity-50" />
                 </div>
-                <span className="text-xs font-medium opacity-60">{segment.label}</span>
+                <span className="text-xs font-medium opacity-60">{known(segment.label)}</span>
               </React.Fragment>
             ))}
           </div>
@@ -574,14 +578,14 @@ export default function TranslationRow({
               <Icon name={item.info.icon} className="shrink-0 size-2.5 opacity-50" />
             </div>
 
-            <span className="text-xs font-medium opacity-60">{item.info.label}</span>
+            <span className="text-xs font-medium opacity-60">{known(item.info.label)}</span>
           </>
         )}
 
         {item.info.description && (
           <>
             <Separator className="w-3! bg-foreground/8" />
-            <div className="text-[11px] text-muted-foreground/70">{item.info.description}</div>
+            <div className="text-[11px] text-muted-foreground/70">{rin5Customer ? customerSlugDescription(item.info.description, t) : item.info.description}</div>
           </>
         )}
 
@@ -593,7 +597,7 @@ export default function TranslationRow({
             onClick={handleToggleCompleted}
             disabled={isUpdatingCompletion}
             className={`flex items-center justify-center pl-2 pr-2.5 py-0.75 gap-1.25 rounded-sm transition-colors cursor-pointer ${translation?.is_completed === true ? 'bg-green-400/6' : 'bg-secondary/50'} disabled:opacity-50 disabled:cursor-not-allowed`}
-            title={isUpdatingCompletion ? 'Updating...' : (translation?.is_completed === true ? 'Mark as not completed' : 'Mark as completed')}
+            title={isUpdatingCompletion ? t('Updating...') : (translation?.is_completed === true ? t('Mark as not completed') : t('Mark as completed'))}
           >
             {isUpdatingCompletion ? (
               <Spinner className="size-3 text-muted-foreground/50" />
@@ -603,7 +607,7 @@ export default function TranslationRow({
               <Icon name="block" className="size-2.25 text-muted-foreground/50" />
             )}
 
-            <span className="text-[10px] uppercase font-medium text-muted-foreground">{translation?.is_completed === true ? 'Done' : 'To do'}</span>
+            <span className="text-[10px] uppercase font-medium text-muted-foreground">{translation?.is_completed === true ? t('Done') : t('To do')}</span>
           </button>
         </div>
       </div>
@@ -652,7 +656,7 @@ export default function TranslationRow({
                 {isRichTextTranslationEmpty ? (
                   <div className="min-h-7 px-2.5 py-1 flex items-center">
                     <span className="text-muted-foreground/50 text-xs">
-                      {translation?.is_completed === true ? '(Using original)' : 'Click to edit...'}
+                      {translation?.is_completed === true ? t('(Using original)') : t('Click to edit...')}
                     </span>
                   </div>
                 ) : (
@@ -678,8 +682,8 @@ export default function TranslationRow({
                 onBlur={handleTranslationBlur}
                 placeholder={
                   translation?.is_completed === true
-                    ? '(Using original)'
-                    : (originalPreviewText || 'Enter translation...')
+                    ? t('(Using original)')
+                    : (originalPreviewText || t('Enter translation...'))
                 }
                 className={`min-h-7 [&_.ProseMirror]:py-1 [&_.ProseMirror]:px-2.5 [&_.ProseMirror]:bg-transparent!`}
                 fieldGroups={fieldGroups}
@@ -697,8 +701,8 @@ export default function TranslationRow({
                 onBlur={handleTranslationBlur}
                 placeholder={
                   translation?.is_completed === true
-                    ? '(Using original)'
-                    : (originalPreviewText || 'Enter translation...')
+                    ? t('(Using original)')
+                    : (originalPreviewText || t('Enter translation...'))
                 }
                 className={`min-h-7 [&_.ProseMirror]:py-1 [&_.ProseMirror]:px-2.5 [&_.ProseMirror]:bg-transparent! ${
                   validationError ? '[&_.ProseMirror]:border-destructive!' : ''
@@ -764,7 +768,7 @@ export default function TranslationRow({
           description={item.info.description || undefined}
           value={translationValueForEditor}
           onChange={handleRichTextSheetChange}
-          placeholder="Enter translation..."
+          placeholder={t('Enter translation...')}
           fieldGroups={fieldGroups}
           allFields={allFields}
           collections={collections}
@@ -772,4 +776,18 @@ export default function TranslationRow({
       )}
     </li>
   );
+}
+
+/**
+ * The slug descriptions are built in lib/localisation-utils with the stock
+ * English language name inside; the customer reads them in Spanish.
+ */
+function customerSlugDescription(description: string, t: ReturnType<typeof useCustomerCopy>): string {
+  const match = /^Affects the (.+) (URL generated for this page|URLs of all pages and folders inside this folder)$/.exec(description);
+  if (!match) return description;
+  const stock = LOCALES.find((locale) => locale.label === match[1]);
+  const language = (stock ? customerLocaleLabel(stock, true) : match[1]).toLocaleLowerCase('es');
+  return match[2] === 'URL generated for this page'
+    ? t('Affects the {language} URL generated for this page', { language })
+    : t('Affects the {language} URLs of all pages and folders inside this folder', { language });
 }

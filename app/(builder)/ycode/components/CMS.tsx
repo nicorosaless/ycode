@@ -45,6 +45,7 @@ import { extractCrossCollectionItemIds, parseCollectionLinkValue, resolveCollect
 import { useEditorUrl } from '@/hooks/use-editor-url';
 import { useRole } from '@/hooks/use-role';
 import { buildDynamicPageUrl } from '@/lib/page-utils';
+import { customerCopy, useCustomerCopy } from '@/lib/rin5-customer-copy';
 import { StructureEditorOnly } from './CustomerWorkspaceAccess';
 import FieldsDropdown from './FieldsDropdown';
 import AirtableSyncButton from './AirtableSyncButton';
@@ -191,7 +192,7 @@ function SortableRow({ item, isSaving, isAiActive, isManualMode, isCollectionPub
                 color: lockInfo.ownerColor,
               }}
               size="sm"
-              tooltipPrefix="Editing by"
+              tooltipPrefix={customerCopy('Editing by')}
             />
           ) : null}
         </td>
@@ -246,6 +247,7 @@ function SortableCollectionItem({
   onRenameCancel,
   onDelete,
 }: SortableCollectionItemProps) {
+  const t = useCustomerCopy();
   const {
     attributes,
     listeners,
@@ -327,10 +329,10 @@ function SortableCollectionItem({
 
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={onRename}>
-                  Rename
+                  {t('Rename')}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onDelete}>
-                  Delete
+                  {t('Delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -345,10 +347,10 @@ function SortableCollectionItem({
       {canManageSchema && (
       <ContextMenuContent>
         <ContextMenuItem onClick={onRename}>
-          Rename
+          {t('Rename')}
         </ContextMenuItem>
         <ContextMenuItem onClick={onDelete}>
-          Delete
+          {t('Delete')}
         </ContextMenuItem>
       </ContextMenuContent>
       )}
@@ -357,6 +359,7 @@ function SortableCollectionItem({
 }
 
 const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: boolean }) {
+  const t = useCustomerCopy();
   const {
     selectedCollectionId,
     setSelectedCollectionId,
@@ -994,8 +997,8 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
       })
       .catch((error) => {
         console.error('Failed to delete item:', error);
-        toast.error('Failed to delete item', {
-          description: 'The item has been restored.',
+        toast.error(t('Failed to delete item'), {
+          description: t('The item has been restored.'),
         });
       });
   };
@@ -1006,11 +1009,11 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
     setItemStatus(selectedCollectionId, itemId, action)
       .catch((error) => {
         console.error('Failed to update item status:', error);
-        toast.error('Failed to update item status', {
-          description: 'Please try again.',
+        toast.error(t('Failed to update item status'), {
+          description: t('Please try again.'),
         });
       });
-  }, [selectedCollectionId, setItemStatus]);
+  }, [selectedCollectionId, setItemStatus, t]);
 
   const handleDuplicateItem = (itemId: string) => {
     if (!selectedCollectionId) return;
@@ -1025,8 +1028,8 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
       })
       .catch((error) => {
         console.error('Failed to duplicate item:', error);
-        toast.error('Failed to duplicate item', {
-          description: 'Please try again.',
+        toast.error(t('Failed to duplicate item'), {
+          description: t('Please try again.'),
         });
       });
   };
@@ -1165,7 +1168,6 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
     if (!selectedCollectionId || selectedItemIds.size === 0) return;
 
     const count = selectedItemIds.size;
-    const itemText = count === 1 ? 'item' : 'items';
     const itemIdsToDelete = Array.from(selectedItemIds);
 
     // Store items for potential rollback
@@ -1201,8 +1203,8 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         // Show warning if some items failed
         if (response.data?.errors && response.data.errors.length > 0) {
           console.warn('Some items failed to delete:', response.data.errors);
-          toast.error(`Deleted ${response.data.deleted} of ${count} ${itemText}`, {
-            description: 'Some items failed to delete.',
+          toast.error(t(count === 1 ? 'Deleted {deleted} of {count} item' : 'Deleted {deleted} of {count} items', { deleted: response.data.deleted, count }), {
+            description: t('Some items failed to delete.'),
           });
         }
 
@@ -1223,8 +1225,8 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
             [selectedCollectionId]: previousCount,
           },
         }));
-        toast.error('Failed to delete items', {
-          description: 'The items have been restored.',
+        toast.error(t('Failed to delete items'), {
+          description: t('The items have been restored.'),
         });
       });
   };
@@ -1234,7 +1236,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
 
     const field = collectionFields.find(f => f.id === fieldId);
     if (field?.key) {
-      toast.error('Cannot delete built-in fields');
+      toast.error(t('Cannot delete built-in fields'));
       return;
     }
 
@@ -1296,7 +1298,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
       const newOrder = collectionFields.length;
       // Store adds field to local state optimistically
       await createField(selectedCollectionId, {
-        name: `${field.name} (Copy)`,
+        name: t('{name} (Copy)', { name: field.name }),
         type: field.type,
         default: field.default,
         fillable: field.fillable,
@@ -1421,7 +1423,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
   // Collection sidebar handlers
   const handleCreateCollection = () => {
     requestAnimationFrame(async () => {
-      const baseName = 'Collection';
+      const baseName = t('Collection');
       let collectionName = baseName;
       let counter = 1;
 
@@ -1445,7 +1447,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         collectionRename.startRename(newCollection.id, newCollection.name);
       } catch (error) {
         console.error('Failed to create collection:', error);
-        toast.error('Failed to create collection');
+        toast.error(t('Failed to create collection'));
       }
     });
   };
@@ -1541,8 +1543,8 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
       }
     } catch (error) {
       console.error('Failed to delete collection:', error);
-      toast.error('Failed to delete collection', {
-        description: 'Please try again.',
+      toast.error(t('Failed to delete collection'), {
+        description: t('Please try again.'),
       });
       throw error; // Re-throw so ConfirmDialog stays open
     }
@@ -1660,26 +1662,26 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
                                 onSelect={() => handleEditFieldClick(field)}
                                 disabled={!!field.key}
                               >
-                                Edit
+                                {t('Edit')}
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDuplicateField(field.id)}
                                 disabled={!!field.key}
                               >
-                                Duplicate
+                                {t('Duplicate')}
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleHideField(field.id)}
-                                disabled={field.name.toLowerCase() === 'name'}
+                                disabled={field.key === 'name' || field.name.toLowerCase() === 'name'}
                               >
-                                {field.hidden ? 'Show' : 'Hide'}
+                                {field.hidden ? t('Show') : t('Hide')}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => handleDeleteField(field.id)}
                                 disabled={!!field.key}
                               >
-                                Delete
+                                {t('Delete')}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1697,7 +1699,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
                       onClick={() => { setEditingField(null); setFieldDialogOpen(true); }}
                     >
                       <Icon name="plus" />
-                      Add field
+                      {t('Add field')}
                     </Button>
                   </th>
                   )}
@@ -2107,14 +2109,14 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
                   <td colSpan={collectionFields.filter(f => !f.hidden).length + 3} className="px-4">
                     {searchQuery ? (
                       <div className="text-muted-foreground py-32 text-center">
-                        No items found matching &quot;{searchQuery}&quot;
+                        {t('No items found matching "{query}"', { query: searchQuery })}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center gap-4 py-32">
                         <Empty className="max-w-sm">
-                          <EmptyTitle>No Items</EmptyTitle>
+                          <EmptyTitle>{t('No Items')}</EmptyTitle>
                           <EmptyDescription>
-                            This collection has no items yet. Add your first item to get started.
+                            {t('This collection has no items yet. Add your first item to get started.')}
                           </EmptyDescription>
                         </Empty>
                       </div>
@@ -2133,7 +2135,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
     sortedItems, collectionFields, isManualMode, selectedItemIds, selectedCollection?.sorting, openDropdownId, fieldDialogOpen, searchQuery, statusFieldId,
     collectionItems.length, showSkeleton, totalItems, pageSize, handleSelectAll, handleColumnClick, handleEditFieldClick, handleDuplicateField,
     handleHideField, handleDeleteField, handleFieldDialogSubmit, handleDragEnd, handleSetItemStatus, handleDuplicateItem, handleDeleteItem, handleEditItem,
-    handleToggleItemSelection, sensors,
+    handleToggleItemSelection, sensors, t,
   ]);
 
   // Collections sidebar component
@@ -2152,12 +2154,12 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
           )}
         >
           <Icon name="globe" className="size-3.5 shrink-0" />
-          <span className="font-medium">Global variables</span>
+          <span className="font-medium">{t('Global variables')}</span>
         </button>
       </div>
       <div className="border-t -mx-4 shrink-0" />
       <header className="py-5 flex items-center justify-between shrink-0">
-        <span className="font-medium">Collections</span>
+        <span className="font-medium">{t('Collections')}</span>
         {canManageSchema && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -2170,14 +2172,14 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={handleCreateCollection}>
-              New collection
+              {t('New collection')}
             </DropdownMenuItem>
             {!rin5Customer && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
-                    Samples
+                    {t('Samples')}
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     {getSampleCollectionOptions().map(option => (
@@ -2236,8 +2238,8 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
 
               {collections.length === 0 && (
                 <Empty>
-                  <EmptyTitle>Collections</EmptyTitle>
-                  <EmptyDescription>No collections yet. Click + to create new.</EmptyDescription>
+                  <EmptyTitle>{t('Collections')}</EmptyTitle>
+                  <EmptyDescription>{t('No collections yet. Click + to create new.')}</EmptyDescription>
                 </Empty>
               )}
             </div>
@@ -2264,9 +2266,9 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         {collectionsSidebar}
         <div className="flex-1 flex items-center justify-center">
           <Empty>
-            <EmptyTitle>No Collection Selected</EmptyTitle>
+            <EmptyTitle>{t('No Collection Selected')}</EmptyTitle>
             <EmptyDescription>
-              Select a collection from the sidebar to manage its items
+              {t('Select a collection from the sidebar to manage its items')}
             </EmptyDescription>
           </Empty>
         </div>
@@ -2284,7 +2286,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         <div className="flex items-center gap-1.5">
           <InputGroup className="w-full max-w-72">
             <InputGroupInput
-              placeholder="Search..."
+              placeholder={t('Search...')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               disabled={showSkeleton}
@@ -2297,7 +2299,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
             size="sm"
             variant="ghost"
             disabled={isLoading || showSkeleton}
-            aria-label="Refresh items"
+            aria-label={t('Refresh items')}
             onClick={() => {
               if (!selectedCollectionId) return;
               if (searchQuery.trim()) {
@@ -2322,7 +2324,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               onClick={handleDeleteSelected}
               disabled={showSkeleton}
             >
-              Delete
+              {t('Delete')}
               <Badge variant="secondary" className="text-[10px] px-1.5">{selectedItemIds.size}</Badge>
             </Button>
           )}
@@ -2352,7 +2354,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               disabled={isCreatingCmsPage}
             >
               <Icon name="page" />
-              {isCreatingCmsPage ? 'Preparando…' : 'Crear página CMS'}
+              {isCreatingCmsPage ? 'Preparando…' : 'Crear una página para cada elemento'}
             </Button>
           )}
 
@@ -2381,7 +2383,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               disabled={!selectedCollectionId || collectionFields.length === 0}
             >
               <Icon name="upload" />
-              Import
+              {t('Import')}
             </Button>
           </StructureEditorOnly>
 
@@ -2392,7 +2394,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
             disabled={collectionFields.length === 0 || showSkeleton}
           >
             <Icon name="plus" />
-            New Item
+            {t('New Item')}
           </Button>
         </div>
       </div>
@@ -2402,20 +2404,20 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         {loadingSampleCollectionId === selectedCollectionId || selectedCollectionId?.startsWith('temp-') ? (
           <div className="flex flex-col items-center justify-center gap-4 p-8 flex-1">
             <Spinner />
-            <span className="text-sm text-muted-foreground">Creating collection...</span>
+            <span className="text-sm text-muted-foreground">{t('Creating collection...')}</span>
           </div>
         ) : collectionFields.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-4 p-8">
             <Empty>
-              <EmptyTitle>No Fields Defined</EmptyTitle>
+              <EmptyTitle>{t('No Fields Defined')}</EmptyTitle>
               <EmptyDescription>
-                This collection has no fields. Add fields to start managing items.
+                {t('This collection has no fields. Add fields to start managing items.')}
               </EmptyDescription>
             </Empty>
             {canManageSchema && (
             <Button onClick={() => { setEditingField(null); setFieldDialogOpen(true); }}>
               <Icon name="plus" />
-              Add Field
+              {t('Add Field')}
             </Button>
             )}
           </div>
@@ -2470,7 +2472,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         <div className="flex items-center justify-between px-4 py-4 border-t">
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Show:</span>
+            <span className="text-xs text-muted-foreground">{t('Show:')}</span>
             {showSkeleton ? (
               <div className="w-20 h-8 bg-secondary/50 rounded-lg animate-pulse" />
             ) : (
@@ -2497,11 +2499,11 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               <div className="h-4 w-48 bg-secondary/50 rounded-[6px] animate-pulse" />
             ) : totalItems === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No results
+                {t('No results')}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} results
+                {t('Showing {from} to {to} of {total} results', { from: ((currentPage - 1) * pageSize) + 1, to: Math.min(currentPage * pageSize, totalItems), total: totalItems })}
               </p>
             )}
           </div>
@@ -2513,7 +2515,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1 || showSkeleton}
             >
-              Previous
+              {t('Previous')}
             </Button>
             <Button
               size="sm"
@@ -2521,7 +2523,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               onClick={() => setCurrentPage(p => p + 1)}
               disabled={currentPage * pageSize >= totalItems || showSkeleton}
             >
-              Next
+              {t('Next')}
             </Button>
           </div>
         </div>
@@ -2548,9 +2550,9 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
           setDeleteItemDialogOpen(open);
           if (!open) setDeleteItemId(null);
         }}
-        title="Delete item"
-        description="Are you sure you want to delete this item?"
-        confirmLabel="Delete"
+        title={t('Delete item')}
+        description={t('Are you sure you want to delete this item?')}
+        confirmLabel={t('Delete')}
         onConfirm={handleConfirmDeleteItem}
       />
       <ConfirmDialog
@@ -2558,9 +2560,9 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         onOpenChange={(open) => {
           setDeleteSelectedDialogOpen(open);
         }}
-        title={`Delete ${selectedItemIds.size} item${selectedItemIds.size === 1 ? '' : 's'}`}
-        description={`Are you sure you want to delete ${selectedItemIds.size} item${selectedItemIds.size === 1 ? '' : 's'}?`}
-        confirmLabel="Delete"
+        title={t(selectedItemIds.size === 1 ? 'Delete {count} item' : 'Delete {count} items', { count: selectedItemIds.size })}
+        description={t(selectedItemIds.size === 1 ? 'Are you sure you want to delete {count} item?' : 'Are you sure you want to delete {count} items?', { count: selectedItemIds.size })}
+        confirmLabel={t('Delete')}
         onConfirm={handleConfirmDeleteSelected}
       />
       <ConfirmDialog
@@ -2575,8 +2577,8 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
             }, 200);
           }
         }}
-        title={fieldUsage && fieldUsage.total > 0 ? 'Field in use' : 'Delete field'}
-        confirmLabel="Delete"
+        title={fieldUsage && fieldUsage.total > 0 ? t('Field in use') : t('Delete field')}
+        confirmLabel={t('Delete')}
         confirmVariant="destructive"
         disableConfirm={loadingFieldUsage || (fieldUsage !== null && fieldUsage.total > 0)}
         onConfirm={handleConfirmDeleteField}
@@ -2584,20 +2586,20 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         {loadingFieldUsage ? (
           <span className="flex items-center gap-2">
             <Spinner />
-            Checking field usage...
+            {t('Checking field usage...')}
           </span>
         ) : fieldUsage && fieldUsage.total > 0 ? (
           <div className="space-y-3">
             <p>
-              This field cannot be deleted because it is still being used. Remove all references before deleting.
+              {t('This field cannot be deleted because it is still being used. Remove all references before deleting.')}
             </p>
             <div className="space-y-2 text-muted-foreground">
               {fieldUsage.pages.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Page collection layers</span>
+                    <span className="text-foreground">{t('Page collection layers')}</span>
                     <span>&mdash;</span>
-                    <span>{fieldUsage.pages.length} item{fieldUsage.pages.length > 1 ? 's' : ''}</span>
+                    <span>{t(fieldUsage.pages.length > 1 ? '{count} items' : '{count} item', { count: fieldUsage.pages.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {fieldUsage.pages.map((p) => (
@@ -2609,9 +2611,9 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               {fieldUsage.components.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Components</span>
+                    <span className="text-foreground">{t('Components')}</span>
                     <span>&mdash;</span>
-                    <span>{fieldUsage.components.length} item{fieldUsage.components.length > 1 ? 's' : ''}</span>
+                    <span>{t(fieldUsage.components.length > 1 ? '{count} items' : '{count} item', { count: fieldUsage.components.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {fieldUsage.components.map((c) => (
@@ -2623,7 +2625,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
             </div>
           </div>
         ) : (
-          'Are you sure you want to delete this field? This will remove it from all items.'
+          t('Are you sure you want to delete this field? This will remove it from all items.')
         )}
       </ConfirmDialog>
       <ConfirmDialog
@@ -2638,8 +2640,8 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
             }, 200);
           }
         }}
-        title={collectionUsage && collectionUsage.total > 0 ? 'Collection in use' : 'Delete collection'}
-        confirmLabel="Delete"
+        title={collectionUsage && collectionUsage.total > 0 ? t('Collection in use') : t('Delete collection')}
+        confirmLabel={t('Delete')}
         confirmVariant="destructive"
         disableConfirm={loadingCollectionUsage || (collectionUsage !== null && collectionUsage.total > 0)}
         onConfirm={handleConfirmDeleteCollection}
@@ -2647,23 +2649,23 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
         {loadingCollectionUsage ? (
           <span className="flex items-center gap-2">
             <Spinner />
-            Checking collection usage...
+            {t('Checking collection usage...')}
           </span>
         ) : collectionUsage && collectionUsage.total > 0 ? (
           <div className="space-y-3">
             <p>
               <span className="text-foreground">
-                {collections.find(c => c.id === deleteCollectionId)?.name ?? 'This collection'}
+                {collections.find(c => c.id === deleteCollectionId)?.name ?? t('This collection')}
               </span>{' '}
-              cannot be deleted because it is still being used. Remove all references before deleting.
+              {t('cannot be deleted because it is still being used. Remove all references before deleting.')}
             </p>
             <div className="space-y-2 text-muted-foreground">
               {collectionUsage.pages.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Page collection layers</span>
+                    <span className="text-foreground">{t('Page collection layers')}</span>
                     <span>&mdash;</span>
-                    <span>{collectionUsage.pages.length} item{collectionUsage.pages.length > 1 ? 's' : ''}</span>
+                    <span>{t(collectionUsage.pages.length > 1 ? '{count} items' : '{count} item', { count: collectionUsage.pages.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {collectionUsage.pages.map((p) => (
@@ -2675,9 +2677,9 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               {collectionUsage.components.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Components</span>
+                    <span className="text-foreground">{t('Components')}</span>
                     <span>&mdash;</span>
-                    <span>{collectionUsage.components.length} item{collectionUsage.components.length > 1 ? 's' : ''}</span>
+                    <span>{t(collectionUsage.components.length > 1 ? '{count} items' : '{count} item', { count: collectionUsage.components.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {collectionUsage.components.map((c) => (
@@ -2689,14 +2691,14 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               {collectionUsage.referenceFields.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Reference fields</span>
+                    <span className="text-foreground">{t('Reference fields')}</span>
                     <span>&mdash;</span>
-                    <span>{collectionUsage.referenceFields.length} field{collectionUsage.referenceFields.length > 1 ? 's' : ''}</span>
+                    <span>{t(collectionUsage.referenceFields.length > 1 ? '{count} fields' : '{count} field', { count: collectionUsage.referenceFields.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {collectionUsage.referenceFields.map((f) => (
                       <li key={f.id}>
-                        Field &quot;{f.name}&quot; in &quot;{f.collectionName}&quot;
+                        {t('Field "{field}" in the "{collection}" collection', { field: f.name, collection: f.collectionName })}
                       </li>
                     ))}
                   </ul>
@@ -2705,9 +2707,9 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
               {collectionUsage.airtableConnections.length > 0 && (
                 <div>
                   <div className="flex gap-1.5 font-medium text-muted-foreground mb-1">
-                    <span className="text-foreground">Airtable sync</span>
+                    <span className="text-foreground">{t('Airtable sync')}</span>
                     <span>&mdash;</span>
-                    <span>{collectionUsage.airtableConnections.length} connection{collectionUsage.airtableConnections.length > 1 ? 's' : ''}</span>
+                    <span>{t(collectionUsage.airtableConnections.length > 1 ? '{count} connections' : '{count} connection', { count: collectionUsage.airtableConnections.length })}</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {collectionUsage.airtableConnections.map((c) => (
@@ -2720,7 +2722,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
           </div>
         ) : (
           <p>
-            Are you sure you want to delete &quot;{collections.find(c => c.id === deleteCollectionId)?.name ?? 'this collection'}&quot;? This action cannot be undone.
+            {t('Are you sure you want to delete "{name}"? This action cannot be undone.', { name: collections.find(c => c.id === deleteCollectionId)?.name ?? t('this collection') })}
           </p>
         )}
       </ConfirmDialog>
@@ -2730,9 +2732,9 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
           setSwitchToManualDialogOpen(open);
           if (!open) setPendingDragEvent(null);
         }}
-        title="Switch to manual order"
-        description="You cannot manually order CMS items when they are sorted by a specific field or a search filter is applied. Do you want to switch to manual sorting and remove any search filter?"
-        confirmLabel="Switch to manual order"
+        title={t('Switch to manual order')}
+        description={t('You cannot manually order CMS items when they are sorted by a specific field or a search filter is applied. Do you want to switch to manual sorting and remove any search filter?')}
+        confirmLabel={t('Switch to manual order')}
         confirmVariant="default"
         onConfirm={handleConfirmSwitchToManual}
       />

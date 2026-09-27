@@ -5,6 +5,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { useCustomerCopy } from '@/lib/rin5-customer-copy'
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 
@@ -60,6 +61,7 @@ function DialogContent({
   variant?: 'default' | 'side'
   width?: string
 }) {
+  const t = useCustomerCopy()
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -85,7 +87,7 @@ function DialogContent({
           >
             <Button variant="ghost" size="sm">
               <Icon name="x" />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{t('Close')}</span>
             </Button>
           </DialogPrimitive.Close>
         )}

@@ -49,6 +49,7 @@ import { FIELD_TYPES } from '@/lib/collection-field-utils';
 import { getFileManagerCategory, isValidAssetForField } from '@/lib/collection-field-utils';
 import { extractPlainTextFromTiptap } from '@/lib/tiptap-utils';
 import { formatDateInTimezone, localDatetimeToUTC, clampDateInputValue } from '@/lib/date-format-utils';
+import { useCustomerCopy, type CustomerCopy } from '@/lib/rin5-customer-copy';
 import ColorFieldInput from './ColorFieldInput';
 import CollectionLinkFieldInput from './CollectionLinkFieldInput';
 import RichTextEditor from './RichTextEditor';
@@ -62,10 +63,10 @@ interface GlobalsManagerProps {
 }
 
 /** Type metadata (label + icon) sourced from the shared collection field config. */
-function getTypeMeta(type: GlobalVariableType): { label: string; icon: Parameters<typeof Icon>[0]['name'] } {
+function getTypeMeta(type: GlobalVariableType, copy: CustomerCopy): { label: string; icon: Parameters<typeof Icon>[0]['name'] } {
   const meta = FIELD_TYPES.find((t) => t.value === type);
   return {
-    label: meta?.label ?? type,
+    label: meta ? copy(meta.label) : type,
     icon: (meta?.icon ?? 'text') as Parameters<typeof Icon>[0]['name'],
   };
 }
@@ -285,6 +286,7 @@ interface GlobalFormState {
 const EMPTY_FORM: GlobalFormState = { name: '', type: 'text', value: '' };
 
 export default function GlobalsManager({ canManageSchema = true, timezone }: GlobalsManagerProps) {
+  const t = useCustomerCopy();
   const { globals, isLoading, hasLoaded, loadGlobals, createGlobal, updateGlobal, deleteGlobal } = useGlobalsStore();
   const getAsset = useAssetsStore((state) => state.getAsset);
 
@@ -371,7 +373,7 @@ export default function GlobalsManager({ canManageSchema = true, timezone }: Glo
       <div className="p-4 flex items-center justify-between border-b">
         <div className="flex items-center gap-2">
           <Icon name="globe" className="size-3.5 text-muted-foreground" />
-          <span className="font-medium">Global variables</span>
+          <span className="font-medium">{t('Global variables')}</span>
         </div>
         {canManageSchema && (
           <Button
@@ -392,9 +394,11 @@ export default function GlobalsManager({ canManageSchema = true, timezone }: Glo
         ) : globals.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <Empty>
-              <EmptyTitle>No global variables</EmptyTitle>
+              <EmptyTitle>{t('No global variables')}</EmptyTitle>
               <EmptyDescription>
-                Create site-wide values you can reuse anywhere via content.
+                {canManageSchema
+                  ? t('Create site-wide values you can reuse anywhere via content.')
+                  : t('Values shared by the whole site appear here.')}
               </EmptyDescription>
             </Empty>
           </div>
@@ -402,14 +406,14 @@ export default function GlobalsManager({ canManageSchema = true, timezone }: Glo
           <table className="border-0 whitespace-nowrap text-xs min-w-full align-top border-separate border-spacing-0 [&>tbody>tr>td]:border-b [&>tbody>tr>td]:max-w-56">
             <thead>
               <tr>
-                <th className="pl-5 pr-4 py-5 text-left font-normal sticky top-0 z-10 bg-background border-b border-border">Name</th>
-                <th className="px-4 py-5 text-left font-normal sticky top-0 z-10 bg-background border-b border-border">Type</th>
-                <th className="px-4 py-5 text-left font-normal sticky top-0 z-10 bg-background border-b border-border">Value</th>
+                <th className="pl-5 pr-4 py-5 text-left font-normal sticky top-0 z-10 bg-background border-b border-border">{t('Name')}</th>
+                <th className="px-4 py-5 text-left font-normal sticky top-0 z-10 bg-background border-b border-border">{t('Type')}</th>
+                <th className="px-4 py-5 text-left font-normal sticky top-0 z-10 bg-background border-b border-border">{t('Value')}</th>
               </tr>
             </thead>
             <tbody>
               {globals.map((global) => {
-                const meta = getTypeMeta(global.type);
+                const meta = getTypeMeta(global.type, t);
                 const preview = getValuePreview(global, timezone, assetName);
                 return (
                   <ContextMenu key={global.id}>
@@ -485,7 +489,7 @@ export default function GlobalsManager({ canManageSchema = true, timezone }: Glo
                 </SelectTrigger>
                 <SelectContent>
                   {GLOBAL_VARIABLE_TYPES.map((type) => {
-                    const meta = getTypeMeta(type);
+                    const meta = getTypeMeta(type, t);
                     return (
                       <SelectItem key={type} value={type}>
                         <span className="flex items-center gap-2">

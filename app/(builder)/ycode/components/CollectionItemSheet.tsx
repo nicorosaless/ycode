@@ -54,7 +54,7 @@ import { useLiveCollectionUpdates } from '@/hooks/use-live-collection-updates';
 import { useResourceLock } from '@/hooks/use-resource-lock';
 import { slugify, normalizeBooleanValue, parseMultiReferenceValue } from '@/lib/collection-utils';
 import { sanitizeSlug } from '@/lib/page-utils';
-import { isAssetFieldType, isMultipleAssetField, getFileManagerCategory, getAssetFieldLabel, getAssetFieldTypeLabel, isValidAssetForField, findStatusFieldId } from '@/lib/collection-field-utils';
+import { isAssetFieldType, isMultipleAssetField, getFileManagerCategory, getAssetFieldAddLabel, getAssetFieldTypeLabel, isValidAssetForField, findStatusFieldId } from '@/lib/collection-field-utils';
 import type { StatusAction } from '@/lib/collection-field-utils';
 import { CollectionStatusPill, parseStatusValue } from './CollectionStatusPill';
 import { formatDateInTimezone, localDatetimeToUTC, clampDateInputValue } from '@/lib/date-format-utils';
@@ -73,6 +73,15 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { getSyncedFieldIds, fetchCachedConnections } from '@/lib/apps/airtable/client';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
+
+/** Every text the invalid-asset toast can produce from getAssetFieldTypeLabel. */
+type InvalidAssetMessage =
+  | 'Please select a image file.'
+  | 'Please select an audio file.'
+  | 'Please select a video file.'
+  | 'Please select a document file.'
+  | 'Please select a file file.';
 
 interface CollectionItemSheetProps {
   open: boolean;
@@ -91,6 +100,7 @@ export default function CollectionItemSheet({
   onSuccess,
   allowDirectPublish = true,
 }: CollectionItemSheetProps) {
+  const t = useCustomerCopy();
   const { collections, fields, items, updateItem, createItem, setItemStatus } = useCollectionsStore();
   const { updateItemInLayerData, invalidateLayerData, refetchLayersForCollection } = useCollectionLayerStore();
   const { updatePageCollectionItem, refetchPageCollectionItem, pages } = usePagesStore();
@@ -373,10 +383,10 @@ export default function CollectionItemSheet({
   // canonical item is needed.
   const handleLocalizedSubmit = (values: Record<string, any>) => {
     if (!editingItem || !selectedLocaleId) {
-      toast.error('Cannot save translation', {
+      toast.error(t('Cannot save translation'), {
         description: !editingItem
-          ? 'Translations can only be added to existing items.'
-          : 'No locale selected.',
+          ? t('Translations can only be added to existing items.')
+          : t('No locale selected.'),
       });
       return;
     }
@@ -449,8 +459,8 @@ export default function CollectionItemSheet({
       })
       .catch((error) => {
         console.error('Failed to save translations:', error);
-        toast.error('Failed to save translations', {
-          description: 'Please try again.',
+        toast.error(t('Failed to save translations'), {
+          description: t('Please try again.'),
         });
       });
   };
@@ -488,7 +498,7 @@ export default function CollectionItemSheet({
       if (!nameValue) {
         form.setError(nameField.id, {
           type: 'manual',
-          message: 'Name is required',
+          message: t('Name is required'),
         });
         hasErrors = true;
       }
@@ -499,14 +509,14 @@ export default function CollectionItemSheet({
       if (!slugValue) {
         form.setError(slugField.id, {
           type: 'manual',
-          message: 'Slug is required',
+          message: t('Slug is required'),
         });
         hasErrors = true;
       } else if (!validateSlugUniqueness(slugValue, slugField.id)) {
         // Validate slug uniqueness
         form.setError(slugField.id, {
           type: 'manual',
-          message: 'This slug already exists in this collection',
+          message: t('This slug already exists in this collection'),
         });
         hasErrors = true;
       }
@@ -567,8 +577,8 @@ export default function CollectionItemSheet({
         })
         .catch((error) => {
           console.error('Failed to update item:', error);
-          toast.error('Failed to save item', {
-            description: 'Changes have been reverted.',
+          toast.error(t('Failed to save item'), {
+            description: t('Changes have been reverted.'),
           });
         });
     } else {
@@ -595,8 +605,8 @@ export default function CollectionItemSheet({
         })
         .catch((error) => {
           console.error('Failed to create item:', error);
-          toast.error('Failed to create item', {
-            description: 'Please try again.',
+          toast.error(t('Failed to create item'), {
+            description: t('Please try again.'),
           });
         });
     }
@@ -646,14 +656,14 @@ export default function CollectionItemSheet({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 flex-wrap">
             {isLocalizing && currentLocale
-              ? `Translate ${collection?.name} Item`
-              : `${editingItem ? 'Edit' : 'Create'} ${collection?.name} Item`}
+              ? t('Translate {collection} Item', { collection: collection?.name ?? '' })
+              : t(editingItem ? 'Edit {collection} Item' : 'Create {collection} Item', { collection: collection?.name ?? '' })}
             {!isNewItem && statusValue && !isLocalizing && (
               <CollectionStatusPill statusValue={statusValue} />
             )}
             {isLocalizing && currentLocale && (
               <span className="text-xs text-muted-foreground font-normal">
-                Translate to {currentLocale.label}
+                {t('Translate to {language}', { language: currentLocale.label })}
               </span>
             )}
           </SheetTitle>
@@ -671,10 +681,10 @@ export default function CollectionItemSheet({
                   <DropdownMenuItem
                     onClick={() => {
                       onOpenChange(false);
-                      toast.info('Use the context menu in the CMS table to delete items');
+                      toast.info(t('Use the context menu in the CMS table to delete items'));
                     }}
                   >
-                    Delete
+                    {t('Delete')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -692,10 +702,10 @@ export default function CollectionItemSheet({
                 className={isLocalizing ? '' : 'rounded-r-none'}
               >
                 {isLocalizing
-                  ? 'Save translation'
+                  ? t('Save translation')
                   : editingItem
-                    ? (isTempId(editingItem.id) ? 'Saving...' : 'Save')
-                    : 'Create'}
+                    ? (isTempId(editingItem.id) ? t('Saving...') : t('Save'))
+                    : t('Create')}
               </Button>
               {!isLocalizing && (
                 <DropdownMenu modal={false}>
@@ -717,7 +727,7 @@ export default function CollectionItemSheet({
                           form.handleSubmit(handleSubmit)();
                         }}
                       >
-                        Save as staged for publish
+                        {t('Save as staged for publish')}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem
@@ -726,7 +736,7 @@ export default function CollectionItemSheet({
                         form.handleSubmit(handleSubmit)();
                       }}
                     >
-                      {isNewItem ? 'Create' : 'Save'} as draft
+                      {isNewItem ? t('Create as draft') : t('Save as draft')}
                     </DropdownMenuItem>
                     {allowDirectPublish && (
                       <DropdownMenuItem
@@ -736,7 +746,7 @@ export default function CollectionItemSheet({
                           form.handleSubmit(handleSubmit)();
                         }}
                       >
-                        {isNewItem ? 'Create' : 'Save'} and publish
+                        {isNewItem ? t('Create and publish') : t('Save and publish')}
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
@@ -777,18 +787,18 @@ export default function CollectionItemSheet({
                             const ids = parseMultiReferenceValue(formField.value);
                             return ids.length > 0 ? (
                               <span className="text-[10px] text-muted-foreground leading-none">
-                                {ids.length} item{ids.length !== 1 ? 's' : ''} selected
+                                {t(ids.length !== 1 ? '{count} items selected' : '{count} item selected', { count: ids.length })}
                               </span>
                             ) : null;
                           })()}
                           {isSynced && (
                             <span className="text-[10px] text-muted-foreground leading-none">
-                              Synced from Airtable
+                              {t('Synced from Airtable')}
                             </span>
                           )}
                           {isLockedForLocale && (
                             <span className="text-[10px] text-muted-foreground leading-none">
-                              Not translatable
+                              {t('Not translatable')}
                             </span>
                           )}
                         </div>
@@ -799,7 +809,7 @@ export default function CollectionItemSheet({
                               <RichTextEditor
                                 value={formField.value || ''}
                                 onChange={formField.onChange}
-                                placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                                placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
                                 variant="full"
                                 withFormatting={true}
                                 excludedLinkTypes={['asset', 'field']}
@@ -809,10 +819,10 @@ export default function CollectionItemSheet({
                               <RichTextEditorSheet
                                 open={expandedRichTextField === field.id}
                                 onOpenChange={(open) => { if (!open) setExpandedRichTextField(null); }}
-                                description={`CMS item "${field.name}" field`}
+                                description={t('CMS item "{field}" field', { field: field.name })}
                                 value={formField.value || ''}
                                 onChange={formField.onChange}
-                                placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                                placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
                                 hidePageContextOptions={true}
                               />
                             </div>
@@ -822,7 +832,7 @@ export default function CollectionItemSheet({
                               value={formField.value || ''}
                               onChange={formField.onChange}
                               isMulti={false}
-                              placeholder={`Select ${field.name.toLowerCase()}...`}
+                              placeholder={t('Select {field}...', { field: field.name.toLowerCase() })}
                             />
                           ) : field.type === 'multi_reference' && field.reference_collection_id ? (
                             <ReferenceFieldCombobox
@@ -830,7 +840,7 @@ export default function CollectionItemSheet({
                               value={formField.value || '[]'}
                               onChange={formField.onChange}
                               isMulti={true}
-                              placeholder={`Select ${field.name.toLowerCase()}...`}
+                              placeholder={t('Select {field}...', { field: field.name.toLowerCase() })}
                             />
                           ) : field.type === 'link' ? (
                             <CollectionLinkFieldInput
@@ -840,14 +850,14 @@ export default function CollectionItemSheet({
                           ) : field.type === 'email' ? (
                             <Input
                               type="email"
-                              placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
                               autoComplete="off"
                               {...formField}
                             />
                           ) : field.type === 'phone' ? (
                             <Input
                               type="tel"
-                              placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
                               autoComplete="off"
                               {...formField}
                             />
@@ -894,12 +904,11 @@ export default function CollectionItemSheet({
                               }
 
                               const fieldTypeLabel = getAssetFieldTypeLabel(field.type);
-                              const addButtonLabel = getAssetFieldLabel(field.type);
 
                               const showInvalidTypeError = () => {
                                 const article = fieldTypeLabel === 'audio' ? 'an' : 'a';
-                                toast.error('Invalid asset type', {
-                                  description: `Please select ${article} ${fieldTypeLabel} file.`,
+                                toast.error(t('Invalid asset type'), {
+                                  description: t(`Please select ${article} ${fieldTypeLabel} file.` as InvalidAssetMessage),
                                 });
                               };
 
@@ -989,7 +998,7 @@ export default function CollectionItemSheet({
                                     onClick={(e) => { e.stopPropagation(); handleAddAsset(); }}
                                   >
                                     <Icon name="plus" className="size-3" />
-                                    Add {addButtonLabel}
+                                    {t(getAssetFieldAddLabel(field.type))}
                                   </Button>
                                 </div>
                               );
@@ -1000,15 +1009,14 @@ export default function CollectionItemSheet({
                               const currentAssetId = formField.value || null;
                               const currentAsset = currentAssetId ? getAsset(currentAssetId) : null;
                               const fieldTypeLabel = getAssetFieldTypeLabel(field.type);
-                              const addButtonLabel = getAssetFieldLabel(field.type);
 
                               const handleOpenFileManager = () => {
                                 openFileManager(
                                   (asset) => {
                                     if (!isValidAssetForField(asset, field.type)) {
                                       const article = fieldTypeLabel === 'audio' ? 'an' : 'a';
-                                      toast.error('Invalid asset type', {
-                                        description: `Please select ${article} ${fieldTypeLabel} file.`,
+                                      toast.error(t('Invalid asset type'), {
+                                        description: t(`Please select ${article} ${fieldTypeLabel} file.` as InvalidAssetMessage),
                                       });
                                       return false;
                                     }
@@ -1029,7 +1037,7 @@ export default function CollectionItemSheet({
                                     onClick={(e) => { e.stopPropagation(); handleOpenFileManager(); }}
                                   >
                                     <Icon name="plus" className="size-3" />
-                                    Add {addButtonLabel}
+                                    {t(getAssetFieldAddLabel(field.type))}
                                   </Button>
                                 );
                               }
@@ -1083,11 +1091,11 @@ export default function CollectionItemSheet({
                                   disabled={options.length === 0}
                                 >
                                   <SelectTrigger className="w-full">
-                                    <SelectValue placeholder={options.length === 0 ? 'No options available' : `Select ${field.name.toLowerCase()}...`} />
+                                    <SelectValue placeholder={options.length === 0 ? t('No options available') : t('Select {field}...', { field: field.name.toLowerCase() })} />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectGroup>
-                                      <SelectItem value="__none__">None</SelectItem>
+                                      <SelectItem value="__none__">{t('None')}</SelectItem>
                                       {options
                                         .filter(o => o.name.trim().length > 0)
                                         .map((option) => (
@@ -1108,7 +1116,7 @@ export default function CollectionItemSheet({
                           ) : field.key === 'name' ? (
                             <Input
                               ref={nameInputRef}
-                              placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
                               autoComplete="off"
                               name={formField.name}
                               value={formField.value}
@@ -1117,7 +1125,7 @@ export default function CollectionItemSheet({
                             />
                           ) : field.key === 'slug' ? (
                             <Input
-                              placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
                               autoComplete="off"
                               name={formField.name}
                               value={formField.value}
@@ -1129,7 +1137,7 @@ export default function CollectionItemSheet({
                             />
                           ) : (
                             <Input
-                              placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
                               autoComplete="off"
                               {...formField}
                             />
@@ -1150,14 +1158,14 @@ export default function CollectionItemSheet({
       <ConfirmDialog
         open={showUnsavedDialog}
         onOpenChange={setShowUnsavedDialog}
-        title="Unsaved Changes"
-        description="You have unsaved changes. Are you sure you want to discard them?"
-        confirmLabel="Discard changes"
-        cancelLabel="Cancel"
+        title={t('Unsaved Changes')}
+        description={t('You have unsaved changes. Are you sure you want to discard them?')}
+        confirmLabel={t('Discard changes')}
+        cancelLabel={t('Cancel')}
         confirmVariant="destructive"
         onConfirm={handleConfirmDiscard}
         onCancel={handleCancelDiscard}
-        saveLabel="Save changes"
+        saveLabel={t('Save changes')}
         onSave={handleSaveFromDialog}
       />
     </Sheet>

@@ -29,6 +29,7 @@ import { findLayersWithAnchorId } from '@/lib/layer-utils';
 import { getLayerIcon, getLayerName } from '@/lib/layer-display-utils';
 import LinkCollectionItemPicker from './LinkCollectionItemPicker';
 import PageSelector from './PageSelector';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 interface CollectionLinkFieldInputProps {
   value: string | CollectionLinkValue | undefined; // JSON string, parsed object, or empty
@@ -72,6 +73,7 @@ export default function CollectionLinkFieldInput({
   onChange,
   disabled = false,
 }: CollectionLinkFieldInputProps) {
+  const t = useCustomerCopy();
   // Stores
   const pages = usePagesStore((state) => state.pages);
   const draftsByPageId = usePagesStore((state) => state.draftsByPageId);
@@ -236,10 +238,10 @@ export default function CollectionLinkFieldInput({
 
   // Link type options
   const linkTypeOptions = [
-    { value: 'none', label: 'No link', detail: null, icon: 'none' },
-    { value: 'page', label: 'Page', detail: 'Link to a regular or dynamic page', icon: 'page' },
-    { value: 'asset', label: 'Asset', detail: 'Link to a downloadable file', icon: 'paperclip' },
-    { value: 'url', label: 'URL', detail: 'Link to a custom URL', icon: 'link' },
+    { value: 'none', label: t('No link'), detail: null, icon: 'none' },
+    { value: 'page', label: t('Page'), detail: t('Link to a regular or dynamic page'), icon: 'page' },
+    { value: 'asset', label: t('Asset'), detail: t('Link to a downloadable file'), icon: 'paperclip' },
+    { value: 'url', label: t('URL'), detail: t('Link to a custom URL'), icon: 'link' },
   ];
 
   return (
@@ -252,7 +254,7 @@ export default function CollectionLinkFieldInput({
           disabled={disabled}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select..." />
+            <SelectValue placeholder={t('Select...')} />
           </SelectTrigger>
           <SelectContent>
             {linkTypeOptions.map((option) => (
@@ -302,7 +304,7 @@ export default function CollectionLinkFieldInput({
               name={(selectedAsset ? getAssetIcon(selectedAsset.mime_type) : 'paperclip') as IconProps['name']}
               className="size-3 mr-0.5"
             />
-            {selectedAsset ? selectedAsset.filename : 'Select asset...'}
+            {selectedAsset ? selectedAsset.filename : t('Select asset...')}
           </Button>
         </div>
       )}
@@ -350,7 +352,7 @@ export default function CollectionLinkFieldInput({
                   disabled={disabled}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select..." />
+                    <SelectValue placeholder={t('Select...')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">

@@ -19,6 +19,7 @@ import { ASSET_CATEGORIES, getOptimizedImageUrl, isAssetOfType, formatFileSize, 
 import { cn } from '@/lib/utils';
 
 import type { Asset, CollectionFieldType } from '@/types';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 export interface AssetFieldCardProps {
   asset: Asset | null;
@@ -31,6 +32,7 @@ export interface AssetFieldCardProps {
 
 /** Card for a single asset with preview, filename, metadata, and Change/Remove actions */
 function AssetFieldCard({ asset, fieldType, onChangeFile, onRemove, dragHandleProps }: AssetFieldCardProps) {
+  const t = useCustomerCopy();
   const isImageField = fieldType === 'image' && asset;
   const isSvgIcon = isImageField && (!!asset!.content || (asset!.mime_type && isAssetOfType(asset!.mime_type, ASSET_CATEGORIES.ICONS)));
   const imageUrl = isImageField && asset!.public_url ? asset!.public_url : null;
@@ -59,7 +61,7 @@ function AssetFieldCard({ asset, fieldType, onChangeFile, onRemove, dragHandlePr
             <img
               src={getOptimizedImageUrl(imageUrl)}
               className="relative w-full h-full object-contain pointer-events-none z-10"
-              alt="Image preview"
+              alt={t('Image preview')}
               loading="lazy"
             />
           ) : (
@@ -97,7 +99,7 @@ function AssetFieldCard({ asset, fieldType, onChangeFile, onRemove, dragHandlePr
             size="sm"
             onClick={(e) => { e.stopPropagation(); onChangeFile(); }}
           >
-            {asset ? 'Change file' : 'Choose file'}
+            {asset ? t('Change file') : t('Choose file')}
           </Button>
           {asset && (
             <Button
@@ -106,7 +108,7 @@ function AssetFieldCard({ asset, fieldType, onChangeFile, onRemove, dragHandlePr
               size="sm"
               onClick={(e) => { e.stopPropagation(); onRemove(); }}
             >
-              Remove
+              {t('Remove')}
             </Button>
           )}
         </div>

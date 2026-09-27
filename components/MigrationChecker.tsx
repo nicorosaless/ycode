@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import BuilderLoading from '@/components/BuilderLoading';
+import { useCustomerCopy, useRin5CustomerMode } from '@/lib/rin5-customer-copy';
 
 /**
  * Migration Checker Component: Checks for and runs pending migrations before allowing
@@ -15,8 +16,10 @@ interface MigrationCheckerProps {
 }
 
 export default function MigrationChecker({ onComplete }: MigrationCheckerProps) {
+  const t = useCustomerCopy();
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
   const [isChecking, setIsChecking] = useState(true);
-  const [progress, setProgress] = useState('Checking database status...');
+  const [progress, setProgress] = useState<'Checking database status...' | 'Checking and running migrations...'>('Checking database status...');
   const [error, setError] = useState<string | null>(null);
 
   // Ref to ensure migration only runs once (prevents React Strict Mode double-run)
@@ -88,21 +91,21 @@ export default function MigrationChecker({ onComplete }: MigrationCheckerProps) 
         <div className="max-w-md w-full mx-4">
           <div className="flex-1 flex items-center text-center flex-col gap-1">
             <Label size="sm">
-              Migration failed
+              {t('Migration failed')}
             </Label>
             <Label variant="muted" size="sm">
-              {error}
+              {rin5Customer ? t('The editor could not be prepared. Try again in a moment.') : error}
             </Label>
             <div className="w-full max-w-xs grid grid-cols-2 gap-3 mt-2">
               <Button onClick={handleRetry}>
-                Retry migration
+                {t('Retry migration')}
               </Button>
               <Button
                 variant="secondary"
                 onClick={handleSkip}
               >
-                <span>Skip</span>
-                <span className="text-[10px] opacity-60">Not recommended</span>
+                <span>{t('Skip')}</span>
+                <span className="text-[10px] opacity-60">{t('Not recommended')}</span>
               </Button>
             </div>
           </div>
@@ -112,5 +115,5 @@ export default function MigrationChecker({ onComplete }: MigrationCheckerProps) 
   }
 
   // Show loading state
-  return <BuilderLoading message={progress} />;
+  return <BuilderLoading title={t('Please wait')} message={t(progress)} />;
 }

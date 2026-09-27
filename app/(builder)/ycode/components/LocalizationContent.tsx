@@ -25,6 +25,8 @@ import { usePagesStore } from '@/stores/usePagesStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { buildFolderPath, getPageIcon } from '@/lib/page-utils';
+import { useCustomerCopy, useRin5CustomerMode } from '@/lib/rin5-customer-copy';
+import { customerLocaleLabel } from '@/lib/rin5-customer-locale';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
 import type { Locale, LocaleOption } from '@/types';
@@ -61,6 +63,10 @@ const initialModalState: ModalState = {
 };
 
 export default function LocalizationContent({ children, canManageLocales = false }: LocalizationContentProps) {
+  const t = useCustomerCopy();
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
+  const localeName = (locale: { code: string; label: string } | null | undefined) =>
+    locale ? customerLocaleLabel(locale, rin5Customer) : undefined;
   // Store (locales are already sorted)
   const locales = useLocalisationStore((state) => state.locales);
   const selectedLocaleId = useLocalisationStore((state) => state.selectedLocaleId);
@@ -485,8 +491,8 @@ export default function LocalizationContent({ children, canManageLocales = false
 
   const localeCodeError = (() => {
     if (!modalState.localeCode || !modalState.regionCode) return null;
-    if (isDuplicateLocaleCode) return 'This locale code already exists.';
-    if (!isValidLocaleCode(fullLocaleCode)) return 'Enter a valid region like "BE".';
+    if (isDuplicateLocaleCode) return t('This locale code already exists.');
+    if (!isValidLocaleCode(fullLocaleCode)) return t('Enter a valid region like "BE".');
     return null;
   })();
 
@@ -600,7 +606,7 @@ export default function LocalizationContent({ children, canManageLocales = false
       {/* Left Sidebar */}
       <div className="w-64 border-r flex flex-col px-4">
         <header className="py-5 flex justify-between items-center">
-          <span className="font-medium">Localization</span>
+          <span className="font-medium">{t('Localization')}</span>
           {canManageLocales && (
             <Button
               size="xs"
@@ -637,9 +643,9 @@ export default function LocalizationContent({ children, canManageLocales = false
                   <div className="flex items-center flex-1 outline-none focus:outline-none select-none text-left text-xs gap-1.5 min-w-0">
                     <span className="bg-secondary text-secondary-foreground text-[10px] font-semibold py-0.5 px-1.5 rounded-[6px] uppercase shrink-0">{locale.code}</span>
                     <Label className="cursor-[inherit] min-w-0 flex-1">
-                      <div className="truncate">{locale.label}</div>
+                      <div className="truncate">{localeName(locale)}</div>
                     </Label>
-                    {locale.is_default && <Badge variant="secondary" className="shrink-0 ml-auto text-[10px]">Default</Badge>}
+                    {locale.is_default && <Badge variant="secondary" className="shrink-0 ml-auto text-[10px]">{t('Default')}</Badge>}
                   </div>
 
                   {canManageLocales && (
@@ -660,7 +666,7 @@ export default function LocalizationContent({ children, canManageLocales = false
             })}
             {locales.length === 0 && (
               <div className="px-2 py-4 text-xs text-muted-foreground">
-                {isLoading.load ? 'Loading locales...' : 'No locales added yet'}
+                {isLoading.load ? t('Loading locales...') : t('No locales added yet')}
               </div>
             )}
           </div>
@@ -675,13 +681,13 @@ export default function LocalizationContent({ children, canManageLocales = false
               <div>
                 <Select value={selectedContentType} onValueChange={setSelectedContentType}>
                   <SelectTrigger className="w-34">
-                    <SelectValue placeholder="Select..." />
+                    <SelectValue placeholder={t('Select...')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pages"><Icon name="page" className="size-3" /> Pages</SelectItem>
-                    <SelectItem value="folders"><Icon name="folder" className="size-3" /> Folders</SelectItem>
-                    <SelectItem value="components"><Icon name="component" className="size-3" /> Components</SelectItem>
-                    <SelectItem value="cms"><Icon name="database" className="size-3" /> CMS</SelectItem>
+                    <SelectItem value="pages"><Icon name="page" className="size-3" /> {t('Pages')}</SelectItem>
+                    <SelectItem value="folders"><Icon name="folder" className="size-3" /> {t('Folders')}</SelectItem>
+                    <SelectItem value="components"><Icon name="component" className="size-3" /> {t('Components')}</SelectItem>
+                    <SelectItem value="cms"><Icon name="database" className="size-3" /> {t('CMS')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -689,13 +695,13 @@ export default function LocalizationContent({ children, canManageLocales = false
               <div>
                 <Select value={completionFilter} onValueChange={(value: 'all' | 'done' | 'todo') => setCompletionFilter(value)}>
                   <SelectTrigger className="w-38">
-                    <SelectValue placeholder="Filter by status" />
+                    <SelectValue placeholder={t('Filter by status')} />
                   </SelectTrigger>
 
                   <SelectContent>
-                    <SelectItem value="all"><Icon name="checkbox" className="size-3" />All translations</SelectItem>
-                    <SelectItem value="todo"><Icon name="block" className="size-3" /> To be translated</SelectItem>
-                    <SelectItem value="done"><Icon name="checkbox" className="size-3" /> Marked as done</SelectItem>
+                    <SelectItem value="all"><Icon name="checkbox" className="size-3" />{t('All translations')}</SelectItem>
+                    <SelectItem value="todo"><Icon name="block" className="size-3" /> {t('To be translated')}</SelectItem>
+                    <SelectItem value="done"><Icon name="checkbox" className="size-3" /> {t('Marked as done')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -703,7 +709,7 @@ export default function LocalizationContent({ children, canManageLocales = false
               <div className="w-full max-w-80">
                 <InputGroup>
                   <InputGroupInput
-                    placeholder="Search..."
+                    placeholder={t('Search...')}
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
                   />
@@ -731,7 +737,7 @@ export default function LocalizationContent({ children, canManageLocales = false
               <div className="flex items-center justify-center flex-1">
                 <div className="flex flex-col items-center gap-3">
                   <Spinner />
-                  <p className="text-sm text-muted-foreground">Loading translations...</p>
+                  <p className="text-sm text-muted-foreground">{t('Loading translations...')}</p>
                 </div>
               </div>
             ) : (
@@ -743,9 +749,9 @@ export default function LocalizationContent({ children, canManageLocales = false
                   <EmptyMedia variant="icon">
                     <Icon name="globe" className="size-4" />
                   </EmptyMedia>
-                  <EmptyTitle>Default locale selected</EmptyTitle>
+                  <EmptyTitle>{t('Default locale selected')}</EmptyTitle>
                   <EmptyDescription>
-                    Please select a different locale to start translating.
+                    {t('Please select a different locale to start translating.')}
                   </EmptyDescription>
                 </Empty>
 
@@ -757,7 +763,7 @@ export default function LocalizationContent({ children, canManageLocales = false
                   <div>
                     {sortedPages.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground text-sm">
-                        No pages found
+                        {t('No pages found')}
                       </div>
                     ) : (
                       sortedPages.map((page) => {
@@ -811,9 +817,9 @@ export default function LocalizationContent({ children, canManageLocales = false
                                 </Label>
 
                                 <span className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
-                                  <span>{defaultLocale?.label}</span>
+                                  <span>{localeName(defaultLocale)}</span>
                                   <Icon name="chevronRight" className="size-3 inline" />
-                                  <span>{selectedLocale?.label}</span>
+                                  <span>{localeName(selectedLocale)}</span>
                                 </span>
                               </div>
                             </header>
@@ -856,7 +862,7 @@ export default function LocalizationContent({ children, canManageLocales = false
                     <div>
                       {sortedFolders.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground text-sm">
-                        No folders found
+                        {t('No folders found')}
                       </div>
                       ) : (
                         sortedFolders.map((folder) => {
@@ -891,9 +897,9 @@ export default function LocalizationContent({ children, canManageLocales = false
                                 </Label>
 
                                 <span className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
-                                  <span>{defaultLocale?.label}</span>
+                                  <span>{localeName(defaultLocale)}</span>
                                   <Icon name="chevronRight" className="size-3 inline" />
-                                  <span>{selectedLocale?.label}</span>
+                                  <span>{localeName(selectedLocale)}</span>
                                 </span>
                               </div>
                             </header>
@@ -930,7 +936,7 @@ export default function LocalizationContent({ children, canManageLocales = false
                   <div>
                     {storeComponents.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground text-sm">
-                        No components found
+                        {t('No components found')}
                       </div>
                     ) : (
                       storeComponents.map((component) => {
@@ -963,9 +969,9 @@ export default function LocalizationContent({ children, canManageLocales = false
                                 <Label>{component.name}</Label>
 
                                 <span className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
-                                  <span>{defaultLocale?.label}</span>
+                                  <span>{localeName(defaultLocale)}</span>
                                   <Icon name="chevronRight" className="size-3 inline" />
-                                  <span>{selectedLocale?.label}</span>
+                                  <span>{localeName(selectedLocale)}</span>
                                 </span>
                               </div>
                             </header>
@@ -1003,7 +1009,7 @@ export default function LocalizationContent({ children, canManageLocales = false
                   <div>
                     {collections.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground text-sm">
-                        No collections found
+                        {t('No collections found')}
                       </div>
                     ) : (
                       collections.flatMap((collection) => {
@@ -1065,9 +1071,9 @@ export default function LocalizationContent({ children, canManageLocales = false
                                   <Label className="cursor-pointer">{collection.name} <span className="text-muted-foreground">›</span> {itemName}</Label>
 
                                   <span className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
-                                  <span>{defaultLocale?.label}</span>
+                                  <span>{localeName(defaultLocale)}</span>
                                   <Icon name="chevronRight" className="size-3 inline" />
-                                  <span>{selectedLocale?.label}</span>
+                                  <span>{localeName(selectedLocale)}</span>
                                 </span>
                                 </div>
                               </header>
@@ -1122,7 +1128,7 @@ export default function LocalizationContent({ children, canManageLocales = false
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
-            <DialogTitle>{modalState.isEditMode ? 'Edit locale' : 'Add locale'}</DialogTitle>
+            <DialogTitle>{modalState.isEditMode ? t('Edit locale') : t('Add locale')}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
@@ -1133,7 +1139,7 @@ export default function LocalizationContent({ children, canManageLocales = false
             )}
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="language">Locale</Label>
+              <Label htmlFor="language">{t('Locale')}</Label>
 
               <InputAutocomplete
                 id="language"
@@ -1142,13 +1148,16 @@ export default function LocalizationContent({ children, canManageLocales = false
                 options={availableLocales}
                 selected={modalState.selectedLanguage}
                 onSelect={handleSelectLanguage}
-                placeholder="Search for a locale"
+                placeholder={t('Search for a locale')}
                 searchableKeys={['label', 'native_label', 'code']}
+                // The customer also finds languages by their Spanish name; the stored label stays the stock one.
+                filterFn={rin5Customer ? (locale, search) => [locale.label, locale.native_label, locale.code, customerLocaleLabel(locale, true)]
+                  .some((text) => text.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es'))) : undefined}
                 disabled={modalState.isEditMode}
                 renderItem={(locale) => (
                   <div className="flex items-center justify-between px-1.5 py-1.25 text-xs">
                     <div className="flex items-center gap-2">
-                      <span>{locale.label}</span>
+                      <span>{customerLocaleLabel(locale, rin5Customer)}</span>
                       <span className="text-muted-foreground">{locale.native_label}</span>
                     </div>
                     <Badge variant="secondary" className="uppercase text-[10px]">
@@ -1158,7 +1167,7 @@ export default function LocalizationContent({ children, canManageLocales = false
                 )}
                 renderEmpty={() => (
                   <div className="px-3 py-6 text-center text-muted-foreground text-xs">
-                    No locales found
+                    {t('No locales found')}
                   </div>
                 )}
               />
@@ -1168,7 +1177,7 @@ export default function LocalizationContent({ children, canManageLocales = false
               <div className="flex gap-3">
                 <div className="flex flex-col gap-2 flex-1">
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="name">Custom name</Label>
+                    <Label htmlFor="name">{t('Custom name')}</Label>
                     {fullLocaleCode && (
                       <span className="text-xs text-muted-foreground uppercase">{fullLocaleCode}</span>
                     )}
@@ -1177,26 +1186,26 @@ export default function LocalizationContent({ children, canManageLocales = false
                     id="name"
                     value={modalState.customLocaleName}
                     onChange={(e) => setModalState(prev => ({ ...prev, customLocaleName: e.target.value }))}
-                    placeholder="Custom name"
+                    placeholder={t('Custom name')}
                   />
                 </div>
                 <div className="flex flex-col gap-2 w-24">
-                  <Label htmlFor="code" className="whitespace-nowrap">Locale code</Label>
+                  <Label htmlFor="code" className="whitespace-nowrap">{t('Locale code')}</Label>
                   <Input
                     id="code"
                     value={modalState.localeCode}
                     disabled
-                    placeholder="Code"
+                    placeholder={t('Code')}
                     className={modalState.localeCode ? 'uppercase' : ''}
                   />
                 </div>
                 <div className="flex flex-col gap-2 w-24">
-                  <Label htmlFor="region" className="whitespace-nowrap">Regional code</Label>
+                  <Label htmlFor="region" className="whitespace-nowrap">{t('Regional code')}</Label>
                   <Input
                     id="region"
                     value={modalState.regionCode}
                     onChange={(e) => setModalState(prev => ({ ...prev, regionCode: sanitizeRegionCode(e.target.value) }))}
-                    placeholder="e.g. BE"
+                    placeholder={t('e.g. BE')}
                     disabled={!modalState.localeCode}
                     className={cn(modalState.regionCode && 'uppercase', localeCodeError && 'border-destructive')}
                   />
@@ -1227,8 +1236,8 @@ export default function LocalizationContent({ children, canManageLocales = false
                     htmlFor="is-default"
                     className={cn('cursor-pointer flex-col items-start gap-0.5', shouldDisable && 'cursor-not-allowed opacity-50')}
                   >
-                    <span>Set as default locale</span>
-                    <span className="text-muted-foreground/75">All your pages and CMS contents should be written in this locale.</span>
+                    <span>{t('Set as default locale')}</span>
+                    <span className="text-muted-foreground/75">{t('All your pages and CMS contents should be written in this locale.')}</span>
                   </Label>
                 </div>
               );
@@ -1244,9 +1253,9 @@ export default function LocalizationContent({ children, canManageLocales = false
 
               let tooltipMessage = '';
               if (isCurrentlyDefault) {
-                tooltipMessage = 'Cannot delete the default locale';
+                tooltipMessage = t('Cannot delete the default locale');
               } else if (isOnlyLocale) {
-                tooltipMessage = 'Cannot delete the only locale';
+                tooltipMessage = t('Cannot delete the only locale');
               }
 
               const button = (
@@ -1258,7 +1267,7 @@ export default function LocalizationContent({ children, canManageLocales = false
                   disabled={isDisabled}
                 >
                   <Icon name="trash" className="size-3" />
-                  Delete
+                  {t('Delete')}
                 </Button>
               );
 
@@ -1286,7 +1295,7 @@ export default function LocalizationContent({ children, canManageLocales = false
                 size="sm"
                 disabled={isLoading.create || isLoading.update || isLoading.delete}
               >
-                Cancel
+                {t('Cancel')}
               </Button>
               <Button
                 type="button"
@@ -1298,7 +1307,7 @@ export default function LocalizationContent({ children, canManageLocales = false
                 }
                 size="sm"
               >
-                {modalState.isEditMode ? 'Update' : 'Add'}
+                {modalState.isEditMode ? t('Update') : t('Add')}
               </Button>
             </div>
           </DialogFooter>

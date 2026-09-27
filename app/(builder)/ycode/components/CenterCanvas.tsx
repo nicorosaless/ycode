@@ -78,6 +78,7 @@ import { DragCaptureOverlay } from '@/components/DragCaptureOverlay';
 import ElementPickerOverlay from './ElementPickerOverlay';
 import { setDragCursor, clearDragCursor } from '@/lib/drag-cursor';
 import { moveCustomerSection, type SectionMoveDirection } from '@/lib/rin5-customer-reorder';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 // 7. Types
 import type { Layer, Page, CollectionField, Asset } from '@/types';
@@ -147,10 +148,21 @@ function ViewportZoomControls({
   onZoomToFit,
   onAutofit,
 }: ViewportZoomControlsProps) {
+  const t = useCustomerCopy();
   const compactLabels: Record<ViewportMode, string> = {
-    desktop: 'D',
-    tablet: 'T',
-    mobile: 'M',
+    desktop: t('D'),
+    tablet: t('T'),
+    mobile: t('M'),
+  };
+  const labels: Record<ViewportMode, string> = {
+    desktop: t('Desktop'),
+    tablet: t('Tablet'),
+    mobile: t('Phone|viewport'),
+  };
+  const titles: Record<ViewportMode, string> = {
+    desktop: t('Desktop View'),
+    tablet: t('Tablet View'),
+    mobile: t('Mobile View'),
   };
 
   return (
@@ -161,10 +173,10 @@ function ViewportZoomControls({
             <TabsTrigger
               key={mode}
               value={mode}
-              title={`${viewportSizes[mode].label} View`}
+              title={titles[mode]}
             >
               <span className="sm:hidden">{compactLabels[mode]}</span>
-              <span className="hidden sm:inline">{mode === 'mobile' ? 'Phone' : viewportSizes[mode].label}</span>
+              <span className="hidden sm:inline">{labels[mode]}</span>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -192,24 +204,24 @@ function ViewportZoomControls({
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <DropdownMenuItem onClick={onZoomIn}>
-            Zoom in
+            {t('Zoom in')}
             <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onZoomOut}>
-            Zoom out
+            {t('Zoom out')}
             <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onResetZoom}>
-            Zoom to 100%
+            {t('Zoom to 100%')}
             <DropdownMenuShortcut>⌘0</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onZoomToFit}>
-            Fit height
+            {t('Fit height')}
             <DropdownMenuShortcut>⌘1</DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onAutofit}>
-            Fit width
+            {t('Fit width')}
             <DropdownMenuShortcut>⌘2</DropdownMenuShortcut>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -608,6 +620,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   liveLayerUpdates,
   liveComponentUpdates,
 }: CenterCanvasProps) {
+  const t = useCustomerCopy();
   const { canEditStructure } = useRole();
   const selectedLayerId = useEditorStore((state) => state.selectedLayerId);
 
@@ -2311,7 +2324,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
               variant="ghost"
               onClick={handleUndo}
               disabled={!canUndo || isUndoRedoLoading}
-              title="Undo (⌘Z)"
+              title={t('Undo (⌘Z)')}
             >
               <Icon name="undo" />
             </Button>
@@ -2320,7 +2333,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
               variant="ghost"
               onClick={handleRedo}
               disabled={!canRedo || isUndoRedoLoading}
-              title="Redo (⌘⇧Z)"
+              title={t('Redo (⌘⇧Z)')}
             >
               <Icon name="redo" />
             </Button>
@@ -2406,7 +2419,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                       asChild
                     >
                       <button
-                        type="button" title="Link"
+                        type="button" title={t('Link')}
                         className="w-auto min-w-0 shrink-0"
                       >
                         <Icon name="link" className="size-3" />
@@ -2431,7 +2444,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                       </button>
                     </ToggleGroupItem>
                   </TooltipTrigger>
-                  <TooltipContent>Links cannot be nested</TooltipContent>
+                  <TooltipContent>{t('Links cannot be nested')}</TooltipContent>
                 </Tooltip>
               </ToggleGroup>
             );
@@ -2451,7 +2464,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 e.preventDefault();
                 toggleBold();
               }}
-              title="Bold (⌘B)"
+              title={t('Bold (⌘B)')}
             >
               <Icon name="bold" className="size-3" />
             </ToggleGroupItem>
@@ -2462,7 +2475,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 e.preventDefault();
                 toggleItalic();
               }}
-              title="Italic (⌘I)"
+              title={t('Italic (⌘I)')}
             >
               <Icon name="italic" className="size-3" />
             </ToggleGroupItem>
@@ -2473,7 +2486,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 e.preventDefault();
                 toggleUnderline();
               }}
-              title="Underline (⌘U)"
+              title={t('Underline (⌘U)')}
             >
               <Icon name="underline" className="size-3" />
             </ToggleGroupItem>
@@ -2484,7 +2497,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 e.preventDefault();
                 toggleStrike();
               }}
-              title="Strikethrough"
+              title={t('Strikethrough')}
             >
               <Icon name="strikethrough" className="size-3" />
             </ToggleGroupItem>
@@ -2495,7 +2508,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 e.preventDefault();
                 toggleSuperscript();
               }}
-              title="Superscript"
+              title={t('Superscript')}
             >
               <Icon name="superscript" className="size-3" />
             </ToggleGroupItem>
@@ -2506,7 +2519,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 e.preventDefault();
                 toggleSubscript();
               }}
-              title="Subscript"
+              title={t('Subscript')}
             >
               <Icon name="subscript" className="size-3" />
             </ToggleGroupItem>
@@ -2527,7 +2540,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 <DropdownMenuTrigger asChild>
                   <ToggleGroupItem value="variable" asChild>
                     <button
-                      type="button" title="Insert Variable"
+                      type="button" title={t('Insert Variable')}
                       className="w-auto min-w-0 shrink-0"
                     >
                       <Icon name="database" className="size-3" />
@@ -2542,7 +2555,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 >
                   {paginationVariableKeys.length > 0 && (
                     <>
-                      <DropdownMenuLabel className="text-xs text-foreground/80">Pagination</DropdownMenuLabel>
+                      <DropdownMenuLabel className="text-xs text-foreground/80">{t('Pagination')}</DropdownMenuLabel>
                       {paginationVariableKeys.map((key) => (
                         <DropdownMenuItem
                           key={key}
@@ -2619,7 +2632,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-50/80 dark:bg-neutral-950/80 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
               <div className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm">Loading page...</span>
+              <span className="text-sm">{t('Loading page...')}</span>
             </div>
           </div>
         )}
@@ -2826,11 +2839,11 @@ const CenterCanvas = React.memo(function CenterCanvas({
                                   <Icon name="layout" className="size-3 text-neutral-900" />
                                 </EmptyMedia>
                                 <EmptyHeader>
-                                  <EmptyTitle className="text-sm">{canEditStructure ? 'Start building' : 'No content yet'}</EmptyTitle>
+                                  <EmptyTitle className="text-sm">{canEditStructure ? 'Start building' : t('No content yet')}</EmptyTitle>
                                   <EmptyDescription>
                                     {canEditStructure
                                       ? 'Add your first block to begin creating your page.'
-                                      : 'This page has no content to edit yet.'}
+                                      : t('This page has no content to edit yet.')}
                                   </EmptyDescription>
                                 </EmptyHeader>
                                 {canEditStructure && (
@@ -2862,12 +2875,12 @@ const CenterCanvas = React.memo(function CenterCanvas({
                           <Icon name="layout" className="w-10 h-10 text-blue-500" />
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                          {canEditStructure ? 'Start building' : 'No content yet'}
+                          {canEditStructure ? 'Start building' : t('No content yet')}
                         </h2>
                         <p className="text-gray-600 mb-8">
                           {canEditStructure
                             ? 'Add your first block to begin creating your page.'
-                            : 'This page has no content to edit yet.'}
+                            : t('This page has no content to edit yet.')}
                         </p>
                         {canEditStructure && <div className="relative inline-block">
                           <Button
@@ -3052,7 +3065,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 size="sm"
                 onClick={() => window.open(previewUrl, '_blank')}
               >
-                Open in new tab
+                {t('Open in new tab')}
                 <Icon name="external-link" />
               </Button>
             )}
@@ -3103,7 +3116,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                   ref={iframeRef}
                   src={previewUrl}
                   className="w-full h-full border-0"
-                  title="Preview"
+                  title={t('Preview')}
                   tabIndex={-1}
                   onLoad={handlePreviewLoad}
                 />
@@ -3114,10 +3127,10 @@ const CenterCanvas = React.memo(function CenterCanvas({
                       <Icon name="layout" className="w-10 h-10 text-blue-500" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                      No content
+                      {t('No content')}
                     </h2>
                     <p className="text-gray-600">
-                      This page has no content to preview.
+                      {t('This page has no content to preview.')}
                     </p>
                   </div>
                 </div>
@@ -3137,10 +3150,10 @@ const CenterCanvas = React.memo(function CenterCanvas({
               closeRichTextSheet();
             }
           }}
-          title="Content editor"
+          title={t('Content editor')}
           description={richTextTranslationContext && selectedLocale
-            ? `Translate to ${selectedLocale.label}`
-            : 'Element content'}
+            ? t('Translate to {language}', { language: selectedLocale.label })
+            : t('Element content')}
           value={richTextSheetValue}
           onChange={handleRichTextSheetChange}
           fieldGroups={richTextSheetFieldGroups}

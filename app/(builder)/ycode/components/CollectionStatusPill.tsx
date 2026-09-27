@@ -1,9 +1,11 @@
 'use client';
 
+import { useCustomerCopy, type CustomerCopyKey } from '@/lib/rin5-customer-copy';
+
 type StatusTheme = 'green' | 'gray' | 'yellow' | 'blue';
 
 interface StatusData {
-  label: string;
+  label: CustomerCopyKey;
   theme: StatusTheme;
 }
 
@@ -51,6 +53,7 @@ interface CollectionStatusPillProps {
 }
 
 export function CollectionStatusPill({ statusValue, className = '' }: CollectionStatusPillProps) {
+  const t = useCustomerCopy();
   if (!statusValue) return null;
 
   const status = getStatus(statusValue);
@@ -59,7 +62,7 @@ export function CollectionStatusPill({ statusValue, className = '' }: Collection
     <span
       className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${THEME_CLASSES[status.theme]} ${className}`}
     >
-      {status.label}
+      {t(status.label)}
     </span>
   );
 }

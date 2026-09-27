@@ -38,6 +38,7 @@ import { getLayerIcon, getLayerName } from '@/lib/layer-display-utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import PageSelector from './PageSelector';
 import { filterFieldGroupsByType, flattenFieldGroups, LINK_FIELD_TYPES, buildReferenceItemOptions, type FieldGroup } from '@/lib/collection-field-utils';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 import LinkCollectionItemPicker from './LinkCollectionItemPicker';
 
 export interface RichTextLinkSettingsProps {
@@ -75,6 +76,7 @@ export default function RichTextLinkSettings({
   excludedLinkTypes = [],
   hidePageContextOptions = false,
 }: RichTextLinkSettingsProps) {
+  const t = useCustomerCopy();
   // Stores
   const pages = usePagesStore((state) => state.pages);
   const draftsByPageId = usePagesStore((state) => state.draftsByPageId);
@@ -203,13 +205,13 @@ export default function RichTextLinkSettings({
     >
   >(() => {
     const allOptions = [
-      { value: 'page', label: 'Page', icon: 'page' },
-      { value: 'asset', label: 'Asset', icon: 'paperclip' },
-      { value: 'field', label: 'CMS field', icon: 'database', disabled: linkFieldGroups.length === 0 },
+      { value: 'page', label: t('Page'), icon: 'page' },
+      { value: 'asset', label: t('Asset'), icon: 'paperclip' },
+      { value: 'field', label: t('CMS field'), icon: 'database', disabled: linkFieldGroups.length === 0 },
       { type: 'separator' },
-      { value: 'url', label: 'URL', icon: 'link' },
-      { value: 'email', label: 'Email', icon: 'email' },
-      { value: 'phone', label: 'Phone', icon: 'phone' },
+      { value: 'url', label: t('URL'), icon: 'link' },
+      { value: 'email', label: t('Email'), icon: 'email' },
+      { value: 'phone', label: t('Phone'), icon: 'phone' },
     ] as Array<
       | { value: LinkType | 'none'; label: string; icon: string; disabled?: boolean }
       | { type: 'separator' }
@@ -221,7 +223,7 @@ export default function RichTextLinkSettings({
       if ('value' in option && excludedLinkTypes.includes(option.value as LinkType)) return false;
       return true;
     });
-  }, [linkFieldGroups, excludedLinkTypes]);
+  }, [linkFieldGroups, excludedLinkTypes, t]);
 
   // Handle link type change
   const handleLinkTypeChange = useCallback(
@@ -457,7 +459,7 @@ export default function RichTextLinkSettings({
     <div className="flex flex-col gap-3">
       {/* Link Type */}
       <div className="grid grid-cols-3 items-center gap-2">
-        <Label className="text-xs text-muted-foreground">Link To</Label>
+        <Label className="text-xs text-muted-foreground">{t('Link To')}</Label>
         <div className="col-span-2 *:w-full">
           <Select
             value={linkType === 'none' ? '' : linkType}
@@ -468,7 +470,7 @@ export default function RichTextLinkSettings({
                 ? () => handleLinkTypeChange('none')
                 : undefined}
             >
-              <SelectValue placeholder="Page or URL..." />
+              <SelectValue placeholder={t('Page or URL...')} />
             </SelectTrigger>
             <SelectContent>
               {linkTypeOptions.map((option, index) => {
@@ -499,7 +501,7 @@ export default function RichTextLinkSettings({
       {/* URL Input */}
       {linkType === 'url' && (
         <div className="grid grid-cols-3 items-center gap-2">
-          <Label className="text-xs text-muted-foreground">URL</Label>
+          <Label className="text-xs text-muted-foreground">{t('URL')}</Label>
           <div className="col-span-2">
             <RichTextEditor
               value={urlValue}
@@ -517,7 +519,7 @@ export default function RichTextLinkSettings({
       {/* Email Input */}
       {linkType === 'email' && (
         <div className="grid grid-cols-3 items-center gap-2">
-          <Label className="text-xs text-muted-foreground">Email</Label>
+          <Label className="text-xs text-muted-foreground">{t('Email')}</Label>
           <div className="col-span-2">
             <RichTextEditor
               value={emailValue}
@@ -535,7 +537,7 @@ export default function RichTextLinkSettings({
       {/* Phone Input */}
       {linkType === 'phone' && (
         <div className="grid grid-cols-3 items-center gap-2">
-          <Label className="text-xs text-muted-foreground">Phone</Label>
+          <Label className="text-xs text-muted-foreground">{t('Phone')}</Label>
           <div className="col-span-2">
             <RichTextEditor
               value={phoneValue}
@@ -553,7 +555,7 @@ export default function RichTextLinkSettings({
       {/* Asset Selection */}
       {linkType === 'asset' && (
         <div className="grid grid-cols-3 items-center gap-2">
-          <Label className="text-xs text-muted-foreground">Asset</Label>
+          <Label className="text-xs text-muted-foreground">{t('Asset')}</Label>
           <div className="col-span-2">
             <Button
               variant="secondary"
@@ -565,7 +567,7 @@ export default function RichTextLinkSettings({
                 name={(selectedAsset ? getAssetIcon(selectedAsset.mime_type) : 'paperclip') as IconProps['name']}
                 className="size-3 mr-0.5"
               />
-              {selectedAsset ? selectedAsset.filename : 'Select asset...'}
+              {selectedAsset ? selectedAsset.filename : t('Select asset...')}
             </Button>
           </div>
         </div>
@@ -575,7 +577,7 @@ export default function RichTextLinkSettings({
       {linkType === 'page' && (
         <>
           <div className="grid grid-cols-3 items-center gap-2">
-            <Label className="text-xs text-muted-foreground">Page</Label>
+            <Label className="text-xs text-muted-foreground">{t('Page')}</Label>
             <div className="col-span-2">
               <PageSelector
                 value={pageId}
@@ -587,7 +589,7 @@ export default function RichTextLinkSettings({
           {/* Collection Item Selection (for dynamic pages) */}
           {isDynamicPage && pageId && (
             <div className="grid grid-cols-3 items-center gap-2">
-              <Label className="text-xs text-muted-foreground">CMS item</Label>
+              <Label className="text-xs text-muted-foreground">{t('CMS item')}</Label>
               <div className="col-span-2">
                 <LinkCollectionItemPicker
                   collectionId={collectionPickerId}
@@ -607,7 +609,7 @@ export default function RichTextLinkSettings({
       {/* Field Selection */}
       {linkType === 'field' && (
         <div className="grid grid-cols-3 items-center gap-2">
-          <Label className="text-xs text-muted-foreground">Field</Label>
+          <Label className="text-xs text-muted-foreground">{t('Field')}</Label>
           <div className="col-span-2">
             <FieldSelectDropdown
               fieldGroups={linkFieldGroups}
@@ -615,7 +617,7 @@ export default function RichTextLinkSettings({
               collections={collections || []}
               value={fieldId}
               onSelect={handleFieldChange}
-              placeholder="Select..."
+              placeholder={t('Select...')}
               allowedFieldTypes={LINK_FIELD_TYPES}
             />
           </div>
@@ -626,12 +628,12 @@ export default function RichTextLinkSettings({
       {(linkType === 'page' || linkType === 'url') && (
         <div className="grid grid-cols-3 items-center gap-2">
           <div className="flex items-center gap-1">
-            <Label className="text-xs text-muted-foreground">Anchor</Label>
+            <Label className="text-xs text-muted-foreground">{t('Anchor')}</Label>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Icon name="info" className="size-3 text-foreground/80" />
               </TooltipTrigger>
-              <TooltipContent>Layers with ID attributes are used as anchors</TooltipContent>
+              <TooltipContent>{t('Layers with ID attributes are used as anchors')}</TooltipContent>
             </Tooltip>
           </div>
 
@@ -642,13 +644,13 @@ export default function RichTextLinkSettings({
               disabled={false}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select..." />
+                <SelectValue placeholder={t('Select...')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">
                   <div className="flex items-center gap-2">
                     <Icon name="none" className="size-3" />
-                    <span>No anchor</span>
+                    <span>{t('No anchor')}</span>
                   </div>
                 </SelectItem>
                 {anchorLayers.map(({ layer: anchorLayer, id }) => (
@@ -670,7 +672,7 @@ export default function RichTextLinkSettings({
       {linkType !== 'none' && (
         <div className="grid grid-cols-3 gap-2 py-1">
           <div>
-            <Label variant="muted">Behavior</Label>
+            <Label variant="muted">{t('Behavior')}</Label>
           </div>
           <div className="col-span-2 flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -684,7 +686,7 @@ export default function RichTextLinkSettings({
                 htmlFor="richtext-newTab"
                 className="cursor-pointer"
               >
-                Open in new tab
+                {t('Open in new tab')}
               </Label>
             </div>
             {linkType === 'asset' && (
@@ -699,7 +701,7 @@ export default function RichTextLinkSettings({
                   htmlFor="richtext-download"
                   className="cursor-pointer"
                 >
-                  Force download
+                  {t('Force download')}
                 </Label>
               </div>
             )}
@@ -714,7 +716,7 @@ export default function RichTextLinkSettings({
                 htmlFor="richtext-nofollow"
                 className="cursor-pointer"
               >
-                No follow
+                {t('No follow')}
               </Label>
             </div>
           </div>

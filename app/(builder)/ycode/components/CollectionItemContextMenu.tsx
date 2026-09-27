@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { useCustomerCopy } from '@/lib/rin5-customer-copy';
 
 interface CollectionItemContextMenuProps {
   children: React.ReactNode;
@@ -34,6 +35,7 @@ export default function CollectionItemContextMenu({
   onDelete,
   disabled = false,
 }: CollectionItemContextMenuProps) {
+  const t = useCustomerCopy();
   if (disabled) {
     return <>{children}</>;
   }
@@ -45,35 +47,35 @@ export default function CollectionItemContextMenu({
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         <ContextMenuItem onClick={onEdit}>
-          Edit CMS item
+          {t('Edit CMS item')}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
           disabled={!isPublishable && !hasPublishedVersion}
           onClick={onSetAsDraft}
         >
-          Set as draft
+          {t('Set as draft')}
         </ContextMenuItem>
         <ContextMenuItem
           disabled={isPublishable || hasPublishedVersion}
           onClick={onStageForPublish}
         >
-          Stage for publish
+          {t('Stage for publish')}
         </ContextMenuItem>
         {allowDirectPublish && (
           <ContextMenuItem
             disabled={!isCollectionPublished || (hasPublishedVersion && isPublishable && !isModified)}
             onClick={onSetAsPublished}
           >
-            Set as published
+            {t('Set as published')}
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
         <ContextMenuItem onClick={onDuplicate}>
-          Duplicate
+          {t('Duplicate')}
         </ContextMenuItem>
         <ContextMenuItem onClick={onDelete}>
-          Delete
+          {t('Delete')}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

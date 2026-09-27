@@ -26,6 +26,7 @@ import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { cn } from '@/lib/utils';
 import type { CollectionItemWithValues } from '@/types';
 import { Empty, EmptyDescription, EmptyTitle } from '@/components/ui/empty';
+import { useCustomerCopy, useRin5CustomerMode } from '@/lib/rin5-customer-copy';
 
 interface ReferenceFieldComboboxProps {
   /** The collection ID to fetch items from */
@@ -47,9 +48,12 @@ export default function ReferenceFieldCombobox({
   value,
   onChange,
   isMulti = false,
-  placeholder = 'Select...',
+  placeholder: placeholderProp,
   disabled = false,
 }: ReferenceFieldComboboxProps) {
+  const t = useCustomerCopy();
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
+  const placeholder = placeholderProp ?? t('Select...');
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -113,7 +117,9 @@ export default function ReferenceFieldCombobox({
         setItems(response.data?.items || []);
         setHasLoadedOnce(true);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load items');
+        setError(rin5Customer
+          ? t('The items could not be loaded. Close and open this field to try again.')
+          : err instanceof Error ? err.message : 'Failed to load items');
       } finally {
         setLoading(false);
       }
@@ -187,7 +193,7 @@ export default function ReferenceFieldCombobox({
         .map((item) => getDisplayName(item));
 
       if (names.length > 0) return names.join(', ');
-      if (!hasLoadedOnce) return 'Loading data...';
+      if (!hasLoadedOnce) return t('Loading data...');
       return placeholder;
     }
 
@@ -197,7 +203,7 @@ export default function ReferenceFieldCombobox({
       return getDisplayName(selectedItem);
     }
 
-    if (!hasLoadedOnce) return 'Loading data...';
+    if (!hasLoadedOnce) return t('Loading data...');
   };
 
   return (
@@ -253,7 +259,7 @@ export default function ReferenceFieldCombobox({
           ) : items.length === 0 ? (
             <div className="text-center py-4 text-sm text-muted-foreground">
               <Empty>
-                <EmptyTitle>{searchQuery ? 'No items found' : 'No items in this collection'}</EmptyTitle>
+                <EmptyTitle>{searchQuery ? t('No items found') : t('No items in this collection')}</EmptyTitle>
               </Empty>
             </div>
           ) : (
