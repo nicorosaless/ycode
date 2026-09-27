@@ -109,7 +109,10 @@ function Rin5Welcome() {
 
   return (
     <div className={styles.scrim}>
-      <section className={styles.welcome} role="dialog" aria-modal="true" aria-labelledby="rin5-welcome-title">
+      <section
+        className={styles.welcome} role="dialog"
+        aria-modal="true" aria-labelledby="rin5-welcome-title"
+      >
         <span className={styles.pill}>Tu prueba de 14 días ha empezado</span>
         <h1 id="rin5-welcome-title" className={styles.welcomeTitle}>Esta es tu web. Ya puedes cambiarla.</h1>
         <p className={styles.welcomeLead}>Todo lo que ves se edita aquí mismo. Te enseñamos lo básico en tres pasos.</p>
@@ -120,10 +123,17 @@ function Rin5Welcome() {
         </ol>
         <p className={styles.welcomeNote}>Tus cambios se guardan solos. Nadie los ve hasta que publicas.</p>
         <div className={styles.welcomeActions}>
-          <button type="button" className={styles.primary} onClick={() => void start()} aria-busy={busy} autoFocus>
+          <button
+            type="button" className={styles.primary}
+            onClick={() => void start()} aria-busy={busy}
+            autoFocus
+          >
             Empezar
           </button>
-          <button type="button" className={styles.quiet} onClick={() => void explore()} disabled={busy}>
+          <button
+            type="button" className={styles.quiet}
+            onClick={() => void explore()} disabled={busy}
+          >
             Lo haré por mi cuenta
           </button>
         </div>
@@ -186,15 +196,24 @@ function Rin5TourTip({ step }: { step: Rin5TourStep }) {
         aria-live="polite"
         style={{ top: placement.top, left: placement.left }}
       >
-        <span className={styles.tipArrow} aria-hidden style={{ left: placement.arrowLeft }} />
+        <span
+          className={styles.tipArrow} aria-hidden
+          style={{ left: placement.arrowLeft }}
+        />
         <p className={styles.tipStep}>Paso {copy.index + 1} de 3</p>
         <p className={styles.tipTitle}>{copy.title}</p>
         <p className={styles.tipBody}>{copy.body}</p>
         <div className={styles.tipFoot}>
           <span className={styles.tipDots} aria-hidden>
-            {[0, 1, 2].map((index) => <span key={index} className={styles.tipDot} data-on={index <= copy.index} />)}
+            {[0, 1, 2].map((index) => <span
+              key={index} className={styles.tipDot}
+              data-on={index <= copy.index}
+                                      />)}
           </span>
-          <button type="button" className={styles.tipSkip} onClick={() => void mark('tour_finished')}>
+          <button
+            type="button" className={styles.tipSkip}
+            onClick={() => void mark('tour_finished')}
+          >
             Saltar el recorrido
           </button>
         </div>
@@ -207,11 +226,20 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
   const radius = 7
   const length = 2 * Math.PI * radius
   return (
-    <svg className={styles.ring} viewBox="0 0 18 18" aria-hidden>
-      <circle className={styles.ringTrack} cx="9" cy="9" r={radius} fill="none" strokeWidth="2.5" />
+    <svg
+      className={styles.ring} viewBox="0 0 18 18"
+      aria-hidden
+    >
+      <circle
+        className={styles.ringTrack} cx="9"
+        cy="9" r={radius}
+        fill="none" strokeWidth="2.5"
+      />
       <circle
         className={styles.ringValue}
-        cx="9" cy="9" r={radius} fill="none" strokeWidth="2.5" strokeLinecap="round"
+        cx="9" cy="9"
+        r={radius} fill="none"
+        strokeWidth="2.5" strokeLinecap="round"
         strokeDasharray={length}
         strokeDashoffset={length * (1 - done / total)}
       />
@@ -251,12 +279,18 @@ export function Rin5ChecklistButton({ navigation }: { navigation: Rin5Navigation
         <span>{done}/{total}</span>
       </button>
       {open && (
-        <section id="rin5-first-steps" className={styles.panel} aria-labelledby="rin5-first-steps-title">
+        <section
+          id="rin5-first-steps" className={styles.panel}
+          aria-labelledby="rin5-first-steps-title"
+        >
           <div className={styles.panelHead}>
             <h2 id="rin5-first-steps-title" className={styles.panelTitle}>Primeros pasos</h2>
             <span className={styles.panelTools}>
               <span className={styles.panelCount}>{done} de {total}</span>
-              <button type="button" className={styles.panelClose} onClick={closeChecklist} aria-label="Cerrar primeros pasos">
+              <button
+                type="button" className={styles.panelClose}
+                onClick={closeChecklist} aria-label="Cerrar primeros pasos"
+              >
                 <X aria-hidden />
               </button>
             </span>
@@ -267,7 +301,10 @@ export function Rin5ChecklistButton({ navigation }: { navigation: Rin5Navigation
               const copy = STEP_COPY[step.id]
               const link = !step.done ? links[step.id] : undefined
               return (
-                <li key={step.id} className={styles.step} data-done={step.done}>
+                <li
+                  key={step.id} className={styles.step}
+                  data-done={step.done}
+                >
                   <span className={styles.check} aria-hidden>{step.done && <Check strokeWidth={3} />}</span>
                   <span className={styles.stepBody}>
                     <span className={styles.stepText}>

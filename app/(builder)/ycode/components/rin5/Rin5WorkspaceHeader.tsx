@@ -125,7 +125,10 @@ export function Rin5WorkspaceHeader({
       <span className={styles.narrow}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className={styles.tab} aria-current="page" aria-label={`Sección: ${current.label}. Cambiar de sección`}>
+            <button
+              type="button" className={styles.tab}
+              aria-current="page" aria-label={`Sección: ${current.label}. Cambiar de sección`}
+            >
               <current.Icon aria-hidden />
               <span className={styles.tabLabel}>{current.label}</span>
               <ChevronDown aria-hidden />
@@ -133,7 +136,10 @@ export function Rin5WorkspaceHeader({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className={styles.menu}>
             {TABS.map(({ id, label, Icon }) => (
-              <DropdownMenuItem key={id} className={styles.menuItem} data-active={active === id} onSelect={() => onSelect(id)}>
+              <DropdownMenuItem
+                key={id} className={styles.menuItem}
+                data-active={active === id} onSelect={() => onSelect(id)}
+              >
                 <Icon aria-hidden />{label}
               </DropdownMenuItem>
             ))}
@@ -141,7 +147,10 @@ export function Rin5WorkspaceHeader({
               <a href={navigation.analyticsUrl}><BarChart3 aria-hidden />Estadísticas</a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className={styles.menuItem} disabled={previewDisabled} onSelect={onTogglePreview}>
+            <DropdownMenuItem
+              className={styles.menuItem} disabled={previewDisabled}
+              onSelect={onTogglePreview}
+            >
               {previewing ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
               {previewing ? 'Salir de la vista previa' : 'Vista previa'}
             </DropdownMenuItem>
@@ -157,7 +166,10 @@ export function Rin5WorkspaceHeader({
       <div className={styles.actions}>
         <Rin5ChecklistButton navigation={navigation} />
         <span className={styles.wide}>
-          <span className={styles.saveState} data-state={saveState} role="status" aria-live="polite">{SAVE_COPY[saveState]}</span>
+          <span
+            className={styles.saveState} data-state={saveState}
+            role="status" aria-live="polite"
+          >{SAVE_COPY[saveState]}</span>
           <button
             type="button"
             className={`${styles.quiet} ${styles.iconButton}`}
@@ -186,7 +198,10 @@ export function Rin5WorkspaceHeader({
         </a>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className={styles.avatar} aria-label="Tu cuenta">
+            <button
+              type="button" className={styles.avatar}
+              aria-label="Tu cuenta"
+            >
               {(userEmail ?? '?').slice(0, 1)}
             </button>
           </DropdownMenuTrigger>
@@ -207,7 +222,10 @@ export function Rin5WorkspaceHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <form ref={logoutForm} method="post" action={navigation.logoutUrl} hidden />
+        <form
+          ref={logoutForm} method="post"
+          action={navigation.logoutUrl} hidden
+        />
       </div>
     </header>
   )
