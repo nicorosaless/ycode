@@ -453,6 +453,7 @@ export const RIN5_CUSTOMER_COPY_ES = {
   '{count} files': '{count} archivos',
   '{shown} of {total} files': '{shown} de {total} archivos',
   'No files found': 'No hay archivos',
+  'Results for "{query}"': 'Resultados de «{query}»',
   'No files were found using the current filters': 'Ningún archivo coincide con la búsqueda o el filtro.',
   'No files': 'Todavía no has subido archivos',
   'No folders or assets in this folder': 'Esta carpeta está vacía',

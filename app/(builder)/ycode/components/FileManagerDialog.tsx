@@ -519,7 +519,7 @@ function FileGridHeader({ children, isSticky = false }: { children: React.ReactN
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-2 min-h-14 shrink-0',
+        'flex flex-wrap items-center justify-between gap-x-2 gap-y-1 min-h-14 shrink-0 py-2',
         isSticky && 'sticky top-0 z-30 bg-background before:absolute before:-top-px before:left-0 before:right-0 before:h-px before:bg-background'
       )}
     >
@@ -1880,7 +1880,7 @@ export default function FileManagerDialog({
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="w-35 justify-between gap-1 font-normal"
+                      className="hidden w-35 justify-between gap-1 font-normal sm:inline-flex"
                     >
                       <span className="flex items-center gap-1.5 truncate">
                         {selectedCategories === null || selectedCategories.length === 0 ? (
@@ -1965,13 +1965,14 @@ export default function FileManagerDialog({
                   </PopoverContent>
                 </Popover>
 
-                <Separator orientation="vertical" className="h-7! shrink-0 mx-0.5" />
+                <Separator orientation="vertical" className="hidden h-7! shrink-0 mx-0.5 sm:block" />
               </div>
 
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="hidden sm:inline-flex"
                   onClick={handleCreateSvg}
                 >
                   <Icon name="icon" />
@@ -2001,7 +2002,8 @@ export default function FileManagerDialog({
 
           <div className="flex-1 flex -my-6 -mx-6 overflow-hidden">
             {/* Folder Sidebar */}
-            <div className="w-64 border-r h-full overflow-y-auto px-4">
+            {/* Below md the folders give their width to the files: a phone shows only the grid. */}
+            <div className="hidden w-64 border-r h-full overflow-y-auto px-4 md:block">
               <header className="py-5 flex justify-between">
                 <span className="font-medium">{t('File manager')}</span>
                 <div className="-my-1">
@@ -2442,7 +2444,7 @@ export default function FileManagerDialog({
                       {searchQuery.trim() ? (
                         <>
                           <span className="text-foreground font-medium">
-                            Results for &quot;{searchQuery}&quot;
+                            {t('Results for "{query}"', { query: searchQuery })}
                           </span>
                           <Icon name="chevronRight" className="size-2.5 opacity-50" />
                           <span className="text-muted-foreground font-medium">
