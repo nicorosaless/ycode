@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Check, ImageIcon, Rocket, Type, X } from 'lucide-react'
 
 import { detectRin5ContentChanges, type Rin5ChecklistStepId, type Rin5TourStep } from '@/lib/rin5-onboarding'
 import type { Rin5Navigation } from '@/lib/rin5-navigation'
+import { placeTourTip, type TourPlacement, type TourRect } from '@/lib/rin5-tour-placement'
 import { usePagesStore } from '@/stores/usePagesStore'
 
 import styles from './rin5-workspace.module.css'
@@ -142,36 +143,59 @@ function Rin5Welcome() {
   )
 }
 
-type Placement = { top: number; left: number; arrowLeft: number; side: 'below' | 'above'; pulse: DOMRect | null }
+type Placement = TourPlacement & { pulse: TourRect | null }
 
-const TIP_WIDTH = 300
+function rectOf(selector: string): TourRect | null {
+  const element = document.querySelector(selector)
+  if (!element) return null
+  const { top, left, width, height } = element.getBoundingClientRect()
+  return width > 0 && height > 0 ? { top, left, width, height } : null
+}
 
 function place(step: Rin5TourStep): Placement | null {
   // While the file manager or any other dialog is open, the tip would cover it.
   if (document.querySelector('[role="dialog"][data-state="open"]')) return null
-  const anchor = document.querySelector(TOUR[step].anchor)
+  const anchor = rectOf(TOUR[step].anchor)
   if (!anchor) return null
-  const rect = anchor.getBoundingClientRect()
-  if (rect.width === 0 || rect.height === 0) return null
-  const viewport = window.innerWidth
-  const width = Math.min(TIP_WIDTH, viewport - 16)
-  if (step === 'publish') {
-    const left = Math.max(8, Math.min(rect.right - width, viewport - width - 8))
-    return { top: rect.bottom + 14, left, arrowLeft: Math.min(width - 24, Math.max(12, rect.left + rect.width / 2 - left - 6)), side: 'below', pulse: rect }
-  }
-  // Canvas steps: the tip sits over the lower part of the page, pointing up
-  // into it, so it never covers the text the customer is about to edit.
-  const left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, viewport - width - 8))
-  const top = Math.max(rect.top + 64, rect.bottom - 220)
-  return { top, left, arrowLeft: width / 2 - 6, side: 'below', pulse: null }
+  const placement = placeTourTip({ step, anchor, column: rectOf('[data-rin5-tour="column"]') })
+  return { ...placement, pulse: step === 'publish' ? anchor : null }
+}
+
+/**
+ * A docked tip takes its height from the canvas (see app/globals.css), so it
+ * sits under the web instead of on top of its lower part.
+ */
+function useDockReserve(docked: boolean) {
+  const ref = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    const tip = ref.current
+    if (!docked || !tip) return
+    const reserve = () => root.style.setProperty('--rin5-tour-dock', `${Math.ceil(tip.getBoundingClientRect().height) + 16}px`)
+    reserve()
+    root.dataset.rin5TourDocked = '1'
+    const observer = new ResizeObserver(reserve)
+    observer.observe(tip)
+    return () => {
+      observer.disconnect()
+      delete root.dataset.rin5TourDocked
+      root.style.removeProperty('--rin5-tour-dock')
+    }
+  }, [docked])
+  return ref
 }
 
 function Rin5TourTip({ step }: { step: Rin5TourStep }) {
   const mark = useRin5Onboarding((state) => state.mark)
   const [placement, setPlacement] = useState<Placement | null>(null)
+  const docked = placement?.mode === 'dock'
+  const tipRef = useDockReserve(docked)
 
   useLayoutEffect(() => {
-    const update = () => setPlacement(place(step))
+    const update = () => setPlacement((previous) => {
+      const next = place(step)
+      return JSON.stringify(next) === JSON.stringify(previous) ? previous : next
+    })
     update()
     const timer = window.setInterval(update, 500)
     window.addEventListener('resize', update)
@@ -180,6 +204,7 @@ function Rin5TourTip({ step }: { step: Rin5TourStep }) {
 
   if (!placement) return null
   const copy = TOUR[step]
+  const float = placement.mode === 'float' ? placement : null
   return (
     <>
       {placement.pulse && (
@@ -190,16 +215,20 @@ function Rin5TourTip({ step }: { step: Rin5TourStep }) {
         />
       )}
       <aside
+        ref={tipRef}
         className={styles.tip}
-        data-side={placement.side}
+        data-mode={placement.mode}
+        data-side={float?.side}
         role="status"
         aria-live="polite"
-        style={{ top: placement.top, left: placement.left }}
+        style={float ? { top: float.top, left: float.left, width: float.width } : undefined}
       >
-        <span
-          className={styles.tipArrow} aria-hidden
-          style={{ left: placement.arrowLeft }}
-        />
+        {float && (
+          <span
+            className={styles.tipArrow} aria-hidden
+            style={float.side === 'left' ? { top: float.arrow } : { left: float.arrow }}
+          />
+        )}
         <p className={styles.tipStep}>Paso {copy.index + 1} de 3</p>
         <p className={styles.tipTitle}>{copy.title}</p>
         <p className={styles.tipBody}>{copy.body}</p>

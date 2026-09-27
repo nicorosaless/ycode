@@ -24,7 +24,7 @@ interface RightPanelProps {
  */
 function ContentOnlyRightPanel() {
   return (
-    <div className="hidden w-64 shrink-0 bg-background border-l flex-col h-full overflow-hidden md:flex">
+    <div className="hidden w-64 shrink-0 bg-background border-l flex-col h-full overflow-hidden md:flex" data-rin5-tour="column">
       <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted-foreground">
         Haz doble clic en un texto para escribir encima, o en una foto para cambiarla.
       </div>

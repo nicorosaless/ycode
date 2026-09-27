@@ -407,7 +407,16 @@
   border-top: 1px solid var(--rin5-live-border);
 }
 .tip[data-side="below"] .tipArrow { top: -7px; transform: rotate(45deg); }
-.tip[data-side="above"] .tipArrow { bottom: -7px; transform: rotate(225deg); }
+.tip[data-side="left"] .tipArrow { left: -7px; transform: rotate(-45deg); }
+/* Sin columna a la derecha (móvil): abajo, a lo ancho, en el hueco que el lienzo le cede. */
+.tip[data-mode="dock"] {
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: auto;
+  max-width: none;
+  padding: 14px 16px;
+}
 .tipStep { font: 600 11.5px/1.1 var(--rin5-font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--rin5-lime-ink); }
 .tipTitle { margin: 8px 0 0; font: 700 17px/1.25 var(--rin5-font); letter-spacing: -0.015em; }
 .tipBody { margin: 6px 0 0; font: 400 14px/1.5 var(--rin5-font); color: var(--rin5-ink-2); }

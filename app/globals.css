@@ -490,3 +490,9 @@ html[data-rin5-workspace].dark {
 html[data-rin5-workspace] body {
   --font-inter: var(--rin5-font);
 }
+
+/* El recorrido acoplado abajo (móvil) toma su alto del lienzo: la web se
+   encoge por encima del aviso en vez de quedar tapada por él. */
+html[data-rin5-tour-docked] [data-rin5-tour="canvas"] {
+  padding-bottom: var(--rin5-tour-dock, 0px);
+}
