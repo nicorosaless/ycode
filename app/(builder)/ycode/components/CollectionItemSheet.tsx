@@ -73,7 +73,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { getSyncedFieldIds, fetchCachedConnections } from '@/lib/apps/airtable/client';
-import { useCustomerCopy } from '@/lib/rin5-customer-copy';
+import { useCustomerCopy, useRin5CustomerMode } from '@/lib/rin5-customer-copy';
+import { customerFieldName } from '@/lib/rin5-customer-fields';
 
 /** Every text the invalid-asset toast can produce from getAssetFieldTypeLabel. */
 type InvalidAssetMessage =
@@ -101,6 +102,8 @@ export default function CollectionItemSheet({
   allowDirectPublish = true,
 }: CollectionItemSheetProps) {
   const t = useCustomerCopy();
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
+  const fieldLabel = (field: CollectionField) => customerFieldName(field, rin5Customer);
   const { collections, fields, items, updateItem, createItem, setItemStatus } = useCollectionsStore();
   const { updateItemInLayerData, invalidateLayerData, refetchLayersForCollection } = useCollectionLayerStore();
   const { updatePageCollectionItem, refetchPageCollectionItem, pages } = usePagesStore();
@@ -782,7 +785,7 @@ export default function CollectionItemSheet({
                     render={({ field: formField }) => (
                       <FormItem>
                         <div className="flex items-center gap-2">
-                          <FormLabel>{field.name}</FormLabel>
+                          <FormLabel>{fieldLabel(field)}</FormLabel>
                           {(field.type === 'multi_reference') && (() => {
                             const ids = parseMultiReferenceValue(formField.value);
                             return ids.length > 0 ? (
@@ -809,7 +812,7 @@ export default function CollectionItemSheet({
                               <RichTextEditor
                                 value={formField.value || ''}
                                 onChange={formField.onChange}
-                                placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
+                                placeholder={field.default || t('Enter {field}...', { field: fieldLabel(field).toLowerCase() })}
                                 variant="full"
                                 withFormatting={true}
                                 excludedLinkTypes={['asset', 'field']}
@@ -819,10 +822,10 @@ export default function CollectionItemSheet({
                               <RichTextEditorSheet
                                 open={expandedRichTextField === field.id}
                                 onOpenChange={(open) => { if (!open) setExpandedRichTextField(null); }}
-                                description={t('CMS item "{field}" field', { field: field.name })}
+                                description={t('CMS item "{field}" field', { field: fieldLabel(field) })}
                                 value={formField.value || ''}
                                 onChange={formField.onChange}
-                                placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
+                                placeholder={field.default || t('Enter {field}...', { field: fieldLabel(field).toLowerCase() })}
                                 hidePageContextOptions={true}
                               />
                             </div>
@@ -832,7 +835,7 @@ export default function CollectionItemSheet({
                               value={formField.value || ''}
                               onChange={formField.onChange}
                               isMulti={false}
-                              placeholder={t('Select {field}...', { field: field.name.toLowerCase() })}
+                              placeholder={t('Select {field}...', { field: fieldLabel(field).toLowerCase() })}
                             />
                           ) : field.type === 'multi_reference' && field.reference_collection_id ? (
                             <ReferenceFieldCombobox
@@ -840,7 +843,7 @@ export default function CollectionItemSheet({
                               value={formField.value || '[]'}
                               onChange={formField.onChange}
                               isMulti={true}
-                              placeholder={t('Select {field}...', { field: field.name.toLowerCase() })}
+                              placeholder={t('Select {field}...', { field: fieldLabel(field).toLowerCase() })}
                             />
                           ) : field.type === 'link' ? (
                             <CollectionLinkFieldInput
@@ -850,14 +853,14 @@ export default function CollectionItemSheet({
                           ) : field.type === 'email' ? (
                             <Input
                               type="email"
-                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
+                              placeholder={field.default || t('Enter {field}...', { field: fieldLabel(field).toLowerCase() })}
                               autoComplete="off"
                               {...formField}
                             />
                           ) : field.type === 'phone' ? (
                             <Input
                               type="tel"
-                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
+                              placeholder={field.default || t('Enter {field}...', { field: fieldLabel(field).toLowerCase() })}
                               autoComplete="off"
                               {...formField}
                             />
@@ -1091,7 +1094,7 @@ export default function CollectionItemSheet({
                                   disabled={options.length === 0}
                                 >
                                   <SelectTrigger className="w-full">
-                                    <SelectValue placeholder={options.length === 0 ? t('No options available') : t('Select {field}...', { field: field.name.toLowerCase() })} />
+                                    <SelectValue placeholder={options.length === 0 ? t('No options available') : t('Select {field}...', { field: fieldLabel(field).toLowerCase() })} />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectGroup>
@@ -1116,7 +1119,7 @@ export default function CollectionItemSheet({
                           ) : field.key === 'name' ? (
                             <Input
                               ref={nameInputRef}
-                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
+                              placeholder={field.default || t('Enter {field}...', { field: fieldLabel(field).toLowerCase() })}
                               autoComplete="off"
                               name={formField.name}
                               value={formField.value}
@@ -1125,7 +1128,7 @@ export default function CollectionItemSheet({
                             />
                           ) : field.key === 'slug' ? (
                             <Input
-                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
+                              placeholder={field.default || t('Enter {field}...', { field: fieldLabel(field).toLowerCase() })}
                               autoComplete="off"
                               name={formField.name}
                               value={formField.value}
@@ -1137,7 +1140,7 @@ export default function CollectionItemSheet({
                             />
                           ) : (
                             <Input
-                              placeholder={field.default || t('Enter {field}...', { field: field.name.toLowerCase() })}
+                              placeholder={field.default || t('Enter {field}...', { field: fieldLabel(field).toLowerCase() })}
                               autoComplete="off"
                               {...formField}
                             />

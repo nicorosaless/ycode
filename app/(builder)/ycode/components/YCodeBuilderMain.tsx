@@ -2481,7 +2481,7 @@ export default function YCodeBuilder({ children, embedded = false, rin5Navigatio
     )}
 
     {/* Toast notifications */}
-    <Toaster containerAriaLabel={translateCustomerCopy('Notifications', rin5Customer)} />
+    <Toaster containerAriaLabel={rin5Customer ? translateCustomerCopy('Notifications', true) : undefined} />
 
     {/* Drag preview portal - follows cursor during element drag */}
     <Suspense fallback={null}>

@@ -75,7 +75,9 @@ import { useTreeDragDrop } from '@/hooks/use-tree-drag-drop';
 import { toast } from 'sonner';
 import type { AffectedPageEntity, AffectedComponentEntity } from '@/lib/asset-usage-utils';
 import { fetchRemixIcons, type RemixIcon, type RemixIconCategory } from '@/lib/remix-icons-api';
-import { useCustomerCopy } from '@/lib/rin5-customer-copy';
+import { useCustomerCopy, useRin5CustomerMode } from '@/lib/rin5-customer-copy';
+import { uploadFailureNotice } from '@/lib/rin5-upload-notice';
+import { fileManagerLayout } from '@/lib/rin5-file-manager-layout';
 import { createAssetLoadGuard } from './file-manager-load';
 
 /** Virtual folder IDs for the icon library tree */
@@ -516,10 +518,11 @@ function FileGridItem({
 }
 
 function FileGridHeader({ children, isSticky = false }: { children: React.ReactNode; isSticky?: boolean }) {
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center justify-between gap-x-2 gap-y-1 min-h-14 shrink-0 py-2',
+        fileManagerLayout(rin5Customer).gridHeader,
         isSticky && 'sticky top-0 z-30 bg-background before:absolute before:-top-px before:left-0 before:right-0 before:h-px before:bg-background'
       )}
     >
@@ -547,6 +550,8 @@ export default function FileManagerDialog({
   category,
 }: FileManagerDialogProps) {
   const t = useCustomerCopy();
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
+  const layout = fileManagerLayout(rin5Customer);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
@@ -1791,8 +1796,11 @@ export default function FileManagerDialog({
             setUploadingAssets((prev) => prev.filter((temp) => temp.id !== tempAsset.id));
             return true;
           }
-          // uploadFileApi returns null on failure: drop the spinner and count it.
-          setUploadingAssets((prev) => prev.filter((temp) => temp.id !== tempAsset.id));
+          // rin5 customer only: uploadFileApi returns null on failure, so drop
+          // the spinner and count it. Standard Ycode keeps its behavior.
+          if (rin5Customer) {
+            setUploadingAssets((prev) => prev.filter((temp) => temp.id !== tempAsset.id));
+          }
           return false;
         } catch (error) {
           console.error(`Failed to upload ${tempAsset.filename}:`, error);
@@ -1803,16 +1811,8 @@ export default function FileManagerDialog({
       });
 
       const uploaded = await Promise.all(uploadPromises);
-      const failed = tempAssets.filter((_, index) => !uploaded[index]);
-      if (failed.length === 1) {
-        toast.error(t('{name} could not be uploaded', { name: failed[0].filename }), {
-          description: t('Use a JPG, PNG or WebP photo under 50 MB and try again.'),
-        });
-      } else if (failed.length > 1) {
-        toast.error(t('{count} files could not be uploaded', { count: failed.length }), {
-          description: t('Use a JPG, PNG or WebP photo under 50 MB and try again.'),
-        });
-      }
+      const notice = uploadFailureNotice(tempAssets.filter((_, index) => !uploaded[index]).map((temp) => temp.filename), rin5Customer);
+      if (notice) toast.error(notice.title, { description: notice.description });
     } catch (error) {
       console.error('Failed to upload files:', error);
     } finally {
@@ -1880,7 +1880,7 @@ export default function FileManagerDialog({
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="hidden w-35 justify-between gap-1 font-normal sm:inline-flex"
+                      className={layout.typeFilter}
                     >
                       <span className="flex items-center gap-1.5 truncate">
                         {selectedCategories === null || selectedCategories.length === 0 ? (
@@ -1965,14 +1965,14 @@ export default function FileManagerDialog({
                   </PopoverContent>
                 </Popover>
 
-                <Separator orientation="vertical" className="hidden h-7! shrink-0 mx-0.5 sm:block" />
+                <Separator orientation="vertical" className={layout.separator} />
               </div>
 
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="hidden sm:inline-flex"
+                  className={layout.svgButton}
                   onClick={handleCreateSvg}
                 >
                   <Icon name="icon" />
@@ -2002,8 +2002,8 @@ export default function FileManagerDialog({
 
           <div className="flex-1 flex -my-6 -mx-6 overflow-hidden">
             {/* Folder Sidebar */}
-            {/* Below md the folders give their width to the files: a phone shows only the grid. */}
-            <div className="hidden w-64 border-r h-full overflow-y-auto px-4 md:block">
+            {/* In the rin5 client space, below md the folders give their width to the files. */}
+            <div className={layout.sidebar}>
               <header className="py-5 flex justify-between">
                 <span className="font-medium">{t('File manager')}</span>
                 <div className="-my-1">
@@ -2672,7 +2672,7 @@ export default function FileManagerDialog({
               parts.push(t(descendantIds.length > 1 ? '{count} subfolders' : '{count} subfolder', { count: descendantIds.length }));
             }
             if (assetsCount > 0) {
-              parts.push(t(assetsCount > 1 ? '{count} files' : '{count} file', { count: assetsCount }));
+              parts.push(t(assetsCount > 1 ? '{count} assets' : '{count} asset', { count: assetsCount }));
             }
             return t('Are you sure you want to delete this folder and all its contents ({contents})? This action cannot be undone.', { contents: parts.join(t(' and ')) });
           }
@@ -2816,7 +2816,7 @@ export default function FileManagerDialog({
           className="gap-0"
         >
           <DialogHeader>
-            <DialogTitle>{t(selectedAssetIds.size > 1 ? 'Move {count} files' : 'Move {count} file', { count: selectedAssetIds.size })}</DialogTitle>
+            <DialogTitle>{t(selectedAssetIds.size > 1 ? 'Move {count} assets' : 'Move {count} asset', { count: selectedAssetIds.size })}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4.5 pt-4">

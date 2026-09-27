@@ -49,7 +49,7 @@ import { FIELD_TYPES } from '@/lib/collection-field-utils';
 import { getFileManagerCategory, isValidAssetForField } from '@/lib/collection-field-utils';
 import { extractPlainTextFromTiptap } from '@/lib/tiptap-utils';
 import { formatDateInTimezone, localDatetimeToUTC, clampDateInputValue } from '@/lib/date-format-utils';
-import { useCustomerCopy, type CustomerCopy } from '@/lib/rin5-customer-copy';
+import { useCustomerCopy, useRin5CustomerMode, type CustomerCopy } from '@/lib/rin5-customer-copy';
 import ColorFieldInput from './ColorFieldInput';
 import CollectionLinkFieldInput from './CollectionLinkFieldInput';
 import RichTextEditor from './RichTextEditor';
@@ -287,6 +287,7 @@ const EMPTY_FORM: GlobalFormState = { name: '', type: 'text', value: '' };
 
 export default function GlobalsManager({ canManageSchema = true, timezone }: GlobalsManagerProps) {
   const t = useCustomerCopy();
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
   const { globals, isLoading, hasLoaded, loadGlobals, createGlobal, updateGlobal, deleteGlobal } = useGlobalsStore();
   const getAsset = useAssetsStore((state) => state.getAsset);
 
@@ -396,9 +397,9 @@ export default function GlobalsManager({ canManageSchema = true, timezone }: Glo
             <Empty>
               <EmptyTitle>{t('No global variables')}</EmptyTitle>
               <EmptyDescription>
-                {canManageSchema
-                  ? t('Create site-wide values you can reuse anywhere via content.')
-                  : t('Values shared by the whole site appear here.')}
+                {rin5Customer && !canManageSchema
+                  ? t('Values shared by the whole site appear here.')
+                  : t('Create site-wide values you can reuse anywhere via content.')}
               </EmptyDescription>
             </Empty>
           </div>

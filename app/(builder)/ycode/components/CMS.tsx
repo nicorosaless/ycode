@@ -46,6 +46,7 @@ import { useEditorUrl } from '@/hooks/use-editor-url';
 import { useRole } from '@/hooks/use-role';
 import { buildDynamicPageUrl } from '@/lib/page-utils';
 import { customerCopy, useCustomerCopy } from '@/lib/rin5-customer-copy';
+import { customerFieldName } from '@/lib/rin5-customer-fields';
 import { StructureEditorOnly } from './CustomerWorkspaceAccess';
 import FieldsDropdown from './FieldsDropdown';
 import AirtableSyncButton from './AirtableSyncButton';
@@ -1635,7 +1636,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
                             className="flex items-center gap-1 hover:opacity-50 cursor-pointer max-w-40"
                             style={{ pointerEvents: showSkeleton ? 'none' : 'auto' }}
                           >
-                            <span className="truncate">{field.name}</span>
+                            <span className="truncate">{customerFieldName(field, rin5Customer)}</span>
                             {sortIcon && (
                               <span className="text-xs font-mono">
                                 {sortIcon}
@@ -1672,7 +1673,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleHideField(field.id)}
-                                disabled={field.key === 'name' || field.name.toLowerCase() === 'name'}
+                                disabled={field.name.toLowerCase() === 'name'}
                               >
                                 {field.hidden ? t('Show') : t('Hide')}
                               </DropdownMenuItem>
@@ -2698,7 +2699,7 @@ const CMS = React.memo(function CMS({ rin5Customer = false }: { rin5Customer?: b
                   <ul className="list-disc list-inside space-y-0.5 ml-1">
                     {collectionUsage.referenceFields.map((f) => (
                       <li key={f.id}>
-                        {t('Field "{field}" in the "{collection}" collection', { field: f.name, collection: f.collectionName })}
+                        {t('Field "{field}" in "{collection}"', { field: f.name, collection: f.collectionName })}
                       </li>
                     ))}
                   </ul>

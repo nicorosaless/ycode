@@ -15,7 +15,8 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useCustomerCopy } from '@/lib/rin5-customer-copy';
+import { useCustomerCopy, useRin5CustomerMode } from '@/lib/rin5-customer-copy';
+import { customerFieldName } from '@/lib/rin5-customer-fields';
 
 interface FieldsDropdownProps {
   fields: CollectionField[];
@@ -32,6 +33,7 @@ interface SortableFieldItemProps {
 }
 
 function SortableFieldItem({ field, onToggleVisibility }: SortableFieldItemProps) {
+  const rin5Customer = useRin5CustomerMode((state) => state.active);
   const {
     attributes,
     listeners,
@@ -62,10 +64,10 @@ function SortableFieldItem({ field, onToggleVisibility }: SortableFieldItemProps
       <Checkbox
         checked={!field.hidden}
         onCheckedChange={() => onToggleVisibility(field.id)}
-        disabled={field.key === 'name' || field.name.toLowerCase() === 'name'}
+        disabled={field.name.toLowerCase() === 'name'}
         className="shrink-0"
       />
-      <span className="truncate text-xs text-muted-foreground select-none">{field.name}</span>
+      <span className="truncate text-xs text-muted-foreground select-none">{customerFieldName(field, rin5Customer)}</span>
     </div>
   );
 }

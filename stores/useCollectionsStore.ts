@@ -5,7 +5,6 @@ import { MULTI_ASSET_COLLECTION_ID, findStatusFieldId, buildStatusValue, getStat
 import type { StatusAction } from '@/lib/collection-field-utils';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { usePagesStore } from '@/stores/usePagesStore';
-import { customerCopy } from '@/lib/rin5-customer-copy';
 import type { Collection, CollectionField, CollectionItemWithValues, CreateCollectionData, UpdateCollectionData, CreateCollectionFieldData, UpdateCollectionFieldData } from '@/types';
 
 /**
@@ -240,7 +239,7 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
       try {
         const builtInFields = [
           {
-            name: customerCopy('ID'),
+            name: 'ID',
             key: 'id',
             type: 'number' as const,
             order: 0,
@@ -248,7 +247,7 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
             hidden: false,
           },
           {
-            name: customerCopy('Status'),
+            name: 'Status',
             key: 'status',
             type: 'status' as const,
             order: 1,
@@ -257,7 +256,7 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
             hidden: false,
           },
           {
-            name: customerCopy('Name'),
+            name: 'Name',
             key: 'name',
             type: 'text' as const,
             order: 2,
@@ -265,7 +264,7 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
             hidden: false,
           },
           {
-            name: customerCopy('Slug'),
+            name: 'Slug',
             key: 'slug',
             type: 'text' as const,
             order: 3,
@@ -273,7 +272,7 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
             hidden: false,
           },
           {
-            name: customerCopy('Created Date'),
+            name: 'Created Date',
             key: 'created_at',
             type: 'date' as const,
             order: 4,
@@ -281,7 +280,7 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
             hidden: false,
           },
           {
-            name: customerCopy('Updated Date'),
+            name: 'Updated Date',
             key: 'updated_at',
             type: 'date' as const,
             order: 5,
